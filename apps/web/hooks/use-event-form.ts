@@ -24,6 +24,7 @@ import {
   resolveSubmittedCategoryId,
   resolveTimezone,
   storedEventId,
+  type QuickAddResult,
   type RecurrenceDeleteScope,
   type RecurrenceEditScope,
 } from "@workspace/calendar-core";
@@ -59,6 +60,7 @@ import {
 import { useRecentContacts } from "./use-recent-contacts";
 import type { UseCalendarDataReturn } from "./use-calendar-data";
 import { EVENTS_QUERY_KEY } from "./use-calendar-events-loader";
+import { useEventTrashUndo } from "./use-event-trash";
 import {
   RECURRING_DELETE_FAILURE_MESSAGES,
   RECURRING_DELETE_SUCCESS_MESSAGES,
@@ -236,6 +238,7 @@ interface UseEventFormReturn {
   handleStartTimeChange: (newStartTime: string) => void;
   handleEndTimeChange: (newEndTime: string) => void;
   handleNotificationChange: (notifications: EventNotification[]) => void;
+  applyQuickAdd: (result: QuickAddResult) => void;
   loadEventData: (event: CalendarEvent) => void;
   resetForm: () => void;
   handleEventSave: (
@@ -289,6 +292,7 @@ export function useEventForm({
   const queryClient = useQueryClient();
   const { data: session } = useSession();
   const { recordUsage } = useRecentContacts();
+  const showTrashUndo = useEventTrashUndo();
   // Use ref to store calendars to avoid infinite loops
   const calendarsRef = useRef(calendars);
   useEffect(() => {
@@ -573,6 +577,20 @@ export function useEventForm({
 
   const handleNotificationChange = (notifications: EventNotification[]) => {
     setEventNotifications(notifications);
+  };
+
+  const applyQuickAdd = (result: QuickAddResult) => {
+    const { startDate, endDate } = getEventPickerDateRange(
+      result,
+      localSettings.timezone,
+    );
+    setEventTitle(result.title);
+    setEventAllDay(result.allDay);
+    setEventStartDate(startDate);
+    setEventEndDate(endDate);
+    setEventStartTime(formatTimeForInput(result.start, localSettings.timezone));
+    setEventEndTime(formatTimeForInput(result.end, localSettings.timezone));
+    setTimeErrors({});
   };
 
   const handleEventSave = async (
@@ -897,8 +915,7 @@ export function useEventForm({
       }
 
       toast.error(errorMessage);
-    });
-    setEventSaving(false);
+    }).finally(() => setEventSaving(false));
   };
 
   const handleEventDelete: (calendarData: Pick<UseCalendarDataReturn, "deleteEvent">) => Promise<void> = async (calendarData) => {
@@ -906,8 +923,9 @@ export function useEventForm({
 
     setEventSaving(true);
     const deleteEvent = async () => {
-      await calendarData.deleteEvent(selectedEvent.id);
-      toast.success(`Event "${eventTitle}" deleted`);
+      const trashId = await calendarData.deleteEvent(selectedEvent.id);
+      if (trashId) showTrashUndo({ trashId, calendarId: selectedEvent.calendarId });
+      else toast.success(`Event "${eventTitle}" deleted`);
       onEventSaved?.();
 
       setTimeout(() => {
@@ -918,8 +936,7 @@ export function useEventForm({
     await deleteEvent().catch((error: unknown) => {
       log.error("Failed to delete event:", error);
       toast.error("Failed to delete event");
-    });
-    setEventSaving(false);
+    }).finally(() => setEventSaving(false));
   };
 
   const handleRecurringDelete = async (
@@ -931,11 +948,12 @@ export function useEventForm({
     setShowRecurringDeleteModal(false);
     setEventSaving(true);
     const deleteOccurrences = async () => {
-      await calendarData.deleteRecurringEvent({
+      const trashId = await calendarData.deleteRecurringEvent({
         event: selectedEvent,
         scope,
       });
-      toast.success(RECURRING_DELETE_SUCCESS_MESSAGES[scope]);
+      if (trashId) showTrashUndo({ trashId, calendarId: selectedEvent.calendarId });
+      else toast.success(RECURRING_DELETE_SUCCESS_MESSAGES[scope]);
       onEventSaved?.();
       onClose();
     };
@@ -944,8 +962,7 @@ export function useEventForm({
       toast.error(
         getErrorMessage(error, RECURRING_DELETE_FAILURE_MESSAGES[scope]),
       );
-    });
-    setEventSaving(false);
+    }).finally(() => setEventSaving(false));
   };
 
   return {
@@ -1005,6 +1022,7 @@ export function useEventForm({
     handleStartTimeChange,
     handleEndTimeChange,
     handleNotificationChange,
+    applyQuickAdd,
     loadEventData,
     resetForm,
     handleEventSave,

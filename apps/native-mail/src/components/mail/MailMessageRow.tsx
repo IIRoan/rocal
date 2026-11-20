@@ -78,6 +78,8 @@ interface MailMessageRowProps {
   selected?: boolean;
   timeFormat: TimeFormat;
   timezone?: string;
+  /** Release time of a pending scheduled send whose sealed copy this row is. */
+  scheduledSendAt?: string;
   density?: ListDensity;
   showLabelChips?: boolean;
   threadExpandable?: boolean;
@@ -199,6 +201,7 @@ export function MailMessageRow({
   selected = false,
   timeFormat,
   timezone,
+  scheduledSendAt,
   density = "compact",
   showLabelChips = true,
   threadExpandable = false,
@@ -293,8 +296,11 @@ export function MailMessageRow({
           onToggleThreadExpanded={toggleThreadExpanded}
           flagged={flagged}
           hasAttachments={hasAttachments}
-          timeFormat={timeFormat}
-          timezone={timezone}
+          dateLabel={
+            scheduledSendAt
+              ? `Scheduled · ${formatMessageDate(scheduledSendAt, { timeFormat, timezone })}`
+              : formatMessageDate(message.receivedAt, { timeFormat, timezone })
+          }
           styles={styles}
         />
 
@@ -345,8 +351,7 @@ function MailRowTopLine({
   onToggleThreadExpanded,
   flagged,
   hasAttachments,
-  timeFormat,
-  timezone,
+  dateLabel,
   styles,
 }: {
   name: string;
@@ -359,8 +364,7 @@ function MailRowTopLine({
   onToggleThreadExpanded: () => void;
   flagged: boolean;
   hasAttachments: boolean;
-  timeFormat: TimeFormat;
-  timezone?: string;
+  dateLabel: string;
   styles: MailRowStyles;
 }) {
   const skin = useMailSkin();
@@ -419,9 +423,7 @@ function MailRowTopLine({
             accessibilityLabel="Has attachments"
           />
         ) : null}
-        <Text style={styles.date}>
-          {formatMessageDate(message.receivedAt, { timeFormat, timezone })}
-        </Text>
+        <Text style={styles.date}>{dateLabel}</Text>
       </View>
     </View>
   );

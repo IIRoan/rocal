@@ -15,6 +15,8 @@ export interface StoredE2eeDeviceRecord {
   updatedAt: string;
   /** Salt of the password envelope known to hold this record's account key; without it sign-out keeps the record. */
   envelopeSalt?: string;
+  /** Set once every event of the account is bound to its row id; unbound event content is refused from then on. */
+  eventContentBound?: boolean;
 }
 
 function openDatabase(): Promise<IDBDatabase | null> {
@@ -93,21 +95,57 @@ export async function deleteStoredE2eeDevice(userId: string): Promise<void> {
   await withStore("readwrite", (store) => store.delete(userId));
 }
 
+/** Runs reads and the writes they decide in one readwrite transaction, so concurrent updates never write back a stale copy. */
+async function readWriteStore(run: (store: IDBObjectStore) => void): Promise<void> {
+  const database = await openDatabase();
+  if (!database) return;
+
+  await new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction(STORE_NAME, "readwrite");
+    run(transaction.objectStore(STORE_NAME));
+    transaction.oncomplete = () => {
+      database.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      reject(transaction.error ?? new Error("IndexedDB transaction failed"));
+    };
+    transaction.onabort = () => {
+      reject(transaction.error ?? new Error("IndexedDB transaction aborted"));
+    };
+  });
+}
+
+async function updateStoredE2eeDevice(
+  userId: string,
+  update: (record: StoredE2eeDeviceRecord) => StoredE2eeDeviceRecord | null,
+): Promise<void> {
+  await readWriteStore((store) => {
+    const read = store.get(userId);
+    read.onsuccess = () => {
+      const record: StoredE2eeDeviceRecord | undefined = read.result;
+      const next = record ? update(record) : null;
+      if (next) store.put(next);
+    };
+  });
+}
+
 export async function rememberStoredDeviceEnvelopeSalt(
   userId: string,
   deviceId: string,
   envelopeSalt: string | null,
 ): Promise<void> {
-  const record = await getStoredE2eeDevice(userId);
-  if (
-    record?.deviceId === deviceId &&
-    (record.envelopeSalt ?? null) !== envelopeSalt
-  ) {
-    await putStoredE2eeDevice({
-      ...record,
-      envelopeSalt: envelopeSalt ?? undefined,
-    });
-  }
+  await updateStoredE2eeDevice(userId, (record) =>
+    record.deviceId === deviceId && (record.envelopeSalt ?? null) !== envelopeSalt
+      ? { ...record, envelopeSalt: envelopeSalt ?? undefined }
+      : null,
+  );
+}
+
+export async function markStoredEventContentBound(userId: string): Promise<void> {
+  await updateStoredE2eeDevice(userId, (record) =>
+    record.eventContentBound ? null : { ...record, eventContentBound: true },
+  );
 }
 
 /** Sign-out keeps a device key no password envelope is known to hold, since it may be the only copy of the account key. */
@@ -118,10 +156,16 @@ export async function listRecoverableE2eeDevices(): Promise<StoredE2eeDeviceReco
   return (records ?? []).filter((record) => record.envelopeSalt);
 }
 
+/** Sign-out also forgets the bound-content marker of a device key it keeps. */
 export async function deleteRecoverableE2eeDevices(): Promise<void> {
-  await Promise.all(
-    (await listRecoverableE2eeDevices()).map((record) =>
-      deleteStoredE2eeDevice(record.userId),
-    ),
-  );
+  await readWriteStore((store) => {
+    const read = store.getAll();
+    read.onsuccess = () => {
+      const records: StoredE2eeDeviceRecord[] = read.result;
+      for (const { eventContentBound, ...record } of records) {
+        if (record.envelopeSalt) store.delete(record.userId);
+        else if (eventContentBound) store.put(record);
+      }
+    };
+  });
 }

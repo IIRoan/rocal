@@ -1,10 +1,14 @@
-import { useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import {
   buildEmailHtmlDocument,
   processEmailHtml,
 } from "@workspace/calendar-core/mail-html";
 import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 import { cn } from "@workspace/ui/lib/utils";
+import {
+  createMailLinkRewriter,
+  registerMailLinks,
+} from "@/lib/mail/mail-link-handoff";
 import { fadeInMailReaderContent } from "../mail-app/mail-reader-transition";
 import { mailBodySurfaceClassName } from "./constants";
 
@@ -12,25 +16,37 @@ export function HtmlEmailRenderer({
   html,
   blockRemoteImages,
   blockTrackingPixels,
+  confirmExternalLinks,
   isDark,
 }: {
   html: string;
   blockRemoteImages: boolean;
   blockTrackingPixels: boolean;
+  confirmExternalLinks: boolean;
   isDark: boolean;
 }) {
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [linkScope, setLinkScope] = useState(() => ({ html, confirmExternalLinks, token: crypto.randomUUID() }));
+  // A new link set gets new ids, so a link page still resolving an old id never receives a different link.
+  if (linkScope.html !== html || linkScope.confirmExternalLinks !== confirmExternalLinks) {
+    setLinkScope({ html, confirmExternalLinks, token: crypto.randomUUID() });
+  }
   const prefersReducedMotion = usePrefersReducedMotion();
+  const { links, rewriteLink } = createMailLinkRewriter(linkScope.token, confirmExternalLinks);
   const srcDoc = buildEmailHtmlDocument({
     processedHtml: processEmailHtml({
       html,
       isDark,
       blockTrackingPixels,
       blockRemoteImages,
+      rewriteLink,
     }),
     blockRemoteImages,
     isDark,
   });
+
+  const registerLinks = useEffectEvent(() => registerMailLinks(links));
+  useEffect(() => registerLinks(), [linkScope.token]);
 
   // The frame paints nothing until its document loads, so it stays hidden over a matching surface and fades in once.
   return (

@@ -1,9 +1,11 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
 import {
   fieldSearchConditions,
+  hasRowStageConditions,
   matchesMessageConditions,
   orderByIds,
   searchIndexedMailbox,
+  searchIndexedMailboxMessages,
 } from "../mail-local-search";
 import { mailToTitleIndexDocument } from "../title-search-index";
 
@@ -70,5 +72,58 @@ describe("searchIndexedMailbox", () => {
     expect(matchesMessageConditions(messages[0]!, [{ isUnread: true }])).toBe(false);
     expect(matchesMessageConditions(messages[1]!, [{ isFlagged: true }])).toBe(true);
     expect(orderByIds(messages, ["m1", "m2", "gone"]).map((m) => m.id)).toEqual(["m1", "m2"]);
+  });
+});
+
+describe("negated and row-stage conditions", () => {
+  it("inverts a negated condition only in the stage that owns it", () => {
+    expect(
+      searchIndexedMailbox(documents, { mailboxId: "inbox", conditions: [{ text: "invoice", negated: true }] }),
+    ).toEqual([]);
+    expect(
+      searchIndexedMailbox(documents, { mailboxId: "inbox", conditions: [{ from: "ada", negated: true }] }),
+    ).toEqual(["m2"]);
+    expect(
+      searchIndexedMailbox(documents, { mailboxId: "inbox", conditions: [{ isFlagged: true, negated: true }] }),
+    ).toEqual(["m2", "m1"]);
+    expect(matchesMessageConditions({ keywords: {} }, [{ from: "ada", negated: true }])).toBe(true);
+  });
+
+  it("checks cc, labels, size, read state and excluded folders on fetched messages", () => {
+    const message = {
+      keywords: { $seen: true, "label:work": true },
+      cc: [{ name: "Grace", email: "grace@example.com" }],
+      size: 2_000_000,
+      mailboxIds: { inbox: true },
+    };
+    expect(matchesMessageConditions(message, [{ cc: "grace" }, { isRead: true }])).toBe(true);
+    expect(matchesMessageConditions(message, [{ label: { id: "work", name: "Work" } }])).toBe(true);
+    expect(matchesMessageConditions(message, [{ minSize: 1_000_000 }, { maxSize: 3_000_000 }])).toBe(true);
+    expect(matchesMessageConditions(message, [{ maxSize: 1_000_000 }])).toBe(false);
+    expect(matchesMessageConditions({ keywords: {} }, [{ minSize: 1 }])).toBe(false);
+    expect(matchesMessageConditions(message, [{ inMailbox: { id: "inbox", name: "inbox" }, negated: true }])).toBe(false);
+    expect(matchesMessageConditions(message, [{ inMailbox: { id: "inbox", name: "inbox" } }])).toBe(true);
+    expect(matchesMessageConditions(message, [{ cc: "grace", negated: true }])).toBe(false);
+  });
+});
+
+describe("searchIndexedMailboxMessages", () => {
+  it("fetches index hits by id and applies the row conditions", async () => {
+    const getMessagesByIds = jest.fn(async (ids: string[]) =>
+      ids.map((id) => ({ id, mailboxIds: { inbox: true }, keywords: { $flagged: id === "m2" } })),
+    );
+    const result = await searchIndexedMailboxMessages({
+      documents,
+      mailboxId: "inbox",
+      text: "invoice",
+      conditions: [{ isFlagged: true }],
+      limit: 1,
+      getMessagesByIds,
+    });
+    expect(getMessagesByIds).toHaveBeenCalledWith(["m1", "m2"]);
+    expect(result).toEqual({ messages: [expect.objectContaining({ id: "m2" })], matchCount: 2 });
+    expect(hasRowStageConditions([{ from: "a" }])).toBe(false);
+    expect(hasRowStageConditions([{ inMailbox: { id: "x", name: "x" } }])).toBe(false);
+    expect(hasRowStageConditions([{ inMailbox: { id: "x", name: "x" }, negated: true }])).toBe(true);
   });
 });

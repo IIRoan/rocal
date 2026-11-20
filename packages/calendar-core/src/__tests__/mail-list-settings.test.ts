@@ -4,6 +4,7 @@ import {
   MIN_UNDO_TOAST_DURATION_MS,
   normalizeMailListSettings,
   parseMailListSettings,
+  resolveMailAutoAdvanceTarget,
   resolveMarkAsReadDelayMs,
   serializeMailListSettings,
 } from "../mail-list-settings";
@@ -30,6 +31,25 @@ describe("mail list settings", () => {
       density: "comfortable",
       threadExpandInList: false,
       undoToastDurationMs: 10000,
+    });
+  });
+
+  it("defaults auto-advance and swipes to today's behaviour and resets unknown values per field", () => {
+    expect(DEFAULT_MAIL_LIST_SETTINGS).toMatchObject({
+      autoAdvance: "next",
+      swipeRight: "read",
+      swipeLeft: "trash",
+    });
+    expect(
+      normalizeMailListSettings({ autoAdvance: "list", swipeRight: "star", swipeLeft: "spam" }),
+    ).toMatchObject({ autoAdvance: "list", swipeRight: "star", swipeLeft: "trash" });
+    expect(normalizeMailListSettings({ autoAdvance: 1 }).autoAdvance).toBe("next");
+  });
+
+  it("keeps keys from a newer client", () => {
+    const parsed = parseMailListSettings(JSON.stringify({ futureKey: "kept" }));
+    expect(parseMailListSettings(serializeMailListSettings(parsed))).toMatchObject({
+      futureKey: "kept",
     });
   });
 
@@ -65,5 +85,17 @@ describe("mail list settings", () => {
     expect(resolveMarkAsReadDelayMs("instant")).toBe(0);
     expect(resolveMarkAsReadDelayMs("delayed")).toBe(3000);
     expect(resolveMarkAsReadDelayMs("never")).toBeNull();
+  });
+
+  it("resolves the auto-advance target without wrapping", () => {
+    const ids = ["a", "b", "c", "d"];
+    expect(resolveMailAutoAdvanceTarget(ids, ["b"], "b", "next")).toBe("c");
+    expect(resolveMailAutoAdvanceTarget(ids, ["b"], "b", "previous")).toBe("a");
+    expect(resolveMailAutoAdvanceTarget(ids, ["d"], "d", "next")).toBeNull();
+    expect(resolveMailAutoAdvanceTarget(ids, ["a"], "a", "previous")).toBeNull();
+    expect(resolveMailAutoAdvanceTarget(ids, ["b", "c"], "b", "next")).toBe("d");
+    expect(resolveMailAutoAdvanceTarget(ids, ["c", "d"], "c", "next")).toBeNull();
+    expect(resolveMailAutoAdvanceTarget(ids, ["b"], "b", "list")).toBeNull();
+    expect(resolveMailAutoAdvanceTarget(ids, ["x"], "x", "next")).toBeNull();
   });
 });

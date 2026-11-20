@@ -59,6 +59,7 @@ type UseCommandPaletteSearchOptions = {
   onOpenChange: (open: boolean) => void;
   executeCommand: (command: Command) => void;
   goForward: (view: PaletteView) => void;
+  timezone?: string | null;
   onSearchResultSelect: (
     result: UnifiedSearchResult<JmapEmailMessage>,
   ) => void;
@@ -101,6 +102,7 @@ export function useCommandPaletteSearch({
   onOpenChange,
   executeCommand,
   goForward,
+  timezone,
   onSearchResultSelect,
 }: UseCommandPaletteSearchOptions): UseCommandPaletteSearchResult {
   const [debouncedQuery, setDebouncedQuery] = useState(initialSearchQuery);
@@ -130,6 +132,7 @@ export function useCommandPaletteSearch({
     includeMail: true,
     includeCalendar: true,
     limit: 15,
+    timezone,
   });
   // Reorder so array indices match the visual layout (mail first, then calendar)
   const searchResults = [

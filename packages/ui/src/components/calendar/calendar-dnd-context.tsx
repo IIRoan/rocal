@@ -34,6 +34,7 @@ import {
   type TimeFormat,
 } from "@workspace/calendar-core";
 
+import type { DraggedEventVerb } from "./event-calendar-mutations";
 import { EventItem } from "./event-item";
 import { CalendarEvent, type CalendarView } from "./types";
 
@@ -55,6 +56,8 @@ type CalendarDndContextType = {
       isLastDay?: boolean;
     };
   } | null;
+  /** Saves a timing change made on the grid, such as a resize. */
+  updateEvent: (event: CalendarEvent, verb?: DraggedEventVerb) => void;
 };
 
 const CalendarDndContext = createContext<CalendarDndContextType>({
@@ -66,13 +69,14 @@ const CalendarDndContext = createContext<CalendarDndContextType>({
   isMultiDay: false,
   multiDayWidth: null,
   dragHandlePosition: null,
+  updateEvent: () => {},
 });
 
 export const useCalendarDnd = () => use(CalendarDndContext);
 
 interface CalendarDndProviderProps {
   children: ReactNode;
-  onEventUpdate: (event: CalendarEvent) => void;
+  onEventUpdate: (event: CalendarEvent, verb?: DraggedEventVerb) => void;
   timezone?: string;
   timeFormat: TimeFormat;
 }
@@ -337,6 +341,7 @@ export function CalendarDndProvider({
       isMultiDay,
       multiDayWidth,
       dragHandlePosition,
+      updateEvent: onEventUpdate,
     }),
     [
       activeEvent,
@@ -347,6 +352,7 @@ export function CalendarDndProvider({
       isMultiDay,
       multiDayWidth,
       dragHandlePosition,
+      onEventUpdate,
     ],
   );
 

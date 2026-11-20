@@ -3,6 +3,7 @@ import type {
   MailAccountStatus as SharedMailAccountStatus,
   MailAuthResultsFields,
   MailSimpleLoginFields,
+  MailUnsubscribeFields,
   MailDemoConfig as SharedMailDemoConfig,
   MailOAuthConfig as SharedMailOAuthConfig,
   MailSignup as SharedMailSignup,
@@ -90,7 +91,7 @@ export type JmapAttachment = {
 /** Keys stay unique across a thread: decrypted attachments have no blob id. */
 export type KeyedAttachment = { key: string; attachment: JmapAttachment };
 
-export type JmapEmailMessage = MailSimpleLoginFields & MailAuthResultsFields & {
+export type JmapEmailMessage = MailSimpleLoginFields & MailUnsubscribeFields & MailAuthResultsFields & {
   id: string;
   threadId?: string;
   messageId?: string[];
@@ -105,6 +106,7 @@ export type JmapEmailMessage = MailSimpleLoginFields & MailAuthResultsFields & {
   bcc?: MailAddress[];
   receivedAt?: string;
   keywords?: Record<string, boolean>;
+  size?: number;
   bodyStructure?: JmapBodyStructure;
   bodyValues?: Record<string, JmapBodyValue>;
   textBody?: JmapBodyPartRef[];

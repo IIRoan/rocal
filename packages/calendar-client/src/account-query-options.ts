@@ -5,7 +5,9 @@ import {
   getInviteCreateFeedback,
   INVITES_QUERY_KEY,
   PUSH_DEVICES_QUERY_KEY,
+  recoveryKitQueryKey,
 } from "@workspace/calendar-core";
+import type { AccountApiService } from "./account-api-service";
 import type { CalendarApiService } from "./calendar-api-service";
 import type { InviteApiService, InviteRecord } from "./invite-api-service";
 
@@ -96,5 +98,16 @@ export function pushDevicesQueryOptions(
     queryFn: () => api.listPushDevices(),
     staleTime: 30_000,
     enabled,
+  };
+}
+
+export function recoveryKitQueryOptions(
+  api: Pick<AccountApiService, "getRecoveryKit">,
+  userId: string | null,
+) {
+  return {
+    queryKey: recoveryKitQueryKey(userId),
+    queryFn: () => api.getRecoveryKit(),
+    enabled: Boolean(userId),
   };
 }

@@ -41,9 +41,11 @@ const ALLOWED_TAG_SET = new Set<string>(ALLOWED_TAGS);
 const ALLOWED_ATTR_SET = new Set<string>(ALLOWED_ATTRS);
 
 /** Browsers ignore whitespace/control chars inside schemes (`java\tscript:`), so strip them first. */
-export function isSafeEmailUrl(tag: string, attr: string, rawValue: string): boolean {
+export function isSafeEmailUrl(tag: string, attr: string, rawValue: string, reader = false): boolean {
   // eslint-disable-next-line no-control-regex
   const value = rawValue.replace(/[\x00- \x7f-\x9f\s]+/g, "").toLowerCase();
+  // The reader frame resolves a scheme-less href (`//host`, `/\host`) against the app's origin, past the link check.
+  if (reader && attr === "href") return /^(?:(?:https?|mailto|tel):|#)/.test(value);
   if (!value) return true;
 
   const schemeMatch = value.match(/^([^/?#]*?):/);
@@ -156,7 +158,7 @@ function serializeAttributes(tag: string, attrs: Array<[string, string]>, reader
   for (const [name, rawValue] of attrs) {
     if (seen.has(name) || !isAllowedAttributeName(name)) continue;
     const decoded = decodeHtmlEntities(rawValue);
-    if (URL_ATTRS.has(name) && !isSafeEmailUrl(tag, name, decoded)) continue;
+    if (URL_ATTRS.has(name) && !isSafeEmailUrl(tag, name, decoded, reader)) continue;
     if (name === "style" && isDangerousCss(decoded)) continue;
     seen.add(name);
     out += ` ${name}="${escapeAttributeValue(rawValue)}"`;
@@ -232,6 +234,11 @@ function sanitizeWithoutDom(input: string, reader: boolean): string {
   return out;
 }
 
+/** Blank output is empty like blank input, so sanitizing it again changes nothing. */
+function emptyWhenBlank(html: string): string {
+  return html.trim() ? html : "";
+}
+
 type DomPurifyInstance = ReturnType<typeof DOMPurify>;
 
 let domPurify: DomPurifyInstance | null | undefined;
@@ -250,7 +257,7 @@ function getDomPurify(): DomPurifyInstance | null {
 
   instance.addHook("uponSanitizeAttribute", (node, data) => {
     const tag = node.nodeName.toLowerCase();
-    if (URL_ATTRS.has(data.attrName) && !isSafeEmailUrl(tag, data.attrName, data.attrValue)) {
+    if (URL_ATTRS.has(data.attrName) && !isSafeEmailUrl(tag, data.attrName, data.attrValue, activeReaderProfile)) {
       data.keepAttr = false;
     }
     if (data.attrName === "style" && isDangerousCss(data.attrValue)) {
@@ -285,12 +292,12 @@ export function sanitizeUntrustedEmailHtml(
 
   const purifier = getDomPurify();
   if (!purifier) {
-    return sanitizeWithoutDom(html, reader);
+    return emptyWhenBlank(sanitizeWithoutDom(html, reader));
   }
 
   activeReaderProfile = reader;
   try {
-    return purifier.sanitize(html, {
+    return emptyWhenBlank(purifier.sanitize(html, {
       ALLOWED_TAGS: reader ? [...ALLOWED_TAGS, "style"] : [...ALLOWED_TAGS],
       ALLOWED_ATTR: [...ALLOWED_ATTRS],
       ALLOW_DATA_ATTR: true,
@@ -299,7 +306,7 @@ export function sanitizeUntrustedEmailHtml(
       FORBID_CONTENTS: [...DROP_WITH_CONTENT_TAGS],
       FORCE_BODY: true,
       RETURN_TRUSTED_TYPE: false,
-    });
+    }));
   } finally {
     activeReaderProfile = false;
   }

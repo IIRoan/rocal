@@ -21,9 +21,9 @@ export function MailSettingsContent() {
   const navigate = useSettingsNavigator();
   const inSheet = useInSettingsSheet();
   const { contacts } = useRecentContacts();
-  // Mailbox management only exists as a drawer page, so the standalone settings stack cannot open it.
+  // Mailboxes and auto-reply only exist as drawer pages, so the standalone settings stack cannot open them.
   const items = getSettingsMailItems("native").filter(
-    (item) => inSheet || item.id !== "mailboxes",
+    (item) => inSheet || (item.id !== "mailboxes" && item.id !== "auto-reply"),
   );
   const contactsCount = contacts.length;
 

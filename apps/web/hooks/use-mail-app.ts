@@ -38,6 +38,8 @@ import {
   isCurrentUserMailAddress,
   resolveEncryptionInternalDomain,
   shouldEncryptOutgoingMail,
+  resolveMailSendHold,
+  resolveTimezone,
   isMailAccountEncryptedAtRest,
   resolveMailReadState,
   type JmapAttachmentInput,
@@ -65,6 +67,7 @@ import { useMailRealtime } from "@/hooks/use-mail-realtime";
 import { useMailKeywordReconciliation } from "@/hooks/use-mail-keyword-reconciliation";
 import { useRecentContacts } from "@/hooks/use-recent-contacts";
 import { useSimpleLoginAliasAction } from "@/hooks/use-simplelogin-alias-action";
+import { useMailUnsubscribeAction } from "@/hooks/use-mail-unsubscribe-action";
 import {
   hasActiveE2eeSession,
   subscribeActiveE2eeSession,
@@ -133,6 +136,8 @@ import {
 } from "@/lib/mail/compose-inline-images";
 import type { InlineImageUpload } from "@/components/mail/rich-text-editor";
 import { readMailComposeSettings } from "@/lib/mail/compose-settings";
+import { announceHeldSend } from "@/lib/mail/held-send-toast";
+import { prepareOutgoingImageFiles } from "@/lib/mail/strip-image-metadata";
 import { MAILBOX_MESSAGES_PAGE_SIZE } from "@/lib/mail/mail-pagination";
 import {
   classifyMessageEncryption,
@@ -186,6 +191,9 @@ import {
 } from "@/lib/mail/mail-app-helpers";
 
 export type { ActiveMailboxState } from "@/lib/mail/mail-app-helpers";
+
+/** The message the reader opens when a remove takes away the open one; absent or `null` closes it. */
+type MailAdvanceOptions = { advanceTo?: string | null };
 
 const log = createLogger("mail-app");
 
@@ -671,8 +679,7 @@ export function useMailApp() {
     await fetchThread().catch((error: unknown) => {
       log.warn("Failed to load thread messages", error);
       setRelatedConversationMessages([]);
-    });
-    setIsConversationLoading(false);
+    }).finally(() => setIsConversationLoading(false));
   };
 
   const clearConversationThread = () => {
@@ -1362,8 +1369,7 @@ export function useMailApp() {
     };
     await fetchNextPage().catch((error: unknown) => {
       log.error("Failed to load more messages", error);
-    });
-    setIsLoadingMore(false);
+    }).finally(() => setIsLoadingMore(false));
   };
 
   const handleSignIn = async (passwordOverride?: string) => {
@@ -1517,8 +1523,7 @@ export function useMailApp() {
       toast.error(
         error instanceof Error ? error.message : "Could not open the mailbox.",
       );
-    });
-    setIsBusy(false);
+    }).finally(() => setIsBusy(false));
   };
 
   const autoOpenMailbox = useEffectEvent(() => handleSignIn());
@@ -1584,10 +1589,12 @@ export function useMailApp() {
   };
 
   const handleComposeImageUpload = async (
-    file: File,
+    original: File,
   ): Promise<InlineImageUpload | null> => {
     if (!activeMailbox) return null;
     const uploadImage = async () => {
+      const [prepared] = await prepareOutgoingImageFiles([original]);
+      const file = prepared ?? original;
       const contentType = file.type || "application/octet-stream";
       const [dataUrl, content] = await Promise.all([
         readBlobAsDataUrl(file),
@@ -1607,13 +1614,14 @@ export function useMailApp() {
     };
     return uploadImage().catch((error: unknown) => {
       log.error("Inline image upload failed", error);
-      toast.error(`Failed to upload ${file.name}`);
+      toast.error(`Failed to upload ${original.name}`);
       return null;
     });
   };
 
   const handleSendMessage = async (options?: {
     skipAttachmentCheck?: boolean;
+    sendAt?: string;
   }) => {
     if (!activeMailbox || composeSendInFlightRef.current) return;
     const bridge = getMailComposeBridge();
@@ -1737,6 +1745,14 @@ export function useMailApp() {
         allRecipients,
         internalDomain,
       );
+      const { hold, error: holdError } = resolveMailSendHold({
+        sendAt: options?.sendAt,
+        undoSendSeconds: composeSettings.undoSendSeconds,
+        policy: mailbox.mailServerPolicy,
+        hasExternalRecipients: !willEncrypt,
+        now: Date.now(),
+      });
+      if (holdError) throw new Error(holdError);
       const preparedAttachments = await prepareOutgoingAttachments(
         composeAttachments,
         {
@@ -1912,10 +1928,40 @@ export function useMailApp() {
         inReplyTo: composeReplyContext?.inReplyTo,
         references: composeReplyContext?.references,
         previousDraftId,
+        hold,
       });
       completeMailSendAttempt(getPrimaryMailAccountId(mailbox.session), `compose:${composeSessionId}`);
+      const sentMessage = encrypted ? "Encrypted message sent." : "Message sent.";
+      const announceSent = () => {
+        if (!hold || !sendResult.emailId) {
+          toast(sentMessage);
+          return;
+        }
+        if ("until" in hold) {
+          queryClient.invalidateQueries({ queryKey: mailQueryKeys.scheduledSends(session?.user?.id ?? null) }).catch(() => undefined);
+        }
+        announceHeldSend({
+          hold,
+          submissionId: sendResult.submissionId,
+          sentMessage,
+          timezone: resolveTimezone(settings?.timezone),
+          timeFormat,
+          cancel: () =>
+            mailbox.client.cancelHeldSubmission(mailbox.session, {
+              submissionId: sendResult.submissionId,
+              copyEmailId: sendResult.emailId,
+              draftsMailboxId,
+            }),
+          moveToDrafts: () =>
+            mailbox.client.moveCanceledSendToDrafts(mailbox.session, { copyEmailId: sendResult.emailId, draftsMailboxId }),
+          onCanceled: () => {
+            getMailComposeBridge()?.restoreDraft(draft, sendResult.emailId);
+            queryClient.invalidateQueries({ queryKey: mailQueryKeys.scheduledSends(session?.user?.id ?? null) }).catch(() => undefined);
+          },
+        });
+      };
       if (!isMailSendScopeOpen(`compose:${composeSessionId}`) || getMailComposeBridge()?.getComposeSessionId() !== composeSessionId) {
-        toast(encrypted ? "Encrypted message sent." : "Message sent.");
+        announceSent();
         return;
       }
       const effectiveThreadId =
@@ -1961,7 +2007,7 @@ export function useMailApp() {
       if (recentEntries.length > 0) {
         recordUsage(recentEntries, "mail");
       }
-      toast(encrypted ? "Encrypted message sent." : "Message sent.");
+      announceSent();
       // Reload only the thread; realtime sync updates the inbox so the sent draft never flashes there.
       if (effectiveThreadId) {
         void loadConversationThread(effectiveThreadId);
@@ -1985,12 +2031,16 @@ export function useMailApp() {
         isReply: Boolean(composeReplyContext),
       });
       toast.error(getErrorMessage(error, "Could not send the message."));
+    }).finally(() => {
+      composeSendInFlightRef.current = false;
+      setIsBusy(false);
     });
-    composeSendInFlightRef.current = false;
-    setIsBusy(false);
   };
 
-  const handleDeleteMessage = async (messageId?: string) => {
+  const handleDeleteMessage = async (
+    messageId?: string,
+    options?: MailAdvanceOptions,
+  ) => {
     const targetId = messageId ?? selectedMessageId;
     if (!activeMailbox || !targetId) return;
     const trashMailbox = activeMailbox.mailboxes.find(
@@ -2011,7 +2061,7 @@ export function useMailApp() {
           cur ? { ...cur, messages: remaining } : cur,
         );
         setSelectedMessageId((cur) =>
-          cur === targetId ? (remaining[0]?.id ?? null) : cur,
+          cur === targetId ? (options?.advanceTo ?? null) : cur,
         );
         toast("Message deleted.");
       } catch (error) {
@@ -2034,7 +2084,7 @@ export function useMailApp() {
 
     setActiveMailbox((cur) => (cur ? { ...cur, messages: remaining } : cur));
     setSelectedMessageId((cur) =>
-      cur === targetId ? (remaining[0]?.id ?? null) : cur,
+      cur === targetId ? (options?.advanceTo ?? null) : cur,
     );
 
     const listSettings = readMailListSettings();
@@ -2556,6 +2606,7 @@ export function useMailApp() {
   const handleMoveMessage = async (
     targetMailboxId: string,
     messageId?: string,
+    options?: MailAdvanceOptions,
   ) => {
     const targetId = messageId ?? selectedMessageId;
     if (!activeMailbox || !targetId) return;
@@ -2570,7 +2621,7 @@ export function useMailApp() {
 
     setActiveMailbox((cur) => (cur ? { ...cur, messages: remaining } : cur));
     setSelectedMessageId((cur) =>
-      cur === targetId ? (remaining[0]?.id ?? null) : cur,
+      cur === targetId ? (options?.advanceTo ?? null) : cur,
     );
 
     const listSettings = readMailListSettings();
@@ -2626,17 +2677,23 @@ export function useMailApp() {
     }, undoMs);
   };
 
-  const handleUntrash = async (messageId?: string) => {
+  const handleUntrash = async (
+    messageId?: string,
+    options?: MailAdvanceOptions,
+  ) => {
     if (!activeMailbox) return;
     const inboxMailbox = findInboxMailbox(activeMailbox.mailboxes);
     if (!inboxMailbox) {
       toast.error("Inbox mailbox not found.");
       return;
     }
-    await handleMoveMessage(inboxMailbox.id, messageId);
+    await handleMoveMessage(inboxMailbox.id, messageId, options);
   };
 
-  const handleReportSpam = async (messageId?: string) => {
+  const handleReportSpam = async (
+    messageId?: string,
+    options?: MailAdvanceOptions,
+  ) => {
     const targetId = messageId ?? selectedMessageId;
     if (!activeMailbox || !targetId) return;
     const spamMailbox = findSpamMailbox(activeMailbox.mailboxes);
@@ -2650,11 +2707,14 @@ export function useMailApp() {
     if (isSpamMailboxRole(currentRole)) {
       return;
     }
-    await handleMoveMessage(spamMailbox.id, targetId);
+    await handleMoveMessage(spamMailbox.id, targetId, options);
   };
 
-  const handleNotSpam = async (messageId?: string) => {
-    await handleUntrash(messageId);
+  const handleNotSpam = async (
+    messageId?: string,
+    options?: MailAdvanceOptions,
+  ) => {
+    await handleUntrash(messageId, options);
   };
 
   const handleEmptyMailbox = async () => {
@@ -2686,8 +2746,7 @@ export function useMailApp() {
       toast.error(
         error instanceof Error ? error.message : "Could not empty the folder.",
       );
-    });
-    setIsBusy(false);
+    }).finally(() => setIsBusy(false));
   };
 
   const handleReorderMailboxes = async (reordered: JmapMailbox[]) => {
@@ -2833,11 +2892,13 @@ export function useMailApp() {
           ? error.message
           : "Could not delete the mailbox.",
       );
-    });
-    setIsBusy(false);
+    }).finally(() => setIsBusy(false));
   };
 
-  const handleBulkDelete = async (messageIds: string[]) => {
+  const handleBulkDelete = async (
+    messageIds: string[],
+    options?: MailAdvanceOptions,
+  ) => {
     if (!activeMailbox || messageIds.length === 0) return;
     const trashMailbox = activeMailbox.mailboxes.find(
       (m) => m.role === "trash",
@@ -2854,7 +2915,7 @@ export function useMailApp() {
       );
       setActiveMailbox((cur) => (cur ? { ...cur, messages: remaining } : cur));
       setSelectedMessageId((cur) =>
-        cur && idSet.has(cur) ? (remaining[0]?.id ?? null) : cur,
+        cur && idSet.has(cur) ? (options?.advanceTo ?? null) : cur,
       );
       toast(
         isInTrash
@@ -2869,13 +2930,13 @@ export function useMailApp() {
           ? error.message
           : "Could not delete the messages.",
       );
-    });
-    setIsBusy(false);
+    }).finally(() => setIsBusy(false));
   };
 
   const handleBulkMove = async (
     messageIds: string[],
     targetMailboxId: string,
+    options?: MailAdvanceOptions,
   ) => {
     if (!activeMailbox || messageIds.length === 0) return;
     const idSet = new Set(messageIds);
@@ -2889,7 +2950,7 @@ export function useMailApp() {
       );
       setActiveMailbox((cur) => (cur ? { ...cur, messages: remaining } : cur));
       setSelectedMessageId((cur) =>
-        cur && idSet.has(cur) ? (remaining[0]?.id ?? null) : cur,
+        cur && idSet.has(cur) ? (options?.advanceTo ?? null) : cur,
       );
       const targetMailbox = activeMailbox.mailboxes.find(
         (m) => m.id === targetMailboxId,
@@ -2903,8 +2964,7 @@ export function useMailApp() {
       toast.error(
         error instanceof Error ? error.message : "Could not move the messages.",
       );
-    });
-    setIsBusy(false);
+    }).finally(() => setIsBusy(false));
   };
 
   const handleBulkMarkAsUnread = async (messageIds: string[]) => {
@@ -2974,14 +3034,17 @@ export function useMailApp() {
     }
   };
 
-  const handleBulkReportSpam = async (messageIds: string[]) => {
+  const handleBulkReportSpam = async (
+    messageIds: string[],
+    options?: MailAdvanceOptions,
+  ) => {
     if (!activeMailbox || messageIds.length === 0) return;
     const spamMailbox = findSpamMailbox(activeMailbox.mailboxes);
     if (!spamMailbox) {
       toast.error("Spam folder not found.");
       return;
     }
-    await handleBulkMove(messageIds, spamMailbox.id);
+    await handleBulkMove(messageIds, spamMailbox.id, options);
   };
 
   const handleMarkAsUnread = async (messageId?: string) => {
@@ -3195,8 +3258,7 @@ export function useMailApp() {
     await refresh().catch((error: unknown) => {
       log.error("Manual refresh failed", error);
       toast.error(getErrorMessage(error, "Could not refresh mail."));
-    });
-    setIsRefreshing(false);
+    }).finally(() => setIsRefreshing(false));
   };
 
   const realtimeAccountId = activeMailbox
@@ -3267,6 +3329,12 @@ export function useMailApp() {
   };
 
   const handleSimpleLoginAction = useSimpleLoginAliasAction({
+    activeMailbox,
+    patchMessageKeyword,
+    trackKeywordWrite: keywordReconciliation.trackWrite,
+  });
+
+  const handleUnsubscribe = useMailUnsubscribeAction({
     activeMailbox,
     patchMessageKeyword,
     trackKeywordWrite: keywordReconciliation.trackWrite,
@@ -3414,6 +3482,12 @@ export function useMailApp() {
   const composeMailPolicy =
     activeMailbox?.mailServerPolicy ??
     resolveMailServerPolicy({ configPolicy: config?.serverLimits ?? null });
+  const composeScheduling = {
+    maxDelayedSendSeconds: composeMailPolicy.maxDelayedSendSeconds,
+    internalDomain: resolveEncryptionInternalDomain(config?.defaultDomain),
+    timezone: resolveTimezone(settings?.timezone),
+    timeFormat,
+  };
 
   const user = session?.user
     ? {
@@ -3444,6 +3518,7 @@ export function useMailApp() {
     hasAttemptedMailboxOpen,
     activeMailbox,
     composeMailPolicy,
+    composeScheduling,
     listThreadRelatedMessages,
     selectedMessage,
     selectedMessageId,
@@ -3516,6 +3591,7 @@ export function useMailApp() {
     handleToggleFlagged,
     handleSetMessageLabel,
     handleSimpleLoginAction,
+    handleUnsubscribe,
     handleCreateLabel,
     handleDeleteLabel,
     handleUpdateLabel,

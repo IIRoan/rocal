@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useEffectEvent,
   useReducer,
   useRef,
   useState,
@@ -14,13 +15,16 @@ import {
   createMailSendScopeLifetime,
   discardMailSendAttempt,
   hasComposeUserContent,
+  parseMailtoLink,
   type ComposeTextFields,
   type MailServerLimits,
+  type MailtoDraft,
   type QuotedDateOptions,
 } from "@workspace/calendar-core";
 import type { JmapEmailMessage, JmapIdentity } from "@/lib/mail/types";
 import { htmlToPlainText } from "@/lib/mail/signature-utils";
 import { resetComposeInlineImages } from "@/lib/mail/compose-inline-images";
+import { resolveMailLink, takeMailLinkFragment, type MailLink } from "@/lib/mail/mail-link-handoff";
 import type { QuotedInlineAttachment } from "@/lib/mail/compose-editor-utils";
 import {
   cancelComposeDraftSave,
@@ -31,6 +35,7 @@ import {
 import {
   buildDraftSeed,
   buildForwardSeed,
+  buildMailtoSeed,
   buildNewMessageSeed,
   buildOpenNewComposeSeed,
   buildReplySeed,
@@ -380,6 +385,60 @@ export function useMailComposeController({
     applySeed(buildNewMessageSeed(recipient, identities, resolvedIdentityId));
   };
 
+  const seedMailto = (draft: MailtoDraft) => {
+    applySeed(buildMailtoSeed(draft, identities, resolvedIdentityId));
+  };
+
+  const restoreDraft = (snapshot: ComposeDraft, draftId: string | null) => {
+    resetDraftRefs();
+    draftIdRef.current = draftId;
+    dispatch({ type: "incrementSession" });
+    dispatch({
+      type: "patch",
+      patch: {
+        composeTo: snapshot.to,
+        composeCc: snapshot.cc,
+        composeBcc: snapshot.bcc,
+        composeSubject: snapshot.subject,
+        composeBody: snapshot.body,
+        composeHtmlBody: snapshot.htmlBody,
+        composeAttachments: snapshot.attachments,
+        composeReplyContext: snapshot.replyContext,
+        composeMode: snapshot.composeMode,
+        signatureAlreadyEmbedded: snapshot.signatureAlreadyEmbedded,
+        selectedIdentityId: snapshot.identityId,
+        draftId,
+        isComposeOpen: true,
+      },
+    });
+  };
+
+  // A mailto link from another tab's message arrives as an opaque fragment id, resolved once this tab's identities load.
+  const mailtoLinkIdRef = useRef<string | null>(null);
+  const seedMailtoLink = useEffectEvent((link: MailLink | null) => {
+    mailtoLinkIdRef.current = "";
+    const draft = link ? parseMailtoLink(link.href) : null;
+    if (draft) seedMailto(draft);
+  });
+  const hasIdentities = identities.length > 0;
+  useEffect(() => {
+    if (mailtoLinkIdRef.current === null) mailtoLinkIdRef.current = takeMailLinkFragment();
+    const id = mailtoLinkIdRef.current;
+    if (!hasIdentities || !id) return;
+    let current = true;
+    resolveMailLink(id).then(
+      (link) => {
+        if (current) seedMailtoLink(link);
+      },
+      () => {
+        if (current) seedMailtoLink(null);
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [hasIdentities]);
+
   const seedDraft = (
     message: JmapEmailMessage,
     overrides?: {
@@ -444,6 +503,7 @@ export function useMailComposeController({
       seedReply,
       seedForward,
       seedNewMessage,
+      restoreDraft,
       seedDraft,
       openDraftEditor,
       markDirty,

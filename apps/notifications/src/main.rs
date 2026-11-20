@@ -108,7 +108,7 @@ async fn main() -> anyhow::Result<()> {
                 move || async move { worker.status_report().await }
             }),
         );
-    // `::` also takes IPv4 where the host has IPv6, so Railway's private network and health check both reach it.
+    // `::` also takes IPv4 where the host has IPv6, so private networks and health checks both reach it.
     let listener = match tokio::net::TcpListener::bind((Ipv6Addr::UNSPECIFIED, port)).await {
         Ok(listener) => listener,
         Err(_) => tokio::net::TcpListener::bind((Ipv4Addr::UNSPECIFIED, port)).await?,
@@ -167,7 +167,7 @@ async fn run_cleanups(worker: Arc<Worker>, mut stopped: watch::Receiver<bool>) {
     }
 }
 
-/// A panic ends the process so Railway restarts it, as a panic did in the Go worker, instead of a silent stall.
+/// A panic ends the process so Kubernetes restarts it, as a panic did in the Go worker, instead of a silent stall.
 fn exit_on_panic(done: Result<(), JoinError>, what: &str) {
     if let Err(error) = done
         && error.is_panic()

@@ -1,4 +1,5 @@
 import { normalizeEmailAddress } from "./mail-addresses";
+import { parseMailtoLink } from "./mail-mailto";
 
 type HeaderAddress = { email?: string | null; name?: string | null };
 
@@ -135,41 +136,23 @@ export function getSimpleLoginForwardNotice(
   };
 }
 
-function safeDecode(value: string): string | null {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return null;
-  }
-}
-
-/** RFC 6068 mailto: `+` stays literal, so URLSearchParams (form decoding) is not used. */
+/** Only a single reverse-alias recipient can carry a SimpleLogin command. */
 function parseMailtoTarget(url: string): SimpleLoginActionTarget | null {
-  if (!/^mailto:/i.test(url)) return null;
-  const rest = url.slice("mailto:".length);
-  const queryIndex = rest.indexOf("?");
-  const rawTo = queryIndex >= 0 ? rest.slice(0, queryIndex) : rest;
-  const to = safeDecode(rawTo);
-  if (!to || to.includes(",") || emailDomain(normalizeEmailAddress(to)) !== SIMPLELOGIN_REVERSE_ALIAS_DOMAIN) {
+  const draft = parseMailtoLink(url);
+  const to = draft?.to[0];
+  if (
+    !draft ||
+    !to ||
+    draft.to.length + draft.cc.length + draft.bcc.length !== 1 ||
+    emailDomain(to) !== SIMPLELOGIN_REVERSE_ALIAS_DOMAIN
+  ) {
     return null;
   }
-
-  const fields: Record<string, string> = {};
-  if (queryIndex >= 0) {
-    for (const pair of rest.slice(queryIndex + 1).split("&")) {
-      const eq = pair.indexOf("=");
-      if (eq <= 0) continue;
-      const key = safeDecode(pair.slice(0, eq))?.toLowerCase();
-      const value = safeDecode(pair.slice(eq + 1));
-      if (key && value !== null && !(key in fields)) fields[key] = value;
-    }
-  }
-
   return {
     type: "mailto",
-    to: normalizeEmailAddress(to),
-    subject: fields.subject?.trim() || DEFAULT_MAILTO_SUBJECT,
-    body: fields.body?.trim() || DEFAULT_MAILTO_BODY,
+    to,
+    subject: draft.subject || DEFAULT_MAILTO_SUBJECT,
+    body: draft.body.trim() || DEFAULT_MAILTO_BODY,
   };
 }
 

@@ -128,4 +128,63 @@ describe("persistDraggedCalendarEvent", () => {
     expect(toast.success).not.toHaveBeenCalled();
     expect(toast.error).not.toHaveBeenCalled();
   });
+
+  it("says resized and asks for the recurring scope when an occurrence is resized", async () => {
+    const updateEvent = jest.fn(async () => undefined);
+    const moveRecurringEvent = jest.fn(async () => true);
+    const occurrence = {
+      ...baseEvent,
+      id: "series-1_2026-06-01T09:00:00.000Z",
+      parentEventId: "series-1",
+      isRecurringInstance: true,
+    } as CalendarEvent;
+    const longer = { ...occurrence, end: new Date("2026-06-01T11:00:00.000Z") };
+
+    await persistDraggedCalendarEvent({
+      timezone: "UTC",
+      timeFormat: "24h",
+      updateEvent,
+      moveRecurringEvent,
+      originalEvent: occurrence,
+      updatedEvent: longer,
+      verb: "resized",
+    });
+
+    expect(moveRecurringEvent).toHaveBeenCalledWith(occurrence, {
+      start: "2026-06-01T09:00:00.000Z",
+      end: "2026-06-01T11:00:00.000Z",
+      allDay: false,
+      timezone: "UTC",
+    });
+    expect(toast.success).toHaveBeenCalledWith(
+      'Event "Standup" resized',
+      expect.anything(),
+    );
+  });
+
+  it("names the resize when saving it fails", async () => {
+    Object.defineProperty(globalThis.navigator, "onLine", {
+      configurable: true,
+      value: true,
+    });
+    const updateEvent = jest.fn(async () => {
+      throw { statusCode: 403 };
+    });
+
+    await persistDraggedCalendarEvent({
+      timezone: "UTC",
+      timeFormat: "24h",
+      updateEvent,
+      originalEvent: baseEvent,
+      updatedEvent: { ...baseEvent, end: new Date("2026-06-01T11:00:00.000Z") },
+      verb: "resized",
+    });
+
+    expect(toast.error).toHaveBeenCalledWith(
+      "Permission denied",
+      expect.objectContaining({
+        description: "You don't have permission to resize this event",
+      }),
+    );
+  });
 });

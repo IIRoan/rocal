@@ -4,6 +4,7 @@ import {
   CATEGORIES_PAGE,
   CATEGORY_CREATE_PAGE,
   SUBSCRIPTION_CREATE_PAGE,
+  TRASH_PAGE,
   calendarEditPage,
   categoryEditPage,
   isCalendarsSheetPage,
@@ -46,6 +47,11 @@ describe("calendars sheet pages", () => {
     });
     expect(parseCalendarsSheetPage(categoryEditPage(""))).toEqual({ kind: "root" });
     expect(isCalendarsSheetPage(CATEGORIES_PAGE)).toBe(true);
+  });
+
+  it("parses the trash page", () => {
+    expect(parseCalendarsSheetPage(TRASH_PAGE)).toEqual({ kind: "trash" });
+    expect(isCalendarsSheetPage(TRASH_PAGE)).toBe(true);
   });
 
   it("recognizes only calendars drawer keys", () => {

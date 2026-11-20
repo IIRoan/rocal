@@ -102,6 +102,21 @@ describe("resolveMailServerPolicy", () => {
       defaultFolders: getBuiltinDefaultFolders(),
     });
   });
+
+  it("reads maxDelayedSend from the submission account, else 0", () => {
+    const submission = "urn:ietf:params:jmap:submission";
+    expect(resolveMailServerPolicy({}).maxDelayedSendSeconds).toBe(0);
+    expect(resolveMailServerPolicy({
+      session: {
+        capabilities: { [submission]: {} },
+        primaryAccounts: { [submission]: "a" },
+        accounts: { a: { accountCapabilities: { [submission]: { maxDelayedSend: 2_592_000 } } } },
+      },
+    }).maxDelayedSendSeconds).toBe(2_592_000);
+    expect(resolveMailServerPolicy({
+      session: { primaryAccounts: { [submission]: "a" }, accounts: { a: { accountCapabilities: { [submission]: { maxDelayedSend: -1 } } } } },
+    }).maxDelayedSendSeconds).toBe(0);
+  });
 });
 
 describe("mailbox policy validation", () => {

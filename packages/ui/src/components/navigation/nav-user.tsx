@@ -57,7 +57,7 @@ export function NavUser({
             <span className="grid min-w-0 text-left leading-[130%]">
               <span className="truncate text-[13px] font-medium text-foreground">
                 {appName}
-              </span>
+              </span>{" "}
               <span className="truncate text-xs text-muted-foreground">
                 {user.name || user.email}
               </span>

@@ -1528,10 +1528,12 @@ async fn events_can_only_be_created_in_own_writable_calendars() {
     let foreign = create_calendar(&mut other, "blue").await;
     let event = |calendar_id: &str| {
         json!({
+            "id": hex(16),
             "start": "2026-11-02T09:00:00.000Z",
             "end": "2026-11-02T10:00:00.000Z",
             "calendarId": calendar_id,
             "encryptedContent": r#"{"version":1}"#,
+            "encryptionKeyVersion": 2,
         })
     };
 

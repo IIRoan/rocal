@@ -9,6 +9,11 @@ mod m20261106_121932_clear_search_tokens;
 mod m20261110_085151_discard_search_tokens;
 mod m20261110_160000_encrypted_mail_trust;
 mod m20261110_170000_mail_policy_monitor;
+mod m20261114_190556_sealed_feed_url;
+mod m20261114_190718_event_trash;
+mod m20261115_113752_password_envelope_argon2id;
+mod m20261115_113835_blank_server_device_key_copies;
+mod m20261115_123334_user_recovery_kit;
 
 use sea_orm::{ConnectionTrait, DatabaseConnection, DbErr, TransactionTrait};
 use sea_orm_migration::{MigrationTrait, MigratorTrait};
@@ -32,6 +37,11 @@ impl MigratorTrait for Migrator {
             // These keep their original names because databases may have recorded them; they apply after the shipped mail migrations.
             Box::new(m20261106_121932_clear_search_tokens::Migration),
             Box::new(m20261110_085151_discard_search_tokens::Migration),
+            Box::new(m20261114_190556_sealed_feed_url::Migration),
+            Box::new(m20261114_190718_event_trash::Migration),
+            Box::new(m20261115_113752_password_envelope_argon2id::Migration),
+            Box::new(m20261115_113835_blank_server_device_key_copies::Migration),
+            Box::new(m20261115_123334_user_recovery_kit::Migration),
         ]
     }
 }
@@ -255,5 +265,46 @@ UPDATE event_category SET blind_index_tokens = '["late"]';
 
         migrate(&scratch.db).await.unwrap();
         assert_eq!(history(&scratch.db).await, after);
+    }
+
+    #[tokio::test]
+    async fn server_device_key_copies_go_only_where_an_envelope_can_open_the_account() {
+        let scratch = ScratchDatabase::empty().await;
+        migrate(&scratch.db).await.unwrap();
+        scratch
+            .db
+            .execute_unprepared(
+                r#"
+INSERT INTO "user" (id, name, email, updated_at) VALUES
+  ('enveloped', 'Test', 'enveloped@solace.test', now()),
+  ('device-only', 'Test', 'device-only@solace.test', now());
+INSERT INTO user_encryption_password (id, user_id, kdf_salt, wrapped_account_key, wrapped_search_key, updated_at)
+VALUES ('envelope', 'enveloped', 'salt', 'account', 'search', now());
+INSERT INTO user_encryption_device (id, user_id, device_id, public_key, wrapped_account_key, wrapped_search_key, updated_at) VALUES
+  ('a', 'enveloped', 'phone', 'public', 'account', 'search', now()),
+  ('b', 'device-only', 'phone', 'public', 'account', 'search', now());
+"#,
+            )
+            .await
+            .unwrap();
+
+        m20261115_113835_blank_server_device_key_copies::Migration
+            .up(&sea_orm_migration::SchemaManager::new(&scratch.db))
+            .await
+            .unwrap();
+
+        let rows = scratch
+            .db
+            .query_all_raw(Statement::from_string(
+                sea_orm::DbBackend::Postgres,
+                "SELECT user_id || ':' || wrapped_account_key || ':' || wrapped_search_key AS line FROM user_encryption_device ORDER BY id",
+            ))
+            .await
+            .unwrap();
+        let lines: Vec<String> = rows
+            .iter()
+            .map(|row| row.try_get("", "line").unwrap())
+            .collect();
+        assert_eq!(lines, ["enveloped::", "device-only:account:search"]);
     }
 }

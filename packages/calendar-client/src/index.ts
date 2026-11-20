@@ -1,6 +1,13 @@
 export { HttpClient } from "./http-client";
 export { createAuthKeyFetch } from "./auth-key-fetch";
 export { changePasswordWithEnvelope } from "./password-change";
+export {
+  RECOVERY_KEY_TYPO_MESSAGE,
+  createRecoveryKit,
+  recoverAccount,
+  recoveryPost,
+} from "./account-recovery";
+export type { RecoveryPost } from "./account-recovery";
 export type { PasswordEnvelopeRequest } from "./password-change";
 export { createMailAccessTokenManager } from "./mail-access-token";
 export type { MailAccessToken } from "./mail-access-token";
@@ -22,6 +29,7 @@ export type {
   EditRecurringEventInput,
 } from "./recurring-event-persistence";
 export { loadEventSearchCorpus } from "./event-search-corpus";
+export { loadCalendarIcsExport } from "./calendar-ics-export";
 export { upgradeStoredEncryption } from "./encryption-upgrade";
 export { respondToMailInvitation } from "./mail-invitation-response";
 export type {

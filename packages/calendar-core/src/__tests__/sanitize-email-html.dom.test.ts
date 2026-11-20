@@ -1,7 +1,7 @@
 /** @jest-environment jsdom */
 import { describe, expect, it } from "@jest/globals";
 import { sanitizeUntrustedEmailHtml } from "../sanitize-email-html";
-import { BYPASS_CASES, expectBypassNeutralized, READER_KEEPS, READER_PARITY } from "./sanitize-email-html.cases";
+import { BYPASS_CASES, expectBypassNeutralized, READER_DROPPED_HREFS, READER_KEEPS, READER_PARITY } from "./sanitize-email-html.cases";
 
 // Runs with a DOM: exercises the DOMPurify path used on web.
 
@@ -47,6 +47,12 @@ describe("sanitizeUntrustedEmailHtml (DOMPurify)", () => {
       { profile: "reader" },
     );
     expect(sanitized).toBe("<style>p{color:red}</style><p>Hi</p>");
+  });
+
+  it.each(READER_DROPPED_HREFS)("drops the scheme-less reader href %p but keeps fragments", (href) => {
+    expect(sanitizeUntrustedEmailHtml(`<a href="${href}">x</a><a href="#top">y</a>`, { profile: "reader" })).toBe(
+      '<a>x</a><a href="#top" target="_blank" rel="noopener noreferrer">y</a>',
+    );
   });
 
   it("does not leak target/rel into the compose profile", () => {

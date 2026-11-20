@@ -27,7 +27,7 @@
     "check:rules": "bun run scripts/check-repo-rules.ts",
     "notices": "bun run scripts/third-party-notices.ts",
     "lint:react-doctor": "bun run --cwd apps/web lint:react-doctor && bun run --cwd packages/ui lint:react-doctor",
-    "typecheck": "cd apps/web && bun run typecheck",
+    "typecheck": "tsc -p e2e/web && cd apps/web && bun run typecheck",
     "typecheck:native": "cd packages/native-core && bun run typecheck && cd ../../apps/native-calendar && bun run typecheck && cd ../native-mail && bun run typecheck",
     "test": "bun run scripts/run-tests.ts",
     "test:coverage": "bun run scripts/run-tests.ts --coverage",
@@ -37,23 +37,25 @@
     "test:native": "cd packages/native-core && bun run test && cd ../../apps/native-calendar && bun run test && cd ../native-mail && bun run test",
     "test:notifications": "cargo test -p solace-notifications",
     "test:ci": "bun run scripts/run-tests.ts --coverage",
+    "test:e2e:web": "playwright test -c e2e/web/playwright.config.ts",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "doctor": "npx react-doctor@latest"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@babel/core": "^7.29.7",
     "@babel/preset-env": "^7.29.7",
     "@babel/preset-react": "^7.28.5",
     "@babel/preset-typescript": "^7.29.7",
+    "@playwright/test": "1.64.1",
+    "@types/node": "^20.19.25",
     "babel-jest": "^30.5.2",
     "babel-preset-jest": "^30.5.0",
     "bun-types": "^1.4.4",
     "jest-environment-jsdom": "30.5.2",
     "prettier": "3.9.10",
-    "railway": "^3.16.0",
     "react-doctor": "^0.9.22",
-    "typescript": "5.9.3",
-    "@types/node": "^20.19.25"
+    "typescript": "5.9.3"
   },
   "engines": {
     "node": "^22.23.4 || ^24.22.1 || ^26.12.1",

@@ -39,7 +39,9 @@ const documents = [
 function createClient() {
   return {
     searchMailboxMessages: jest.fn(async (_session: JmapSession, _mailboxId: string, _query: string, _limit?: number) => ({ messages: [{ id: "server" }], total: 1 })),
-    searchMailboxMessagesWithFilter: jest.fn(async () => ({ messages: [], total: 0 })),
+    searchMailboxMessagesWithFilter: jest.fn(
+      async (_session: JmapSession, _mailboxId: string, _filter: Record<string, unknown>, _limit?: number) => ({ messages: [], total: 0 }),
+    ),
     getMessagesByIds: jest.fn(async (_session: JmapSession, ids: string[]) =>
       [...ids].reverse().map((id) => ({
         id,
@@ -155,5 +157,50 @@ describe("searchMailbox", () => {
       40,
     );
     expect(messages.messages.map((message) => message.id)).toEqual(["server"]);
+  });
+
+  it("runs typed operators over the index in the typed folder, never the server", async () => {
+    mockLoadLocalMailSearchDocuments.mockResolvedValue([
+      mailToTitleIndexDocument({ id: "a1", subject: "Invoice", receivedAt: "2026-03-02T09:00:00Z", mailboxIds: { archive: true } }),
+    ]);
+    const client = createClient();
+    client.getMessagesByIds.mockResolvedValue([{ id: "a1", keywords: {}, mailboxIds: { archive: true } }] as never);
+
+    const messages = await searchMailbox({
+      client: client as unknown as StalwartJmapClient,
+      session,
+      mailboxId: "inbox",
+      text: "invoice",
+      filters: { conditions: [{ inMailbox: { id: "archive", name: "archive" } }, { isRead: true, negated: true }] },
+      limit: 40,
+    });
+
+    expect(client.searchMailboxMessagesWithFilter).not.toHaveBeenCalled();
+    expect(client.searchMailboxMessages).not.toHaveBeenCalled();
+    expect(messages.messages.map((message) => message.id)).toEqual(["a1"]);
+  });
+
+  it("sends typed operators as a JMAP filter scoped to the typed folder when the index is off", async () => {
+    mockIndexEnabled.current = false;
+    const client = createClient();
+
+    await searchMailbox({
+      client: client as unknown as StalwartJmapClient,
+      session,
+      mailboxId: "inbox",
+      text: "",
+      filters: { conditions: [{ inMailbox: { id: "archive", name: "archive" } }, { from: "ada", negated: true }] },
+      limit: 40,
+    });
+
+    expect(client.searchMailboxMessagesWithFilter).toHaveBeenCalledWith(
+      session,
+      "archive",
+      {
+        operator: "AND",
+        conditions: [{ inMailbox: "archive" }, { operator: "NOT", conditions: [{ from: "ada" }] }],
+      },
+      40,
+    );
   });
 });

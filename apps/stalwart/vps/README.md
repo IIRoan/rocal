@@ -13,7 +13,7 @@ The outbound relay units deliver from the Webdock hosts. Keep relay listeners pr
 
 ## Verify
 
-On the respective VPS, inspect `haproxy`, `k3s-agent` and the relay units in the table. Run `/usr/local/bin/solace-vps-health` to inspect the same check used by Gatus. It checks this node's kubelet, relay units and SMTP STARTTLS. Independently verify public SMTP from outside the VPSs:
+On the respective VPS, inspect `haproxy`, `k3s-agent` and the relay units in the table. Independently verify public SMTP from outside the VPSs:
 
 ```sh
 for mx in mx.solace.onl mx2.solace.onl; do
@@ -22,8 +22,4 @@ for mx in mx.solace.onl mx2.solace.onl; do
 done
 ```
 
-Confirm both MX records and priorities, then check the [public status page](https://status.solace.onl). A successful handshake verifies the public listener and certificate. Test local-backend recovery and failover separately when making routing changes.
-
-## Provision the monitoring account
-
-For a replacement host, install [`vps-health.py`](../../gatus/vps-health.py) as `/usr/local/bin/solace-vps-health`, owned by root with mode 755. Run [`setup-gatus-monitor.sh`](setup-gatus-monitor.sh) with `--check /path/to/monitor.pub` and then `--apply /path/to/monitor.pub` as root. It installs the restricted `gatus-monitor` SSH account and a forced command. Pin the verified host key in the existing [Railway Monitoring settings](../../gatus/README.md#railway-variables).
+Confirm both MX records and priorities. A successful handshake verifies the public listener and certificate. Test local-backend recovery and failover separately when making routing changes.

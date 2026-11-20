@@ -123,6 +123,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/recovery/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sets the new password and its envelope, ends every session and consumes the kit; the client then signs in as usual. */
+        post: operations["completeAccountRecovery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/recovery/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The account keys wrapped under the recovery key, for the key's holder to open on the device. */
+        post: operations["startAccountRecovery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/calendars": {
         parameters: {
             query?: never;
@@ -276,6 +310,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/e2ee/recovery-kit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether the caller has a recovery kit. */
+        get: operations["getRecoveryKit"];
+        /** Stores a new recovery kit after checking the current password, replacing any earlier one. */
+        put: operations["putRecoveryKit"];
+        post?: never;
+        /** Removes the caller's recovery kit, so it can no longer reset the password. */
+        delete: operations["deleteRecoveryKit"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/e2ee/reset-snapshot": {
         parameters: {
             query?: never;
@@ -423,6 +476,58 @@ export interface paths {
         get: operations["getEventSearchCorpus"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's deleted events, newest first, restorable for 30 days. */
+        get: operations["listTrashedEvents"];
+        put?: never;
+        post?: never;
+        /** Deletes every event in the caller's trash for good. */
+        delete: operations["emptyEventTrash"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/trash/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Deletes one trashed event for good. */
+        delete: operations["deleteTrashedEvent"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/trash/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restores a trashed event under its id, into its calendar or the default one when that is gone. */
+        post: operations["restoreTrashedEvent"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1126,7 +1231,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Syncs a feed now, paused or not; a failed fetch is recorded and answered as an error. */
+        /** Syncs a feed now, paused or not; a sealed feed's URL comes in the body. A failed fetch is recorded and answered as an error. */
         post: operations["syncSubscription"];
         delete?: never;
         options?: never;
@@ -1267,6 +1372,8 @@ export interface components {
             calendar: components["schemas"]["SubscribedCalendar"];
             calendarId: components["schemas"]["CalendarId"];
             createdAt: components["schemas"]["Timestamp"];
+            /** @description The feed URL sealed on the device; the server cannot open it. */
+            encryptedUrl: string | null;
             etag: string | null;
             id: components["schemas"]["SubscriptionId"];
             isActive: boolean;
@@ -1281,6 +1388,7 @@ export interface components {
             /** Format: int32 */
             syncIntervalMinutes: number;
             updatedAt: components["schemas"]["Timestamp"];
+            /** @description The feed URL, or `sealed:<id>` once `encryptedUrl` holds it. */
             url: string;
             userId: components["schemas"]["UserId"];
         };
@@ -1339,6 +1447,8 @@ export interface components {
             /** Format: int32 */
             encryptionKeyVersion?: number;
             end: string;
+            /** @description A client-proposed row id (32 lowercase hex) that the event content is bound to. */
+            id: components["schemas"]["EventId"];
             /** @description Transient plaintext for invitation mail; never stored. */
             invitationContent?: components["schemas"]["InvitationContent"];
             participants?: components["schemas"]["ParticipantInput"][];
@@ -1359,9 +1469,13 @@ export interface components {
             color?: string;
             /** @description The name sealed as a calendar name; stored on the mirrored calendar. */
             encryptedName?: string;
+            encryptedUrl?: string;
             /** Format: int32 */
             encryptionKeyVersion?: number;
+            /** @description A client-proposed id (32 lowercase hex) that the sealed URL is bound to. */
+            id: components["schemas"]["SubscriptionId"];
             name?: string;
+            /** @description Probed and synced once, then stored only as `encryptedUrl` when that is sent. */
             url: string;
         };
         CreatedNotification: {
@@ -1419,6 +1533,8 @@ export interface components {
         EditRecurringRequest: {
             /** @description `this_only`, `this_and_future` or `all`. */
             editScope: string;
+            /** @description The row id a `this_only` or `this_and_future` child takes, which its new content is bound to. */
+            newEventId?: components["schemas"]["EventId"];
             /** @description The occurrence instant; required for `this_only` and `this_and_future`. */
             occurrenceDate?: string;
             updates: components["schemas"]["RecurringUpdates"];
@@ -1446,6 +1562,8 @@ export interface components {
             end: components["schemas"]["Timestamp"];
             excludedDates?: components["schemas"]["Timestamp"][];
             externalId: string;
+            /** @description A client-proposed row id that the event content is bound to. */
+            id: components["schemas"]["EventId"];
             occurrenceDate?: components["schemas"]["Timestamp"];
             participants?: components["schemas"]["ParticipantInput"][];
             /** @description A recurrence rule object as JSON text. */
@@ -1505,7 +1623,9 @@ export interface components {
             updatedAt: components["schemas"]["Timestamp"];
             userId: components["schemas"]["UserId"];
             wrapAlgorithm: string;
+            /** @description Empty when the device keeps its wrapped keys only on itself. */
             wrappedAccountKey: string;
+            /** @description Empty when the device keeps its wrapped keys only on itself. */
             wrappedSearchKey: string;
         };
         EncryptionEvent: {
@@ -1536,6 +1656,8 @@ export interface components {
         EncryptionUpgrades: {
             /** @description Sealed events whose colour or category still sits in a readable column. */
             eventsWithReadableAttributes: components["schemas"]["EventId"][];
+            /** @description Sealed events whose content is not yet bound to their row id. */
+            eventsWithUnboundContent: components["schemas"]["EventId"][];
             /** @description Events whose pending reminders lack a sealed title or lead. */
             eventsWithUnsealedReminders: components["schemas"]["EventId"][];
             /**
@@ -1545,6 +1667,13 @@ export interface components {
             readableInvitations: number;
             /** @description Feeds whose name is still stored readable. */
             subscriptionsWithReadableNames: components["schemas"]["SubscriptionId"][];
+            /** @description Feeds whose URL is still stored readable. */
+            subscriptionsWithReadableUrls: components["schemas"]["SubscriptionId"][];
+            /**
+             * Format: int64
+             * @description Trash entries whose events are not yet bound; a restore lists them above, and none may remain before the account is marked bound.
+             */
+            trashWithUnboundContent: number;
             /** @description Whether the app preferences are still stored readable. */
             unsealedSettings: boolean;
         };
@@ -1649,6 +1778,8 @@ export interface components {
             deletedEventId: components["schemas"]["EventId"];
             message: string;
             success: boolean;
+            /** @description The trash entry that can restore the event for 30 days; absent when the delete was permanent. */
+            trashId?: components["schemas"]["TrashedEventId"];
         };
         EventId: string;
         EventList: {
@@ -1710,6 +1841,8 @@ export interface components {
         };
         /** @description `GET /api/events/search-corpus`: pages of the owner's events for on-device indexing. */
         EventSearchCorpusQuery: {
+            /** @description Series rows carry `recurrenceExceptions`, for an export built on the device. */
+            includeExceptions?: boolean | null;
             /** Format: int64 */
             limit?: number | null;
             /** Format: int64 */
@@ -1773,6 +1906,8 @@ export interface components {
             encryptedContent: string;
             /** Format: int32 */
             encryptionKeyVersion?: number;
+            /** @description The row id the content is bound to: a new copy takes it (32 lowercase hex), an existing copy is sealed only when it is its id. */
+            eventId: components["schemas"]["EventId"];
             externalId: string;
         };
         /** @description What an ICS invitation import did. */
@@ -2125,8 +2260,21 @@ export interface components {
             createdAt: components["schemas"]["Timestamp"];
             id: string;
             kdfAlgorithm: string;
-            /** Format: int32 */
+            /**
+             * Format: int32
+             * @description PBKDF2 iterations, or Argon2id passes.
+             */
             kdfIterations: number;
+            /**
+             * Format: int32
+             * @description Argon2id memory in KiB; null for PBKDF2.
+             */
+            kdfMemoryKiB: number | null;
+            /**
+             * Format: int32
+             * @description Argon2id lanes; null for PBKDF2.
+             */
+            kdfParallelism: number | null;
             kdfSalt: string;
             /** Format: int32 */
             keyVersion: number;
@@ -2140,6 +2288,16 @@ export interface components {
             kdfAlgorithm?: string;
             /** Format: int32 */
             kdfIterations?: number;
+            /**
+             * Format: int32
+             * @description Required for Argon2id, absent for PBKDF2.
+             */
+            kdfMemoryKiB?: number;
+            /**
+             * Format: int32
+             * @description Required for Argon2id, absent for PBKDF2.
+             */
+            kdfParallelism?: number;
             kdfSalt: string;
             /** Format: int32 */
             keyVersion?: number;
@@ -2220,6 +2378,44 @@ export interface components {
             encryptionKeyVersion: number;
             updatedAt: components["schemas"]["Timestamp"];
         };
+        /** @description Resets the password with the recovery key: the new auth key and the account keys rewrapped for it. */
+        RecoveryCompleteRequest: {
+            email: string;
+            /** @description The auth key derived from the new password; a raw password is refused. */
+            newPassword: string;
+            passwordEnvelope: components["schemas"]["PasswordEnvelopeRequest"];
+            recoveryAuthKey: string;
+            /** @description Deletes every passkey, for someone who lost theirs. */
+            removePasskeys?: boolean;
+        };
+        /** @description The account keys wrapped under the recovery key, which only the key's holder can open. */
+        RecoveryEnvelope: {
+            /** Format: int32 */
+            keyVersion: number;
+            wrappedAccountKey: string;
+            wrappedSearchKey: string;
+        };
+        /** @description A new recovery kit: the account keys wrapped under the recovery key, and the key that proves it. */
+        RecoveryKitRequest: {
+            /** @description The auth key the client derived from the current password. */
+            currentPassword: string;
+            /** Format: int32 */
+            keyVersion?: number;
+            /** @description `rk1:` and the base64url HKDF output of the recovery key. */
+            recoveryAuthKey: string;
+            wrappedAccountKey: string;
+            wrappedSearchKey: string;
+        };
+        /** @description Whether the caller has a recovery kit; the key itself is never stored or returned. */
+        RecoveryKitStatus: {
+            createdAt?: components["schemas"]["Timestamp"];
+            exists: boolean;
+        };
+        /** @description Proves the recovery key for an email, before the client unwraps the account keys. */
+        RecoveryStartRequest: {
+            email: string;
+            recoveryAuthKey: string;
+        };
         RecurrenceException: {
             createdAt: components["schemas"]["Timestamp"];
             exceptionDate: components["schemas"]["Timestamp"];
@@ -2276,6 +2472,8 @@ export interface components {
             deletedEventId: components["schemas"]["EventId"];
             message: string;
             success: boolean;
+            /** @description Set when `delete_all` moved the series to the trash. */
+            trashId?: components["schemas"]["TrashedEventId"];
         };
         RecurringUpdates: {
             allDay?: boolean;
@@ -2309,8 +2507,9 @@ export interface components {
             publicKey: string;
             publicKeyAlgorithm?: string;
             wrapAlgorithm?: string;
-            wrappedAccountKey: string;
-            wrappedSearchKey: string;
+            /** @description Both or neither; current clients keep their wrapped keys only on the device. */
+            wrappedAccountKey?: string;
+            wrappedSearchKey?: string;
         };
         RegisterPushDeviceRequest: {
             bundleId: string;
@@ -2516,11 +2715,41 @@ export interface components {
             /** Format: int64 */
             syncLogs: number;
         };
+        /** @description Body of `POST /api/subscriptions/:id/sync`; a sealed feed needs its URL, which is used once and never stored. */
+        SyncSubscriptionRequest: {
+            url?: string;
+        };
         /**
          * Format: date-time
          * @description A UTC instant as JavaScript's `toISOString()` writes it: three fractional digits and `Z`.
          */
         Timestamp: string;
+        /** @description A deleted event in the trash, read from its stored row: ciphertext only, restorable until `purgeAt`. */
+        TrashedEvent: {
+            allDay: boolean;
+            calendarId: components["schemas"]["CalendarId"];
+            /** @description The original calendar is gone or read-only, so a restore lands in the default calendar. */
+            calendarMissing: boolean;
+            encryptedContent: string | null;
+            /** Format: int32 */
+            encryptionKeyVersion: number;
+            encryptionState: string;
+            end: components["schemas"]["Timestamp"];
+            /** @description The id the event keeps when restored. */
+            eventId: components["schemas"]["EventId"];
+            id: components["schemas"]["TrashedEventId"];
+            purgeAt: components["schemas"]["Timestamp"];
+            recurrence: string | null;
+            start: components["schemas"]["Timestamp"];
+            timezone: string;
+            title: string;
+            trashedAt: components["schemas"]["Timestamp"];
+        };
+        TrashedEventId: string;
+        /** @description `GET /api/events/trash`, newest first. */
+        TrashedEventList: {
+            events: components["schemas"]["TrashedEvent"][];
+        };
         /** @description Without a token every device of the user is removed. */
         UnregisterPushDeviceRequest: {
             token?: string;
@@ -2614,6 +2843,8 @@ export interface components {
             /** @description Recolors the mirrored calendar. */
             color?: string;
             encryptedName?: string;
+            /** @description Replaces the readable URL with this sealed one. */
+            encryptedUrl?: string;
             /** Format: int32 */
             encryptionKeyVersion?: number;
             /** @description Background sealing may replace only the names read with this revision. */
@@ -2808,6 +3039,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionWithUser"] | null;
+                };
+            };
+        };
+    };
+    completeAccountRecovery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecoveryCompleteRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusFlag"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthError"];
+                };
+            };
+        };
+    };
+    startAccountRecovery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecoveryStartRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryEnvelope"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthError"];
                 };
             };
         };
@@ -3107,6 +3400,74 @@ export interface operations {
             };
         };
     };
+    getRecoveryKit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryKitStatus"];
+                };
+            };
+        };
+    };
+    putRecoveryKit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecoveryKitRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryKitStatus"];
+                };
+            };
+        };
+    };
+    deleteRecoveryKit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessMessage"];
+                };
+            };
+            /** @description The caller has no recovery kit */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     getE2eeResetSnapshot: {
         parameters: {
             query?: never;
@@ -3314,6 +3675,7 @@ export interface operations {
                 offset?: number;
                 updatedAfter?: string;
                 readableInvitations?: boolean;
+                includeExceptions?: boolean;
             };
             header?: never;
             path?: never;
@@ -3328,6 +3690,100 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["EventSearchCorpus"];
                 };
+            };
+        };
+    };
+    listTrashedEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrashedEventList"];
+                };
+            };
+        };
+    };
+    emptyEventTrash: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessMessage"];
+                };
+            };
+        };
+    };
+    deleteTrashedEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessMessage"];
+                };
+            };
+            /** @description Not in the caller's trash */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    restoreTrashedEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
+            };
+            /** @description Not in the caller's trash */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -4691,7 +5147,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["SyncSubscriptionRequest"] | null;
+            };
+        };
         responses: {
             200: {
                 headers: {

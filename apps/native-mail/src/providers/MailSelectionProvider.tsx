@@ -13,6 +13,9 @@ export interface MailSelectionContextValue {
   selectedMailboxId: string | null;
   /** Update the selected mailbox. */
   setSelectedMailboxId: (id: string | null) => void;
+  /** Message ids in list order when the reader was opened from a row, for auto-advance. */
+  readerOrder: string[];
+  setReaderOrder: (ids: string[]) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -36,7 +39,14 @@ export function MailSelectionProvider({
     null,
   );
 
-  const value: MailSelectionContextValue = { selectedMailboxId, setSelectedMailboxId };
+  const [readerOrder, setReaderOrder] = useState<string[]>([]);
+
+  const value: MailSelectionContextValue = {
+    selectedMailboxId,
+    setSelectedMailboxId,
+    readerOrder,
+    setReaderOrder,
+  };
 
   return (
     <MailSelectionContext.Provider value={value}>

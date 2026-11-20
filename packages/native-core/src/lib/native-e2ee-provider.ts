@@ -2,13 +2,11 @@ import * as SecureStore from "expo-secure-store";
 import {
   encryptEventContentRequest,
   encryptNameRequest,
-  hydrateEncryptedEventWithoutSession,
   hydrateEncryptedName,
+  openEncryptedEvent,
   parseEncryptedJsonPayload,
-  withDecryptedEventContent,
   withoutPlaintextEventContent,
   withoutPlaintextName,
-  type DecryptedEventContent,
   type E2eeModule,
   type E2eeProvider as IE2eeProvider,
 } from "@workspace/e2ee";
@@ -175,12 +173,8 @@ export async function registerDeviceForSession({
         "Content-Type": "application/json",
         ...getAuthHeaders(),
       },
-      body: JSON.stringify({
-        deviceId,
-        publicKey,
-        wrappedAccountKey,
-        wrappedSearchKey,
-      }),
+      // The wrapped keys stay on this device; the server keeps no copy a key could be swapped into.
+      body: JSON.stringify({ deviceId, publicKey }),
     });
 
     if (!deviceResponse.ok) {
@@ -192,12 +186,13 @@ export async function registerDeviceForSession({
 
   // The old device's salt must never vouch for the new key, even if the app dies between writes.
   await rememberDeviceEnvelopeSalt(null);
+  // The only wrapped copy is written before the key pair it belongs to, so a kill between writes never strands a key.
+  await rememberOwnDeviceKeys({ deviceId, wrappedAccountKey, wrappedSearchKey });
   await SecureStore.setItemAsync(SECURE_STORE_KEYS.E2EE_DEVICE_ID, deviceId);
   await writeChunkedSecureValue(
     SECURE_STORE_KEYS.E2EE_PRIVATE_KEY,
     exportedPrivateKeyJson,
   );
-  await rememberOwnDeviceKeys({ deviceId, wrappedAccountKey, wrappedSearchKey });
   if (envelopeSalt) {
     await rememberDeviceEnvelopeSalt(envelopeSalt);
   }
@@ -221,6 +216,7 @@ export async function recoverableStoredDeviceId(): Promise<string | null> {
 
 /** Forgets this device's key pair only when the password envelope is known to hold its account key; otherwise it may be the only copy. */
 export async function clearRecoverableStoredDevice(): Promise<void> {
+  await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.E2EE_EVENT_CONTENT_BOUND);
   if (!(await SecureStore.getItemAsync(SECURE_STORE_KEYS.E2EE_ENVELOPE_SALT))) {
     return;
   }
@@ -258,69 +254,37 @@ async function readOwnDeviceKeys(deviceId: string): Promise<OwnDeviceKeys | null
   }
 }
 
-/** Opens this device's own wrapped keys; installs from before that copy existed trust the server's once and keep it. */
+/** Opens this device's own wrapped keys, never the server's; null when it keeps none or they no longer open, while read failures throw. */
 export async function unwrapStoredDeviceKeys(
   e2ee: E2eeModule,
   privateKeyJwk: string,
-  device: OwnDeviceKeys,
-): Promise<{ accountKey: CryptoKey; blindIndexKey: CryptoKey }> {
+  deviceId: string,
+): Promise<{ accountKey: CryptoKey; blindIndexKey: CryptoKey } | null> {
+  const own = await readOwnDeviceKeys(deviceId);
+  if (!own) return null;
   const crypto = createNativeCryptoProvider();
   if (!crypto) {
     throw new Error("Native crypto is unavailable for E2EE unwrap.");
   }
 
-  const privateKey = await crypto.subtle.importKey(
-    "jwk",
-    JSON.parse(privateKeyJwk),
-    { name: "RSA-OAEP", hash: "SHA-256" },
-    false,
-    ["unwrapKey"],
-  );
-
-  const own = await readOwnDeviceKeys(device.deviceId);
-  const wrapped = own ?? device;
-  const accountKey = await e2ee.unwrapAccountKey(
-    wrapped.wrappedAccountKey,
-    privateKey,
-  );
-  const blindIndexKey = await e2ee.unwrapBlindIndexKey(
-    wrapped.wrappedSearchKey,
-    privateKey,
-  );
-  if (!own) {
-    // A failed write only means the next start trusts the server's copy again, never a lost key.
-    await rememberOwnDeviceKeys({
-      deviceId: device.deviceId,
-      wrappedAccountKey: device.wrappedAccountKey,
-      wrappedSearchKey: device.wrappedSearchKey,
-    }).catch((error: unknown) => {
-      log.warn("Failed to keep this device's wrapped keys", {
-        errorName: error instanceof Error ? error.name : typeof error,
-      });
+  const open = async () => {
+    const privateKey = await crypto.subtle.importKey(
+      "jwk",
+      JSON.parse(privateKeyJwk),
+      { name: "RSA-OAEP", hash: "SHA-256" },
+      false,
+      ["unwrapKey"],
+    );
+    const accountKey = await e2ee.unwrapAccountKey(own.wrappedAccountKey, privateKey);
+    const blindIndexKey = await e2ee.unwrapBlindIndexKey(own.wrappedSearchKey, privateKey);
+    return { accountKey, blindIndexKey };
+  };
+  return open().catch((error: unknown) => {
+    log.warn("Stored E2EE device key no longer opens", {
+      errorName: error instanceof Error ? error.name : typeof error,
     });
-  }
-  return { accountKey, blindIndexKey };
-}
-
-export async function putPasswordEnvelope({
-  e2ee,
-  session,
-  apiBaseUrl,
-  password,
-}: {
-  e2ee: E2eeModule;
-  session: E2eeSession;
-  apiBaseUrl: string;
-  password: string;
-}): Promise<void> {
-  await uploadPasswordEnvelope(
-    apiBaseUrl,
-    await e2ee.createPasswordEnvelope(
-      session.accountKey,
-      session.blindIndexKey,
-      password,
-    ),
-  );
+    return null;
+  });
 }
 
 /** Stores an envelope already wrapped with the password, and remembers its salt as this device's. */
@@ -380,15 +344,39 @@ export function createNativeE2eeProvider({
     }
   };
 
+  let boundUserId: Promise<string | null> | null = null;
+  const refusesUnboundContent = async (session: E2eeSession): Promise<boolean> => {
+    boundUserId ??= SecureStore.getItemAsync(
+      SECURE_STORE_KEYS.E2EE_EVENT_CONTENT_BOUND,
+    ).catch(() => null);
+    return (await boundUserId) === session.userId;
+  };
+
   const provider: IE2eeProvider = {
     async attachEventEncryptionShadow<
       T extends CreateEventRequest | UpdateEventRequest,
-    >(request: T): Promise<EventWireRequest<T>> {
+    >(request: T, eventId: string): Promise<EventWireRequest<T>> {
       return encryptWith(
         "event",
-        (e2ee, session) => encryptEventContentRequest(e2ee, session, request),
+        (e2ee, session) =>
+          encryptEventContentRequest(e2ee, session, request, eventId),
         () => withoutPlaintextEventContent(request),
       );
+    },
+
+    async markEventContentBound(): Promise<void> {
+      const session = await waitForSession();
+      if (!session || (await refusesUnboundContent(session))) return;
+      boundUserId = Promise.resolve(session.userId);
+      await SecureStore.setItemAsync(
+        SECURE_STORE_KEYS.E2EE_EVENT_CONTENT_BOUND,
+        session.userId,
+      );
+    },
+
+    async refusesUnboundContent(): Promise<boolean> {
+      const session = await waitForSession();
+      return session ? refusesUnboundContent(session) : false;
     },
 
     async attachCalendarEncryptionShadow<
@@ -438,36 +426,14 @@ export function createNativeE2eeProvider({
     },
 
     async hydrateEncryptedEvent(event: CalendarEvent): Promise<CalendarEvent> {
-      if (
-        event.encryptionState !== "encrypted" ||
-        !event.encryptedContent ||
-        typeof event.encryptedContent !== "string"
-      ) {
-        return event;
-      }
-
-      const session = await waitForSession();
-      if (!session) {
-        return hydrateEncryptedEventWithoutSession(event);
-      }
-
-      try {
-        const e2ee = await getModule();
-        if (!e2ee) {
-          return hydrateEncryptedEventWithoutSession(event);
-        }
-
-        const payload = JSON.parse(event.encryptedContent);
-        const decrypted = await e2ee.decryptJsonPayload<DecryptedEventContent>(
-          session.accountKey,
-          payload,
-          "event-content:v1",
-        );
-
-        return withDecryptedEventContent(event, decrypted);
-      } catch {
-        return hydrateEncryptedEventWithoutSession(event);
-      }
+      const session = event.encryptedContent ? await waitForSession() : null;
+      const e2ee = session ? await getModule().catch(() => null) : null;
+      return openEncryptedEvent(
+        e2ee,
+        session,
+        event,
+        session ? await refusesUnboundContent(session) : false,
+      );
     },
 
     async hydrateEncryptedEvents(

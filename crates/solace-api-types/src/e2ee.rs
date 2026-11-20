@@ -13,12 +13,18 @@ pub struct EncryptionUpgrades {
     pub events_with_readable_attributes: Vec<EventId>,
     /// Events whose pending reminders lack a sealed title or lead.
     pub events_with_unsealed_reminders: Vec<EventId>,
+    /// Sealed events whose content is not yet bound to their row id.
+    pub events_with_unbound_content: Vec<EventId>,
+    /// Trash entries whose events are not yet bound; a restore lists them above, and none may remain before the account is marked bound.
+    pub trash_with_unbound_content: i64,
     /// Invitation copies the server still stores readable.
     pub readable_invitations: i64,
     /// Whether the app preferences are still stored readable.
     pub unsealed_settings: bool,
     /// Feeds whose name is still stored readable.
     pub subscriptions_with_readable_names: Vec<SubscriptionId>,
+    /// Feeds whose URL is still stored readable.
+    pub subscriptions_with_readable_urls: Vec<SubscriptionId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -54,7 +60,9 @@ pub struct EncryptionDevice {
     pub device_label: Option<String>,
     pub public_key: String,
     pub public_key_algorithm: String,
+    /// Empty when the device keeps its wrapped keys only on itself.
     pub wrapped_account_key: String,
+    /// Empty when the device keeps its wrapped keys only on itself.
     pub wrapped_search_key: String,
     pub wrap_algorithm: String,
     pub key_version: i32,
@@ -70,7 +78,15 @@ pub struct PasswordEnvelope {
     pub user_id: UserId,
     pub kdf_algorithm: String,
     pub kdf_salt: String,
+    /// PBKDF2 iterations, or Argon2id passes.
     pub kdf_iterations: i32,
+    /// Argon2id memory in KiB; null for PBKDF2.
+    #[serde(rename = "kdfMemoryKiB")]
+    #[schema(required = true)]
+    pub kdf_memory_kib: Option<i32>,
+    /// Argon2id lanes; null for PBKDF2.
+    #[schema(required = true)]
+    pub kdf_parallelism: Option<i32>,
     pub wrapped_account_key: String,
     pub wrapped_search_key: String,
     pub wrap_algorithm: String,
@@ -168,8 +184,13 @@ pub struct RegisterDeviceRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub public_key_algorithm: Option<String>,
-    pub wrapped_account_key: String,
-    pub wrapped_search_key: String,
+    /// Both or neither; current clients keep their wrapped keys only on the device.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub wrapped_account_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub wrapped_search_key: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub wrap_algorithm: Option<String>,
@@ -188,11 +209,48 @@ pub struct PasswordEnvelopeRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub kdf_iterations: Option<i32>,
+    /// Required for Argon2id, absent for PBKDF2.
+    #[serde(
+        default,
+        rename = "kdfMemoryKiB",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(nullable = false)]
+    pub kdf_memory_kib: Option<i32>,
+    /// Required for Argon2id, absent for PBKDF2.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub kdf_parallelism: Option<i32>,
     pub wrapped_account_key: String,
     pub wrapped_search_key: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub wrap_algorithm: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub key_version: Option<i32>,
+}
+
+/// Whether the caller has a recovery kit; the key itself is never stored or returned.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RecoveryKitStatus {
+    pub exists: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub created_at: Option<Timestamp>,
+}
+
+/// A new recovery kit: the account keys wrapped under the recovery key, and the key that proves it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RecoveryKitRequest {
+    /// The auth key the client derived from the current password.
+    pub current_password: String,
+    /// `rk1:` and the base64url HKDF output of the recovery key.
+    pub recovery_auth_key: String,
+    pub wrapped_account_key: String,
+    pub wrapped_search_key: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub key_version: Option<i32>,

@@ -6,7 +6,6 @@ import Link from "next/link";
 import { authClient, signIn, signUp, useSession } from "@/lib/auth-client";
 import { createLogger } from "@workspace/logger";
 import { resolveAuthRedirectTarget } from "@/lib/api-url";
-import { FORGOT_PASSWORD_NOTICE } from "@workspace/calendar-core/product-info";
 import {
   completeAuthNavigation,
   isAuthNavigationPending,
@@ -47,6 +46,7 @@ import {
   type LoginField,
 } from "./login-form-state";
 import type { LoginSearchParams } from "./login-form-params";
+import { RecoverAccountDialog } from "./recover-account-dialog";
 
 const log = createLogger("login");
 const DEFAULT_SIGNUP_DOMAIN = "solace.onl";
@@ -282,6 +282,8 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
   );
 
   const titleRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [recoverEntry, setRecoverEntry] = useState<"password" | "passkey" | null>(null);
   const hasAutoPromptedStepUpRef = useRef(false);
   const isLeavingRef = useRef(false);
 
@@ -914,6 +916,15 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
     dispatchChrome({ type: "finish-email-auth" });
   };
 
+  /** A recovered account signs in through the normal submit, so the new password opens the keys as any sign-in does. */
+  function signInAfterRecovery(recoveredEmail: string, newPassword: string) {
+    setRecoverEntry(null);
+    dispatchChrome({ type: "clear-messages" });
+    dispatchFields({ type: "set-email", email: recoveredEmail });
+    dispatchFields({ type: "set-password", password: newPassword });
+    afterPaint(() => formRef.current?.requestSubmit());
+  }
+
   const title = isSignUp
     ? "Create an account"
     : requiresPasskeyStepUp
@@ -971,7 +982,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                 ) : null}
               </div>
 
-              <form onSubmit={handleEmailAuth} className="space-y-5">
+              <form ref={formRef} onSubmit={handleEmailAuth} className="space-y-5">
                 <AnimatedCollapse isOpen={isSignUp}>
                   <div className="space-y-2 pb-0.5">
                     <Label htmlFor="name" className="text-sm font-medium">
@@ -1186,12 +1197,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                     {!isSignUp ? (
                       <button
                         type="button"
-                        onClick={() =>
-                          dispatchChrome({
-                            type: "set-notice",
-                            notice: FORGOT_PASSWORD_NOTICE,
-                          })
-                        }
+                        onClick={() => setRecoverEntry("password")}
                         className="text-xs font-medium text-accent transition-colors hover:text-accent/80"
                       >
                         Forgot password?
@@ -1312,6 +1318,15 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                     </Button>
                   </>
                 ) : null}
+                {requiresPasskeyStepUp ? (
+                  <button
+                    type="button"
+                    onClick={() => setRecoverEntry("passkey")}
+                    className="mt-3 w-full cursor-pointer rounded-md py-2 text-center text-xs font-medium text-accent transition-colors hover:text-accent/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    Lost your passkey? Use your recovery kit
+                  </button>
+                ) : null}
               </div>
 
               <p className="mt-6 text-center text-sm text-muted-foreground">
@@ -1356,6 +1371,16 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
           </div>
         </div>
       </main>
+
+      <RecoverAccountDialog
+        open={recoverEntry !== null}
+        onOpenChange={(open) => {
+          if (!open) setRecoverEntry(null);
+        }}
+        lostPasskey={recoverEntry === "passkey"}
+        initialEmail={email}
+        onRecovered={signInAfterRecovery}
+      />
 
       {overlayVisible ? (
         <PageLoadingOverlay

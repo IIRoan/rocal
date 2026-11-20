@@ -3,6 +3,7 @@ export const CALENDAR_CREATE_PAGE = "calendar-create";
 export const SUBSCRIPTION_CREATE_PAGE = "subscription-create";
 export const CATEGORIES_PAGE = "categories";
 export const CATEGORY_CREATE_PAGE = "category-create";
+export const TRASH_PAGE = "trash";
 
 const CALENDAR_EDIT_PREFIX = "calendar-edit:";
 const SUBSCRIPTION_EDIT_PREFIX = "subscription-edit:";
@@ -28,7 +29,8 @@ export type CalendarsSheetPage =
   | { kind: "subscription-edit"; id: string }
   | { kind: "categories" }
   | { kind: "category-create" }
-  | { kind: "category-edit"; id: string };
+  | { kind: "category-edit"; id: string }
+  | { kind: "trash" };
 
 /** Maps a page-stack key to the calendars drawer page it renders; unknown keys fall back to the root list. */
 export function parseCalendarsSheetPage(page: string): CalendarsSheetPage {
@@ -36,6 +38,7 @@ export function parseCalendarsSheetPage(page: string): CalendarsSheetPage {
   if (page === SUBSCRIPTION_CREATE_PAGE) return { kind: "subscription-create" };
   if (page === CATEGORIES_PAGE) return { kind: "categories" };
   if (page === CATEGORY_CREATE_PAGE) return { kind: "category-create" };
+  if (page === TRASH_PAGE) return { kind: "trash" };
   if (page.startsWith(CATEGORY_EDIT_PREFIX) && page.length > CATEGORY_EDIT_PREFIX.length) {
     return { kind: "category-edit", id: page.slice(CATEGORY_EDIT_PREFIX.length) };
   }

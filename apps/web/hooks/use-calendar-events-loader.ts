@@ -40,7 +40,7 @@ const DEFAULT_STALE_TIME = 15 * 60 * 1000;
 const GC_TIME = 30 * 60 * 1000;
 
 /** Padded fetch range for an account-zone month key (`"YYYY-MM"`). */
-function monthFetchRange(month: string, timezone: string): DateRange {
+export function monthFetchRange(month: string, timezone: string): DateRange {
   const [year, monthNumber] = month.split("-").map(Number);
   return getPaddedCalendarMonthRange(
     new Date(year, monthNumber - 1, 1),

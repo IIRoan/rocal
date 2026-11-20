@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { sanitizeUntrustedEmailHtml } from "../sanitize-email-html";
-import { BYPASS_CASES, expectBypassNeutralized, READER_KEEPS, READER_PARITY } from "./sanitize-email-html.cases";
+import { BYPASS_CASES, expectBypassNeutralized, READER_DROPPED_HREFS, READER_KEEPS, READER_PARITY } from "./sanitize-email-html.cases";
 
 // Runs in the node environment: exercises the non-DOM tokenizer used on React Native.
 
@@ -61,6 +61,12 @@ describe("sanitizeUntrustedEmailHtml (no DOM)", () => {
     expect(sanitized).toContain('target="_blank" rel="noopener noreferrer"');
     expect(sanitized).toContain('src="cid:abc@x"');
     expect(sanitized).toContain('src="data:image/png;base64,abc"');
+  });
+
+  it.each(READER_DROPPED_HREFS)("drops the scheme-less reader href %p but keeps fragments", (href) => {
+    expect(sanitizeUntrustedEmailHtml(`<a href="${href}">x</a><a href="#top">y</a>`, { profile: "reader" })).toBe(
+      '<a>x</a><a href="#top" target="_blank" rel="noopener noreferrer">y</a>',
+    );
   });
 
   it("does not add target/rel to compose links", () => {

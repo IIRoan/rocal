@@ -7,6 +7,7 @@ import {
   type QuotedDateOptions,
 } from "@workspace/calendar-core";
 import type { ComposeRequest } from "./compose-request";
+import type { PendingComposeAttachment } from "./compose-attachments";
 import {
   buildForwardBody,
   buildReplyBody,
@@ -34,7 +35,7 @@ const EMPTY_FIELDS: ComposeTextFields = {
 };
 
 export type ComposeSeedPlan =
-  | { kind: "fields"; fields: ComposeTextFields; draftId?: string }
+  | { kind: "fields"; fields: ComposeTextFields; draftId?: string; restoredAttachments?: PendingComposeAttachment[] }
   | { kind: "decrypt-draft"; draftId: string }
   | { kind: "decrypt-source"; draftId?: undefined };
 
@@ -78,6 +79,21 @@ export function planComposeSeed({
   runtime,
   sourcePlaintext,
 }: ComposeSeedInput): ComposeSeedPlan | null {
+  if (params.restore) {
+    return {
+      kind: "fields",
+      fields: params.restore.fields,
+      draftId: params.restore.draftId,
+      restoredAttachments: params.restore.attachments,
+    };
+  }
+  if (params.mailto) {
+    const { to, cc, bcc, subject, body } = params.mailto;
+    return {
+      kind: "fields",
+      fields: { to: to.join(", "), cc: cc.join(", "), bcc: bcc.join(", "), subject, body },
+    };
+  }
   if (params.to) {
     const name = params.toName?.trim();
     return {

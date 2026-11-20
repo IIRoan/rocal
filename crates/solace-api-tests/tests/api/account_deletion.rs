@@ -154,6 +154,7 @@ async fn owned_calendar(user: &mut TestUser) -> String {
 
 fn encrypted_event(external_id: &str, start: &str, end: &str) -> EncryptedIcsEvent {
     EncryptedIcsEvent {
+        id: crate::helpers::hex(16).into(),
         external_id: external_id.into(),
         series_external_id: None,
         occurrence_date: None,
@@ -165,7 +166,7 @@ fn encrypted_event(external_id: &str, start: &str, end: &str) -> EncryptedIcsEve
         recurrence: None,
         encrypted_content: fake_envelope(),
         blind_index_tokens: Some(vec![fake_token()]),
-        encryption_key_version: None,
+        encryption_key_version: Some(2),
         participants: None,
     }
 }
@@ -239,8 +240,19 @@ async fn fill_account(app: &TestApp, user: &mut TestUser) -> String {
         role: None,
         status: None,
     }]);
-    import(user, &calendar, vec![series, moved]).await;
+    let binned = encrypted_event(
+        "binned",
+        "2099-11-06T09:00:00.000Z",
+        "2099-11-06T10:00:00.000Z",
+    );
+    import(user, &calendar, vec![series, moved, binned]).await;
     let series_id = event_id(db, &calendar, "series").await;
+    // A deleted event waits in the trash, which the user row's cascade must take along.
+    let binned_id = event_id(db, &calendar, "binned").await;
+    ok(user
+        .delete(&format!("/api/events/{binned_id}"))
+        .await
+        .expect_status(200));
     ok(user
         .put(
             &format!("/api/notifications/event/{series_id}"),
@@ -283,14 +295,26 @@ async fn fill_account(app: &TestApp, user: &mut TestUser) -> String {
     ok(user
         .put(
             "/api/recent-contacts",
-            json!({"encryptedContent": fake_envelope()}),
+            json!({"encryptedContent": fake_envelope(), "encryptionKeyVersion": 2}),
         )
         .await
         .expect_status(200));
     ok(user
         .put(
             "/api/mail-settings",
-            json!({"encryptedContent": fake_envelope()}),
+            json!({"encryptedContent": fake_envelope(), "encryptionKeyVersion": 2}),
+        )
+        .await
+        .expect_status(200));
+    ok(user
+        .put(
+            "/api/e2ee/recovery-kit",
+            json!({
+                "currentPassword": user.password,
+                "recoveryAuthKey": format!("rk1:{}", fake_token()),
+                "wrappedAccountKey": fake_envelope(),
+                "wrappedSearchKey": fake_envelope(),
+            }),
         )
         .await
         .expect_status(200));
@@ -507,7 +531,7 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
         .expect("one-time token")
         .to_owned();
     let one_time = format!("one-time-token:{}", sha256_base64url(&one_time_token));
-    // Each passkey sign-in leaves a step-up marker for the native bridge's complete-step-up.
+    // Each passkey sign-in, and each token a stepped-up session hands over, leaves a step-up marker for complete-step-up.
     assert_eq!(
         verifications(&app.db, &victim.id, &one_time).await,
         [
@@ -544,6 +568,7 @@ async fn deleting_an_account_removes_every_row_mailbox_and_avatar_it_owns() {
         "user_encryption_password",
         "user_mail_settings",
         "user_recent_contacts",
+        "user_recovery_kit",
         "user_settings",
         "verification",
     ] {

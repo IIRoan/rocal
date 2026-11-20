@@ -14,6 +14,7 @@ import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  CALENDAR_SEARCH_OPERATOR_HINT,
   clockTimePattern,
   formatInUserTimezone,
   resolveTimezone,
@@ -40,6 +41,7 @@ import {
   CALENDAR_CREATE_PAGE,
 } from "../lib/calendars-sheet-pages";
 import { useNativeTitleIndex } from "../hooks/use-native-title-index";
+import { useCalendars } from "../hooks/use-calendar-management";
 import {
   mergePaletteSearchResults,
   type NativePaletteSearchResult,
@@ -101,6 +103,8 @@ export function CommandPalette() {
   const { navigate, push } = useRouter();
   const inputRef = useRef<TextInputInstance>(null);
   const titleIndex = useNativeTitleIndex();
+  const timezone = useUserTimezone();
+  const { data: calendars } = useCalendars();
 
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -153,11 +157,14 @@ export function CommandPalette() {
             query: trimmedQuery,
             events: eventCorpus ?? [],
             limit: SEARCH_LIMIT,
+            context: { timezone, calendars },
           })
         : [],
     [
+      calendars,
       eventCorpus,
       searchEnabled,
+      timezone,
       titleIndex.documents,
       trimmedQuery,
     ],
@@ -323,7 +330,12 @@ export function CommandPalette() {
               />
               <View style={styles.sectionCard}>
                 {calendarResults.length === 0 ? (
-                  <Text style={styles.emptyText}>No matching events.</Text>
+                  <>
+                    <Text style={styles.emptyText}>No matching events.</Text>
+                    <Text style={styles.hintText}>
+                      {CALENDAR_SEARCH_OPERATOR_HINT}
+                    </Text>
+                  </>
                 ) : (
                   calendarResults.map((result, index) => (
                     <SearchResultRow
@@ -583,6 +595,14 @@ function createStyles(theme: ThemeTokens) {
       fontSize: theme.typography.fontSize.sm.size,
       color: theme.colors.mutedForeground,
       paddingVertical: theme.spacing["4"],
+      paddingHorizontal: 14,
+      textAlign: "center" as const,
+    },
+    hintText: {
+      fontSize: theme.typography.fontSize.xs.size,
+      lineHeight: theme.typography.fontSize.xs.lineHeight,
+      color: theme.colors.mutedForeground,
+      paddingBottom: theme.spacing["4"],
       paddingHorizontal: 14,
       textAlign: "center" as const,
     },

@@ -25,6 +25,7 @@ import { BlobatarAvatar } from "@workspace/native-core/components/BlobatarAvatar
 import { MailAuthResultsBadge } from "./MailAuthResultsBadge";
 import { MailIdentityBadge } from "./MailIdentityBadge";
 import { MailSimpleLoginRow } from "./MailSimpleLoginRow";
+import { MailUnsubscribeRow } from "./MailUnsubscribeRow";
 import { RecipientLinkList, RecipientSheet } from "./RecipientSheet";
 import {
   MAIL_LAYOUT,
@@ -39,6 +40,8 @@ export type MailMessageHeaderProps = {
   identities: JmapIdentity[];
   simpleLoginPending: boolean;
   onSimpleLoginAction: (message: JmapEmailMessage, mode: SimpleLoginActionMode) => void;
+  unsubscribePending: boolean;
+  onUnsubscribe: (message: JmapEmailMessage) => void;
   timeFormat: TimeFormat;
   timezone?: string;
 };
@@ -52,6 +55,8 @@ export function MailMessageHeader({
   identities,
   simpleLoginPending,
   onSimpleLoginAction,
+  unsubscribePending,
+  onUnsubscribe,
   timeFormat,
   timezone,
 }: MailMessageHeaderProps) {
@@ -126,6 +131,12 @@ export function MailMessageHeader({
             identities={identities}
             pending={simpleLoginPending}
             onRun={onSimpleLoginAction}
+          />
+          <MailUnsubscribeRow
+            message={message}
+            identities={identities}
+            pending={unsubscribePending}
+            onUnsubscribe={onUnsubscribe}
           />
         </View>
       </View>

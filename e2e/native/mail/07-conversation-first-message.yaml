@@ -53,4 +53,4 @@ appId: ${APP_ID}
       BODY_TEXT: ".*Maestro peer opening note.*"
       OPEN_TIMEOUT_MS: 10000
 - takeScreenshot: ${SCREENSHOT_DIR}/conversation-first-delivery
-- tapOn: Go back
+- runFlow: ../common/go-back.yaml

@@ -10,7 +10,7 @@ appId: ${APP_ID}
     env:
       REPLY_TEXT: Maestro online recovery reply
       RECIPIENT_EMAIL: ${EMAIL}
-- tapOn: Go back
+- runFlow: go-back.yaml
 - tapOn: ".*Switch mailbox"
 - tapOn: Inbox
 - waitForAnimationToEnd
@@ -25,7 +25,8 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible:
       id: mail-message-text
-      text: ".*Maestro online recovery reply.*"
+      # The reply must sit above the quote header, not inside it.
+      text: "Maestro online recovery reply.*wrote:.*"
     timeout: 60000
 - assertVisible: Signed with your local key
 - takeScreenshot: ${SCREENSHOT_DIR}/mail-recovered-without-restart

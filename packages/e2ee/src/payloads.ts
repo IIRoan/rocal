@@ -1,9 +1,12 @@
 import {
+  BOUND_EVENT_CONTENT_VERSION,
   CONTENT_ENCRYPTION_KEY_VERSION,
   encryptedNameAad,
   encryptedNamePlaceholder,
   eventContentAad,
   findPlaintextEventContentFields,
+  storedEventId,
+  type CalendarEvent,
   type CreateCalendarRequest,
   type CreateCategoryRequest,
   type CreateEventRequest,
@@ -16,6 +19,11 @@ import {
   type UpdateEventRequest,
 } from "@workspace/calendar-core";
 import type { E2eeModule, EncryptedJsonPayload } from "./e2ee-module";
+import {
+  hydrateEncryptedEventWithoutSession,
+  withDecryptedEventContent,
+  type DecryptedEventContent,
+} from "./hydration";
 
 export type ContentEncrypter = Pick<E2eeModule, "encryptJsonPayload">;
 export type ContentDecrypter = Pick<E2eeModule, "decryptJsonPayload">;
@@ -87,14 +95,15 @@ export function shouldEncryptEventContent(request: object): boolean {
   return Boolean(trimToNull((request as { title?: string | null }).title));
 }
 
-/** A transient `invitationContent` copy is attached because invitees cannot decrypt the ciphertext. */
+/** Seals under the stored row id `eventId`; a transient `invitationContent` copy is attached because invitees cannot decrypt the ciphertext. */
 export async function encryptEventContentRequest<
   T extends CreateEventRequest | UpdateEventRequest,
 >(
   e2ee: ContentEncrypter,
   keys: E2eeSessionKeys,
   request: T,
-  keyVersion: number = CONTENT_ENCRYPTION_KEY_VERSION,
+  eventId: string,
+  keyVersion: number = BOUND_EVENT_CONTENT_VERSION,
 ): Promise<EventWireRequest<T>> {
   if (!shouldEncryptEventContent(request)) {
     return withoutPlaintextEventContent(request);
@@ -110,7 +119,7 @@ export async function encryptEventContentRequest<
     await e2ee.encryptJsonPayload(
       keys.accountKey,
       { title, description, location, color, categoryId },
-      eventContentAad(keyVersion),
+      eventContentAad(keyVersion, storedEventId(eventId)),
     ),
   );
   const {
@@ -141,6 +150,46 @@ export async function encryptEventContentRequest<
     attributesEncrypted: true,
     ...(invitationContent ? { invitationContent } : {}),
   };
+}
+
+/** Opens an event's content under the AAD its stored version names; null when it does not open or is unbound and `refuseUnbound`. */
+export async function decryptEventContent(
+  e2ee: ContentDecrypter,
+  keys: Pick<E2eeSessionKeys, "accountKey">,
+  event: Pick<CalendarEvent, "id" | "encryptedContent" | "encryptionKeyVersion">,
+  refuseUnbound: boolean,
+): Promise<DecryptedEventContent | null> {
+  const version = event.encryptionKeyVersion ?? CONTENT_ENCRYPTION_KEY_VERSION;
+  const payload = event.encryptedContent
+    ? parseEncryptedJsonPayload(event.encryptedContent)
+    : null;
+  if (!payload || (refuseUnbound && version < BOUND_EVENT_CONTENT_VERSION)) {
+    return null;
+  }
+  return e2ee
+    .decryptJsonPayload<DecryptedEventContent>(
+      keys.accountKey,
+      payload,
+      eventContentAad(version, storedEventId(event.id)),
+    )
+    .catch(() => null);
+}
+
+/** An encrypted event opened for display, or a read-only placeholder when it does not open on this device. */
+export async function openEncryptedEvent(
+  e2ee: ContentDecrypter | null,
+  keys: Pick<E2eeSessionKeys, "accountKey"> | null,
+  event: CalendarEvent,
+  refuseUnbound: boolean,
+): Promise<CalendarEvent> {
+  if (event.encryptionState !== "encrypted" || !event.encryptedContent) {
+    return event;
+  }
+  const content =
+    e2ee && keys ? await decryptEventContent(e2ee, keys, event, refuseUnbound) : null;
+  return content
+    ? withDecryptedEventContent(event, content)
+    : hydrateEncryptedEventWithoutSession(event);
 }
 
 /** Requests that do not rename (visibility, color) carry no name on the wire. */

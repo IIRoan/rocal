@@ -65,6 +65,7 @@ export function MailComposeProvider({ children }: { children: ReactNode }) {
           presentKey={presentKey}
           onClose={closeCompose}
           onCloseComplete={handleCloseComplete}
+          onRestore={openCompose}
         />
       </WorkspaceThemeScope>
     </MailComposeContext.Provider>

@@ -76,7 +76,7 @@ pub struct Config {
     pub mailer: Option<MailerConfig>,
     /// Verifies Stalwart's signed webhooks; the webhook answers 503 without it.
     pub stalwart_webhook_secret: Option<String>,
-    /// The backend-gate key the Railway Stalwart domain requires (`apps/stalwart/backend-gate.cfg`).
+    /// The key Stalwart's private gateway requires (`.zeabur/solace-mail/gateway/`, `apps/stalwart/backend-gate.cfg` in tests).
     pub stalwart_gate_key: Option<String>,
     pub stalwart_admin_user_ids: Vec<String>,
     pub stalwart_admin_gate_key: Option<String>,
@@ -90,7 +90,7 @@ pub struct Config {
     pub avatar_bucket: Option<AvatarBucketConfig>,
 }
 
-/// `env.avatarBucket`: an S3-compatible bucket (Railway) holding only re-encoded avatar variants.
+/// `env.avatarBucket`: an S3-compatible bucket holding only re-encoded avatar variants.
 #[derive(Debug, Clone)]
 pub struct AvatarBucketConfig {
     pub name: String,

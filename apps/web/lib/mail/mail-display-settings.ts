@@ -30,14 +30,9 @@ export {
 
 const STORAGE_KEY = MAIL_DISPLAY_SETTINGS_STORAGE_KEY;
 
+/** Trusted senders are sealed in their own store; every other key, known or from a newer client, stays here. */
 function serializeDisplayPreferences(settings: MailDisplaySettings): string {
-  const preferences = {
-    externalContentPolicy: settings.externalContentPolicy,
-    emailAppearance: settings.emailAppearance,
-    blockTrackingPixels: settings.blockTrackingPixels,
-    hideInlineImageAttachments: settings.hideInlineImageAttachments,
-    attachmentImagePreviewsEnabled: settings.attachmentImagePreviewsEnabled,
-  } satisfies Omit<MailDisplaySettings, "trustedSenders">;
+  const { trustedSenders: _trustedSenders, ...preferences } = settings;
   return JSON.stringify(preferences);
 }
 

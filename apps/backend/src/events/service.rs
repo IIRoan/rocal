@@ -10,10 +10,13 @@ use solace_api_types::events::{
     ParticipantInput, SealEncryptionRequest, UpdateEventRequest,
 };
 
-use super::encryption::{InvitationContentSource, clear_plaintext, resolve_invitation_content};
+use super::encryption::{
+    BOUND_EVENT_CONTENT_VERSION, InvitationContentSource, clear_plaintext, require_bound_content,
+    resolve_invitation_content,
+};
 use super::view::{self, Relations};
 use super::{constraints, queries, recurrence};
-use super::{participants, rsvp};
+use super::{participants, rsvp, trash};
 use crate::addresses::is_reserved_system_email;
 use crate::auth::guard::RouteUser;
 use crate::calendars::queries as calendars;
@@ -214,6 +217,18 @@ fn checked_reminder(minutes: Option<i32>) -> Result<Option<i32>, AppError> {
     Ok(minutes)
 }
 
+/// A mailed invitation's copy held by the caller as an attendee; deleting one declines or removes it instead of trashing it.
+pub fn is_attendee_invitation(
+    user_id: &str,
+    event: &calendar_event::Model,
+    participants: &[(
+        crate::db::entities::event_participant::Model,
+        Option<crate::db::entities::user::Model>,
+    )],
+) -> bool {
+    non_blank(event.external_id.as_deref()).is_some() && attendee_copy(user_id, participants)
+}
+
 /// `isAttendeeCopyForUser`: the caller is on the event as an attendee.
 fn attendee_copy(
     user_id: &str,
@@ -376,6 +391,10 @@ pub async fn create(
             "encryptedContent",
         ));
     }
+    require_bound_content(
+        Some(&request.encrypted_content),
+        request.encryption_key_version,
+    )?;
     let uid = format!("{}@solace-calendar.local", uuid::Uuid::new_v4());
     let mut row = calendar_event::ActiveModel {
         start: Set(start),
@@ -396,9 +415,10 @@ pub async fn create(
         ..Default::default()
     };
     clear_plaintext(&mut row);
-    if let Some(version) = request.encryption_key_version {
-        row.encryption_key_version = Set(version);
-    }
+    row.encryption_key_version = Set(request
+        .encryption_key_version
+        .unwrap_or(BOUND_EVENT_CONTENT_VERSION));
+    row.id = Set(request.id.0.clone());
     let event = queries::insert(&state.db, row).await?;
     let synced = participants::sync(
         &state.db,
@@ -476,6 +496,10 @@ pub async fn update(
     let existing_participants =
         queries::participants_with_users(&state.db, std::slice::from_ref(&existing.id)).await?;
     assert_editable(&user.id, &existing, &existing_participants)?;
+    require_bound_content(
+        request.encrypted_content.as_deref(),
+        request.encryption_key_version,
+    )?;
     let start = request
         .start
         .as_deref()
@@ -582,9 +606,10 @@ pub async fn update(
     if let Some(content) = &request.encrypted_content {
         row.encrypted_content = Set(Some(content.clone()));
         row.blind_index_tokens = Set(None);
-    }
-    if let Some(version) = request.encryption_key_version {
-        row.encryption_key_version = Set(version);
+        // The version names the AAD of this ciphertext, so it never changes without it.
+        row.encryption_key_version = Set(request
+            .encryption_key_version
+            .unwrap_or(BOUND_EVENT_CONTENT_VERSION));
     }
     row.updated_at = Set(instant::now());
     let updated = queries::update_if_unchanged(&state.db, row, &id, seen)
@@ -694,8 +719,7 @@ pub async fn delete(
     refuse_synced(&existing, "delete")?;
     let participants =
         queries::participants_with_users(&state.db, std::slice::from_ref(&existing.id)).await?;
-    let attendee_invitation = non_blank(existing.external_id.as_deref()).is_some()
-        && attendee_copy(&user.id, &participants);
+    let attendee_invitation = is_attendee_invitation(&user.id, &existing, &participants);
     if attendee_invitation && !existing.is_cancelled {
         rsvp::respond(state, user, &id, RsvpStatus::Declined).await?;
         rsvp::purge(state, user, &id).await?;
@@ -703,18 +727,27 @@ pub async fn delete(
             success: true,
             message: "Invitation declined and removed from your calendar".into(),
             deleted_event_id: id.into(),
+            trash_id: None,
         });
     }
     let transaction = state.db.begin().await?;
-    let deleted_reminders = queries::delete_reminders(&transaction, vec![id.clone()]).await?;
-    queries::delete_notification_logs(&transaction, Some(&user.id), vec![id.clone()]).await?;
-    queries::delete(&transaction, &user.id, vec![id.clone()]).await?;
+    let trash_id = if attendee_invitation {
+        let deleted_reminders = queries::delete_reminders(&transaction, vec![id.clone()]).await?;
+        queries::delete_notification_logs(&transaction, Some(&user.id), vec![id.clone()]).await?;
+        queries::delete(&transaction, &user.id, vec![id.clone()]).await?;
+        tracing::info!(
+            deleted_reminders,
+            "Deleted notifications for a deleted event"
+        );
+        None
+    } else {
+        trash::trash_events(&transaction, &user.id, std::slice::from_ref(&id))
+            .await?
+            .into_iter()
+            .next()
+    };
     transaction.commit().await?;
-    tracing::info!(
-        deleted_reminders,
-        "Deleted notifications for a deleted event"
-    );
-    let message = if attendee_invitation && existing.is_cancelled {
+    let message = if attendee_invitation {
         "Cancelled event removed from your calendar"
     } else {
         "Event deleted successfully"
@@ -723,6 +756,7 @@ pub async fn delete(
         success: true,
         message: message.into(),
         deleted_event_id: id.into(),
+        trash_id: trash_id.map(Into::into),
     })
 }
 
@@ -798,24 +832,28 @@ pub async fn bulk(
         }
         "delete" => {
             let invitation = |e: &calendar_event::Model| {
-                non_blank(e.external_id.as_deref()).is_some() && attendee(e)
+                is_attendee_invitation(&user.id, e, relations.participants_of(&e.id))
             };
             let mut declined: u64 = 0;
             for event in events.iter().filter(|e| invitation(e) && !e.is_cancelled) {
                 rsvp::respond(state, user, &event.id, RsvpStatus::Declined).await?;
                 declined += 1;
             }
-            let local: Vec<String> = events
+            let (cancelled, trashable): (Vec<&calendar_event::Model>, Vec<_>) = events
                 .iter()
                 .filter(|e| !invitation(e) || e.is_cancelled)
-                .map(|e| e.id.clone())
-                .collect();
-            let mut deleted = declined;
-            if !local.is_empty() {
+                .partition(|e| invitation(e));
+            let ids = |rows: Vec<&calendar_event::Model>| -> Vec<String> {
+                rows.into_iter().map(|e| e.id.clone()).collect()
+            };
+            let (cancelled, trashable) = (ids(cancelled), ids(trashable));
+            let mut deleted = declined + trashable.len() as u64;
+            if !cancelled.is_empty() || !trashable.is_empty() {
                 let transaction = state.db.begin().await?;
-                queries::delete_reminders(&transaction, local.clone()).await?;
-                queries::delete_notification_logs(&transaction, None, local.clone()).await?;
-                deleted += queries::delete(&transaction, &user.id, local).await?;
+                queries::delete_reminders(&transaction, cancelled.clone()).await?;
+                queries::delete_notification_logs(&transaction, None, cancelled.clone()).await?;
+                deleted += queries::delete(&transaction, &user.id, cancelled).await?;
+                trash::trash_events(&transaction, &user.id, &trashable).await?;
                 transaction.commit().await?;
             }
             Ok(BulkEventResult {
@@ -862,6 +900,13 @@ async fn duplicate(
     relations: &Relations,
     target_calendar_id: Option<&str>,
 ) -> Result<BulkEventResult, AppError> {
+    // Sealed content opens only under its own row id, or is unbound content that is never written again, so a copy needs new ciphertext from the client.
+    if events
+        .iter()
+        .any(|event| non_blank(event.encrypted_content.as_deref()).is_some())
+    {
+        return Err(AppError::validation("Duplicate this event in the app."));
+    }
     let settings = queries::settings(&state.db, &user.id).await?;
     let mut created = Vec::new();
     for event in events {
@@ -952,6 +997,10 @@ pub async fn seal(
             "encryptedContent",
         ));
     }
+    require_bound_content(
+        Some(&request.encrypted_content),
+        request.encryption_key_version,
+    )?;
     let existing = queries::find(&state.db, &user.id, id)
         .await?
         .ok_or_else(not_found)?;
@@ -970,7 +1019,9 @@ pub async fn seal(
     clear_plaintext(&mut row);
     row.encrypted_content = Set(Some(request.encrypted_content));
     row.blind_index_tokens = Set(None);
-    row.encryption_key_version = Set(request.encryption_key_version.unwrap_or(1));
+    row.encryption_key_version = Set(request
+        .encryption_key_version
+        .unwrap_or(BOUND_EVENT_CONTENT_VERSION));
     let updated = queries::update(&state.db, row).await?;
     view::one(&state.db, &updated).await
 }
@@ -983,17 +1034,17 @@ async fn reseal(
     expected: &str,
     request: SealEncryptionRequest,
 ) -> Result<Event, AppError> {
-    let mut row = calendar_event::ActiveModel {
+    let row = calendar_event::ActiveModel {
         encrypted_content: Set(Some(request.encrypted_content)),
         color: Set(None),
         category_id: Set(None),
         blind_index_tokens: Set(None),
+        encryption_key_version: Set(request
+            .encryption_key_version
+            .unwrap_or(BOUND_EVENT_CONTENT_VERSION)),
         updated_at: Set(instant::now()),
         ..Default::default()
     };
-    if let Some(version) = request.encryption_key_version {
-        row.encryption_key_version = Set(version);
-    }
     let updated = queries::reseal_if_unchanged(&state.db, &user.id, id, expected, row)
         .await?
         .ok_or_else(|| {

@@ -12,17 +12,15 @@ use solace_api_types::e2ee::PasswordEnvelopeRequest;
 
 use super::api::{ApiError, codes, json, validate};
 use super::email_password::{check_auth_key_email, check_new_password};
-use super::guard;
 use super::hooks::{self, Reply};
 use super::password::{self, Verdict};
 use super::pipeline::AuthBody;
 use super::session;
-use super::sessions::require_session;
+use super::sessions::{require_session, require_step_up};
 use super::store;
 use crate::db::entities::user;
 use crate::e2ee;
 use crate::email;
-use crate::error::AppError;
 use crate::http::extract::RequestSchema;
 use crate::http::zod::{self, Schema};
 use crate::state::AppState;
@@ -57,20 +55,6 @@ struct PasswordBody {
 
 static VERIFY: LazyLock<Schema> = LazyLock::new(|| zod::object([("password", zod::string())]));
 
-/// The sign-in page the "password updated" mail links to.
-fn sign_in_url(state: &AppState) -> String {
-    format!("{}/login", state.config.frontend_url.trim_end_matches('/'))
-}
-
-fn greeting(user: &user::Model) -> String {
-    let name = user.name.trim();
-    if name.is_empty() {
-        "there".into()
-    } else {
-        name.to_owned()
-    }
-}
-
 /// The current password must match; a legacy hash can only be checked once the client resends it raw.
 fn require_match(verdict: Verdict) -> Result<(), ApiError> {
     match verdict {
@@ -81,7 +65,7 @@ fn require_match(verdict: Verdict) -> Result<(), ApiError> {
 }
 
 async fn notify_password_updated(state: &AppState, user: &user::Model) {
-    let message = email::password_updated(&greeting(user), &sign_in_url(state));
+    let message = email::password_updated(&email::greeting(&user.name), &email::sign_in_url(state));
     let _ = email::send(
         state,
         "password update notification",
@@ -103,12 +87,7 @@ pub async fn change_password(
         let active = require_session(&state, &headers, &mut cookies).await?;
         // A new envelope decides which keys new devices open, so it needs the same passkey step-up as `PUT /api/e2ee/password`.
         if body.password_envelope.is_some() {
-            guard::step_up(&state, &headers, &active)
-                .await
-                .map_err(|error| match error {
-                    AppError::StepUpRequired => codes::passkey_step_up_required(),
-                    _ => ApiError::internal(),
-                })?;
+            require_step_up(&state, &headers, &active).await?;
         } else if e2ee::service::has_password_envelope(&state, &active.user.id).await? {
             // Without the rewrapped envelope the new password could no longer open the keys on a new device.
             return Err(codes::password_envelope_required());

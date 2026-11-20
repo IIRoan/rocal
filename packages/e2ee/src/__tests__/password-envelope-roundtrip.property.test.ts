@@ -1,10 +1,8 @@
 import { describe, it, expect } from "@jest/globals";
 import fc from "fast-check";
-import { webcrypto } from "node:crypto";
 
-import type { CryptoProvider } from "../crypto-provider";
-import { createE2eeModule } from "../e2ee-module";
 import type { E2eeModule } from "../e2ee-module";
+import { pbkdf2Envelope, testE2eeModule } from "./envelope-fixtures";
 
 /**
  * Property 11: Password envelope round-trip
@@ -19,9 +17,7 @@ import type { E2eeModule } from "../e2ee-module";
 
 // ─── Setup ───────────────────────────────────────────────────────────────────
 
-const nodeCrypto: CryptoProvider = webcrypto as unknown as CryptoProvider;
-
-const e2eeModule: E2eeModule = createE2eeModule(nodeCrypto);
+const e2eeModule: E2eeModule = testE2eeModule;
 
 // ─── Arbitraries ─────────────────────────────────────────────────────────────
 
@@ -98,6 +94,31 @@ describe("Password envelope round-trip - Property Tests", () => {
       );
     }, 60_000);
   });
+
+  it("writes Argon2id envelopes with the mail vault's parameters", async () => {
+    const envelope = await e2eeModule.createPasswordEnvelope(
+      await e2eeModule.generateAccountKey(),
+      await e2eeModule.generateBlindIndexKey(),
+      "pw",
+    );
+    expect(envelope).toMatchObject({
+      kdfAlgorithm: "Argon2id",
+      kdfIterations: 3,
+      kdfMemoryKiB: 65536,
+      kdfParallelism: 4,
+    });
+  });
+
+  it.each([310000, 600000])("still opens a PBKDF2 envelope written at %i iterations", async (kdfIterations) => {
+    const accountKey = await e2eeModule.generateAccountKey();
+    const blindIndexKey = await e2eeModule.generateBlindIndexKey();
+    const envelope = await pbkdf2Envelope({ password: "pw", accountKey, blindIndexKey, kdfIterations });
+
+    const recovered = await e2eeModule.unwrapPasswordEnvelope("pw", envelope);
+
+    const sealed = await e2eeModule.encryptJsonPayload(accountKey, "legacy");
+    await expect(e2eeModule.decryptJsonPayload(recovered.accountKey, sealed)).resolves.toBe("legacy");
+  }, 30_000);
 
   describe("Unwrapping with a wrong password fails", () => {
     it("should throw an error when unwrapping with a different password", async () => {

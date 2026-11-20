@@ -58,6 +58,7 @@ export function MailAppListColumn({
     isSearchDebouncing,
     searchActive,
     searchCoverageText,
+    searchIssues,
     showSearchLoadingState,
     searchInputRef,
     clearListSearch,
@@ -89,6 +90,7 @@ export function MailAppListColumn({
     hasMoreMessages,
     isLoadingMore,
     listSettings,
+    scheduledSendAtById,
   } = controller;
 
   const contentRef = useRef<HTMLDivElement>(null);
@@ -206,6 +208,9 @@ export function MailAppListColumn({
             }
           />
         )}
+        <p role="status" className="px-3 py-1 text-xs text-destructive empty:hidden">
+          {searchIssues.join(" ")}
+        </p>
         <p role="status" className="sr-only">
           {listStatus}
         </p>
@@ -289,6 +294,7 @@ export function MailAppListColumn({
               labels={labels}
               timeFormat={timeFormat}
               timezone={timezone}
+              scheduledSendAtById={scheduledSendAtById}
               onLoadMore={
                 searchActive
                   ? undefined

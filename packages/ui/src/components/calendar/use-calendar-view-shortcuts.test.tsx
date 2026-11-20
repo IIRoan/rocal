@@ -12,25 +12,41 @@ import {
 import { createRoot, type Root } from "react-dom/client";
 
 import type { CalendarView } from "./types";
-import { useCalendarViewShortcuts } from "./use-calendar-view-shortcuts";
+import { useCalendarShortcuts } from "./use-calendar-view-shortcuts";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 const onViewChange = jest.fn<(view: CalendarView) => void>();
+const actions = {
+  onViewChange,
+  onPrevious: jest.fn(),
+  onNext: jest.fn(),
+  onToday: jest.fn(),
+  onGoToDate: jest.fn(),
+  onCreate: jest.fn(),
+  onSearch: jest.fn(),
+  onHelp: jest.fn(),
+};
 
-function Harness() {
-  useCalendarViewShortcuts(onViewChange);
+function Harness({
+  enabled = true,
+  viewOnly = false,
+}: {
+  enabled?: boolean;
+  viewOnly?: boolean;
+}) {
+  useCalendarShortcuts(viewOnly ? { onViewChange } : actions, enabled);
   return null;
 }
 
-describe("useCalendarViewShortcuts", () => {
+describe("useCalendarShortcuts", () => {
   let container: HTMLDivElement;
   let root: Root;
 
   beforeEach(() => {
-    onViewChange.mockClear();
+    jest.clearAllMocks();
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -108,5 +124,82 @@ describe("useCalendarViewShortcuts", () => {
     press(button, "m");
 
     expect(onViewChange).not.toHaveBeenCalled();
+  });
+
+  it.each(["combobox", "listbox"])(
+    "leaves type-ahead to a select's %s, which opens outside the dialog",
+    (role) => {
+      const select = document.createElement("div");
+      select.setAttribute("role", role);
+      select.dataset.state = "closed";
+      const option = document.createElement("div");
+      select.appendChild(option);
+      document.body.appendChild(select);
+
+      for (const key of ["w", "c", "j", "/"]) press(option, key);
+
+      expect(onViewChange).not.toHaveBeenCalled();
+      expect(actions.onCreate).not.toHaveBeenCalled();
+      expect(actions.onNext).not.toHaveBeenCalled();
+      expect(actions.onSearch).not.toHaveBeenCalled();
+    },
+  );
+
+  it("works again once a dialog closed with focus still inside it", () => {
+    const dialog = document.createElement("div");
+    dialog.setAttribute("role", "dialog");
+    dialog.dataset.state = "closed";
+    const button = document.createElement("button");
+    dialog.appendChild(button);
+    document.body.appendChild(dialog);
+
+    press(button, "m");
+
+    expect(onViewChange).toHaveBeenCalledWith("month");
+  });
+
+  it.each([
+    ["j", "onNext"],
+    ["k", "onPrevious"],
+    ["n", "onToday"],
+    ["g", "onGoToDate"],
+    ["c", "onCreate"],
+    ["/", "onSearch"],
+  ] as const)("runs %s", (key, handler) => {
+    const event = press(document.body, key);
+
+    expect(actions[handler]).toHaveBeenCalledTimes(1);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it("accepts Shift only for symbols such as ?", () => {
+    press(document.body, "?", { shiftKey: true });
+    press(document.body, "J", { shiftKey: true });
+
+    expect(actions.onHelp).toHaveBeenCalledTimes(1);
+    expect(actions.onNext).not.toHaveBeenCalled();
+  });
+
+  it("turns every shortcut off when disabled", () => {
+    act(() => root.render(<Harness enabled={false} />));
+
+    for (const key of ["w", "j", "n", "g", "c", "/", "?"]) {
+      press(document.body, key);
+    }
+
+    expect(onViewChange).not.toHaveBeenCalled();
+    for (const handler of Object.values(actions)) {
+      expect(handler).not.toHaveBeenCalled();
+    }
+  });
+
+  it("leaves keys without a handler to the browser", () => {
+    act(() => root.render(<Harness viewOnly />));
+
+    const search = press(document.body, "/");
+    press(document.body, "m");
+
+    expect(search.defaultPrevented).toBe(false);
+    expect(onViewChange).toHaveBeenCalledWith("month");
   });
 });

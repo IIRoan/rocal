@@ -27,7 +27,7 @@ const answers = [
   {
     question: "What if I forget my password?",
     answer:
-      "Your password signs you in and opens your encrypted data on every device. Solace does not reset passwords from the sign-in screen, so email support from a different address. Without your password, no one, including Solace, can open your encrypted content.",
+      "Your password signs you in and opens your encrypted data on every device. Choose Forgot password on the sign-in screen and enter your recovery kit to set a new one; your data stays readable. Without a recovery kit, email support from a different address. Without your password or your recovery kit, no one, including Solace, can open your encrypted content.",
   },
   {
     question: "How do I change notification permissions?",

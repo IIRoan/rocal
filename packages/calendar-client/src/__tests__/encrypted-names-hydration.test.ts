@@ -21,6 +21,7 @@ function decryptingProvider(): E2eeProvider {
     hydrateEncryptedCategory: decryptName,
     attachCalendarEncryptionShadow: async ({ name, ...rest }: { name?: string }) =>
       name ? { ...rest, encryptedName: `sealed:${name}`, encryptionKeyVersion: 1 } : rest,
+    encryptJson: async (value: unknown) => `sealed:${JSON.stringify(value)}`,
     attachEventEncryptionShadow: async (request: Record<string, unknown>) => {
       const wire = { ...request, encryptedContent: "ciphertext" };
       for (const field of ["title", "description", "location", "color", "categoryId"]) {
@@ -122,6 +123,7 @@ describe("CalendarApiService encrypted names", () => {
     expect(JSON.parse(body)).toEqual({
       editScope: "this_only",
       occurrenceDate: "2026-06-01T09:00:00.000Z",
+      newEventId: expect.stringMatching(/^[0-9a-f]{32}$/),
       updates: { encryptedContent: "ciphertext" },
     });
   });
@@ -155,6 +157,7 @@ describe("CalendarApiService encrypted names", () => {
         color: "rose",
         categoryId: "k1",
       }),
+      "e1",
     );
 
     fetchMock.mockClear();
@@ -178,15 +181,17 @@ describe("CalendarApiService encrypted names", () => {
 
     const created = await service.createSubscription({
       name: "Therapy practice",
-      url: "https://feeds.test/a.ics",
+      url: "https://feeds.test/new.ics",
       color: "blue",
     });
     await service.updateSubscription("s1", { name: "Clinic", isActive: false, expectedNameRevision: "original-revision" });
     const [listed] = await service.getSubscriptions();
 
-    const bodies = fetchMock.mock.calls.map(([, init]) => init?.body && JSON.parse(String(init.body)));
+    const bodies = fetchMock.mock.calls
+      .filter(([, init]) => init?.body)
+      .map(([, init]) => JSON.parse(String(init?.body)));
     expect(bodies.slice(0, 2)).toEqual([
-      { url: "https://feeds.test/a.ics", color: "blue", encryptedName: "sealed:Therapy practice", encryptionKeyVersion: 1 },
+      { id: expect.stringMatching(/^[0-9a-f]{32}$/), url: "https://feeds.test/new.ics", color: "blue", encryptedName: "sealed:Therapy practice", encryptionKeyVersion: 1, encryptedUrl: `sealed:${JSON.stringify({ url: "https://feeds.test/new.ics" })}` },
       { isActive: false, expectedNameRevision: "original-revision", encryptedName: "sealed:Clinic", encryptionKeyVersion: 1 },
     ]);
     for (const subscription of [created, listed]) {

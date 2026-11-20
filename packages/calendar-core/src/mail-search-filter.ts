@@ -1,4 +1,5 @@
 import { getMailListAgeCutoff, type MailListFilters } from "./mail-list-view-filter";
+import { parseStalwartSizeBytes } from "./mail-server-limits";
 import { getZonedDayUtcBounds, resolveTimezone } from "./timezone";
 
 export type MailSearchFilterCondition = {
@@ -11,7 +12,19 @@ export type MailSearchFilterCondition = {
   after?: string;
   isFlagged?: boolean;
   isUnread?: boolean;
+  cc?: string;
+  /** A negated plain word, matched against subject, sender, recipient and text. */
+  text?: string;
+  isRead?: boolean;
+  /** Positive: the folder to search instead of the open one; negated: messages outside it. */
+  inMailbox?: MailSearchNamedRef;
+  label?: MailSearchNamedRef;
+  minSize?: number;
+  maxSize?: number;
+  negated?: boolean;
 };
+
+export type MailSearchNamedRef = { id: string; name: string };
 
 export type MailSearchFilters = {
   text?: string;
@@ -20,7 +33,7 @@ export type MailSearchFilters = {
 
 export type MailSearchChip = {
   field: keyof MailSearchFilterCondition;
-  value: string | boolean;
+  value: string | boolean | number | MailSearchNamedRef;
   label: string;
 };
 
@@ -101,37 +114,94 @@ export function toJmapUtcDate(
   return instant.toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
+/** Quotes a value the parser would split or read as an operator or negation; it drops quotes, so they go here too. */
+export function formatSearchOperatorValue(value: string): string {
+  const bare = value.replace(/"/g, "");
+  return /[\s:]|^-/.test(bare) ? `"${bare}"` : bare;
+}
+
+const SIZE_SUFFIXES: [number, string][] = [
+  [1_000_000_000, "G"],
+  [1_000_000, "M"],
+  [1_000, "K"],
+];
+
+/** `500K`, `10M` or plain bytes, in the same decimal units the size operators parse. */
+export function formatSearchSize(bytes: number): string {
+  for (const [unit, suffix] of SIZE_SUFFIXES) {
+    if (bytes >= unit && bytes % unit === 0) return `${bytes / unit}${suffix}`;
+  }
+  return String(bytes);
+}
+
+/** Bytes for `500K`, `10M`, `1G`, `2MB` or plain bytes; `null` when it is not a size. */
+export function parseSearchSize(value: string): number | null {
+  const trimmed = value.trim().toLowerCase();
+  return parseStalwartSizeBytes(/[kmg]$/.test(trimmed) ? `${trimmed}b` : trimmed);
+}
+
+function chip(
+  condition: MailSearchFilterCondition,
+  field: keyof MailSearchFilterCondition,
+  value: MailSearchChip["value"],
+  label: string,
+): MailSearchChip {
+  return { field, value, label: condition.negated ? `-${label}` : label };
+}
+
 export function conditionToChip(
   condition: MailSearchFilterCondition,
 ): MailSearchChip[] {
   const chips: MailSearchChip[] = [];
+  const quoted = formatSearchOperatorValue;
 
   if (condition.from) {
-    chips.push({ field: "from", value: condition.from, label: `from:${condition.from}` });
+    chips.push(chip(condition, "from", condition.from, `from:${quoted(condition.from)}`));
   }
   if (condition.to) {
-    chips.push({ field: "to", value: condition.to, label: `to:${condition.to}` });
+    chips.push(chip(condition, "to", condition.to, `to:${quoted(condition.to)}`));
+  }
+  if (condition.cc) {
+    chips.push(chip(condition, "cc", condition.cc, `cc:${quoted(condition.cc)}`));
   }
   if (condition.subject) {
-    chips.push({ field: "subject", value: condition.subject, label: `subject:${condition.subject}` });
+    chips.push(chip(condition, "subject", condition.subject, `subject:${quoted(condition.subject)}`));
   }
   if (condition.body) {
     chips.push({ field: "body", value: condition.body, label: `body:${condition.body}` });
   }
+  if (condition.text) {
+    chips.push(chip(condition, "text", condition.text, quoted(condition.text)));
+  }
   if (condition.hasAttachment) {
-    chips.push({ field: "hasAttachment", value: true, label: "has:attachment" });
+    chips.push(chip(condition, "hasAttachment", true, "has:attachment"));
   }
   if (condition.before) {
-    chips.push({ field: "before", value: condition.before, label: `before:${condition.before}` });
+    chips.push(chip(condition, "before", condition.before, `before:${condition.before}`));
   }
   if (condition.after) {
-    chips.push({ field: "after", value: condition.after, label: `after:${condition.after}` });
+    chips.push(chip(condition, "after", condition.after, `after:${condition.after}`));
   }
   if (condition.isFlagged) {
-    chips.push({ field: "isFlagged", value: true, label: "is:starred" });
+    chips.push(chip(condition, "isFlagged", true, "is:starred"));
   }
   if (condition.isUnread) {
-    chips.push({ field: "isUnread", value: true, label: "is:unread" });
+    chips.push(chip(condition, "isUnread", true, "is:unread"));
+  }
+  if (condition.isRead) {
+    chips.push(chip(condition, "isRead", true, "is:read"));
+  }
+  if (condition.inMailbox) {
+    chips.push(chip(condition, "inMailbox", condition.inMailbox, `in:${quoted(condition.inMailbox.name)}`));
+  }
+  if (condition.label) {
+    chips.push(chip(condition, "label", condition.label, `label:${quoted(condition.label.name)}`));
+  }
+  if (condition.minSize !== undefined) {
+    chips.push(chip(condition, "minSize", condition.minSize, `larger:${formatSearchSize(condition.minSize)}`));
+  }
+  if (condition.maxSize !== undefined) {
+    chips.push(chip(condition, "maxSize", condition.maxSize, `smaller:${formatSearchSize(condition.maxSize)}`));
   }
 
   return chips;
@@ -165,25 +235,61 @@ function conditionToJmapFragment(
   if (after) fragment.after = after;
   if (condition.isFlagged) fragment.hasKeyword = "$flagged";
   if (condition.isUnread) fragment.notKeyword = "$seen";
+  if (condition.cc?.trim()) fragment.cc = condition.cc.trim();
+  if (condition.text?.trim()) fragment.text = toJmapTextQuery(condition.text);
+  if (condition.isRead) fragment.hasKeyword = "$seen";
+  if (condition.label) fragment.hasKeyword = `label:${condition.label.id}`;
+  if (condition.minSize !== undefined) fragment.minSize = condition.minSize;
+  if (condition.maxSize !== undefined) fragment.maxSize = condition.maxSize;
+  // A positive folder is the search scope (`resolveMailSearchScope`), not a filter.
+  if (condition.inMailbox && condition.negated) fragment.inMailbox = condition.inMailbox.id;
 
-  return fragment;
+  if (!condition.negated || Object.keys(fragment).length === 0) return fragment;
+  return { operator: "NOT", conditions: [fragment] };
 }
 
-/** Builds a JMAP Email/query FilterCondition (or AND operator) scoped to one mailbox. */
+/** The folder a search runs in: the first typed `in:` folder, else the open one. */
+export function resolveMailSearchScope(
+  currentMailboxId: string,
+  filters: MailSearchFilters | null | undefined,
+): string {
+  const scoped = filters?.conditions.find(
+    (condition) => condition.inMailbox && !condition.negated,
+  );
+  return scoped?.inMailbox?.id ?? currentMailboxId;
+}
+
+function isNegatedFragment(fragment: Record<string, unknown>): boolean {
+  return fragment.operator === "NOT";
+}
+
+/** Builds a JMAP Email/query FilterCondition (or AND operator) scoped to one mailbox, or to a typed `in:` folder. */
 export function buildJmapFilter(
-  mailboxId: string,
+  currentMailboxId: string,
   filters: MailSearchFilters,
   options: { timezone?: string | null } = {},
 ): Record<string, unknown> {
+  const fragments = filters.conditions
+    .map((condition) => conditionToJmapFragment(condition, options.timezone))
+    .filter((fragment) => Object.keys(fragment).length > 0);
+  const negated = fragments.filter(isNegatedFragment);
+  const filter = buildPositiveJmapFilter(
+    resolveMailSearchScope(currentMailboxId, filters),
+    filters.text?.trim(),
+    fragments.filter((fragment) => !isNegatedFragment(fragment)),
+  );
+  return negated.length === 0 ? filter : { operator: "AND", conditions: [filter, ...negated] };
+}
+
+function buildPositiveJmapFilter(
+  mailboxId: string,
+  text: string | undefined,
+  conditionFragments: Record<string, unknown>[],
+): Record<string, unknown> {
   const base: Record<string, unknown> = { inMailbox: mailboxId };
-  const text = filters.text?.trim();
   if (text) {
     base.text = toJmapTextQuery(text);
   }
-
-  const conditionFragments = filters.conditions
-    .map((condition) => conditionToJmapFragment(condition, options.timezone))
-    .filter((fragment) => Object.keys(fragment).length > 0);
 
   if (conditionFragments.length === 0) {
     return base;

@@ -1,4 +1,8 @@
-import type { E2eeModule, PasswordEnvelopeInput } from "./e2ee-module";
+import {
+  PASSWORD_ARGON2ID_ALGORITHM,
+  type E2eeModule,
+  type PasswordEnvelopeInput,
+} from "./e2ee-module";
 
 /** The salt of the envelope known to hold this device's account key; sign-out may delete a device key only while one is known. */
 export async function resolveDeviceEnvelopeSalt(
@@ -27,6 +31,16 @@ export async function resolveDeviceEnvelopeSalt(
     () => envelope.kdfSalt,
     () => null,
   );
+}
+
+/** Whether the sign-in password should rewrap the envelope: it must hold this device's key, or the rewrap would orphan the key it holds. */
+export function shouldUpgradePasswordEnvelope(input: {
+  envelope: Pick<PasswordEnvelopeInput, "kdfSalt" | "kdfAlgorithm"> | null;
+  deviceEnvelopeSalt: string | null | undefined;
+}): boolean {
+  const { envelope, deviceEnvelopeSalt } = input;
+  if (!envelope || deviceEnvelopeSalt !== envelope.kdfSalt) return false;
+  return envelope.kdfAlgorithm !== PASSWORD_ARGON2ID_ALGORITHM;
 }
 
 /** Why a signed-in device cannot open the account key; the session then ends instead of asking for a password. */

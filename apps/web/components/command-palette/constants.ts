@@ -268,6 +268,7 @@ export type PaletteView =
   | "categories"
   | "category-create"
   | "category-edit"
+  | "trash"
   | "subscriptions"
   | "subscriptions-add-feed"
   | "subscriptions-holidays"

@@ -223,7 +223,7 @@ class SolaceAdminGateTests(unittest.TestCase):
     def test_private_authorizer_hostname_uses_the_configured_dns_resolver(self):
         ipv6_authorizer = IPv6HTTPServer(("::1", 0), Authorizer)
         threading.Thread(target=ipv6_authorizer.serve_forever, daemon=True).start()
-        # Railway environments created before 2025-10-16, like production, resolve private names to IPv6 only.
+        # Some private networks resolve their names to IPv6 only.
         for families, port, query in (((1, 28), self.authorizer.server_port, 1),
                                       ((28,), ipv6_authorizer.server_port, 28)):
             with self.subTest(families=families):
@@ -233,7 +233,7 @@ class SolaceAdminGateTests(unittest.TestCase):
                 with open(config, "w") as handle:
                     handle.write(contents.replace("parse-resolv-conf", f"nameserver test_dns 127.0.0.1:{dns.port}"))
                 env = {**self.env,
-                       "SOLACE_ADMIN_AUTH_URL": f"http://solace-api.railway.internal:{port}/api/internal/stalwart/admin-access",
+                       "SOLACE_ADMIN_AUTH_URL": f"http://solace-api.solace.internal:{port}/api/internal/stalwart/admin-access",
                        "STALWART_GATE_PORT": str(gate_tools.free_port()),
                        "STALWART_PUBLIC_PORT": str(gate_tools.free_port())}
                 process = self.start_gate(env, config)

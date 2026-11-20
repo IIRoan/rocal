@@ -1,11 +1,10 @@
 import { describe, expect, it } from "@jest/globals";
-import { webcrypto } from "node:crypto";
-import type { CryptoProvider } from "../crypto-provider";
-import { lockWithoutDeviceKeys, resolveDeviceEnvelopeSalt } from "../device-key";
-import { createE2eeModule } from "../e2ee-module";
-
-// Node's WebCrypto matches the provider at runtime; only the DOM-shaped declarations differ.
-const e2ee = createE2eeModule(webcrypto as unknown as CryptoProvider);
+import {
+  lockWithoutDeviceKeys,
+  resolveDeviceEnvelopeSalt,
+  shouldUpgradePasswordEnvelope,
+} from "../device-key";
+import { testE2eeModule as e2ee } from "./envelope-fixtures";
 
 async function envelopeFor(password: string) {
   const [accountKey, blindIndexKey] = await Promise.all([
@@ -90,6 +89,21 @@ describe("resolveDeviceEnvelopeSalt", () => {
         accountKey,
       }),
     ).resolves.toBeNull();
+  });
+});
+
+describe("shouldUpgradePasswordEnvelope", () => {
+  const legacy = { kdfSalt: "salt", kdfAlgorithm: "PBKDF2-SHA-256" };
+
+  it.each([
+    ["rewraps a PBKDF2 envelope that holds this device's key", legacy, "salt", true],
+    ["rewraps a legacy envelope that names no KDF", { kdfSalt: "salt" }, "salt", true],
+    ["leaves an envelope that may hold another key", legacy, "other-salt", false],
+    ["leaves an envelope no remembered salt vouches for", legacy, null, false],
+    ["leaves an Argon2id envelope", { ...legacy, kdfAlgorithm: "Argon2id" }, "salt", false],
+    ["has nothing to rewrap without an envelope", null, "salt", false],
+  ])("%s", (_case, envelope, deviceEnvelopeSalt, expected) => {
+    expect(shouldUpgradePasswordEnvelope({ envelope, deviceEnvelopeSalt })).toBe(expected);
   });
 });
 

@@ -608,7 +608,7 @@ def main(platform, diagnostic=False, resume=False):
     if diagnostic:
         if platform != "ios":
             raise SystemExit("The focused diagnostic supports iOS only")
-        for name in (*CALENDAR_START, "07-profile-picture"):
+        for name in CALENDAR_START:
             if not run_journey(platform, "calendar", scenarios / f"calendar/{name}.yaml", results):
                 raise SystemExit("The focused iOS diagnostic failed")
         publish(results)

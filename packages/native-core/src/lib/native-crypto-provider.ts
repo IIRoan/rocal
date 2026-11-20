@@ -1,5 +1,5 @@
 /** Native CryptoProvider over react-native-quick-crypto's SubtleCrypto; expo-crypto supplies the CSPRNG. */
-import type { CryptoProvider } from "@workspace/e2ee";
+import type { Argon2idDerive, CryptoProvider } from "@workspace/e2ee";
 import * as ExpoCrypto from "expo-crypto";
 import { Platform } from "react-native";
 import { createLogger } from "@workspace/logger";
@@ -8,6 +8,7 @@ import {
   getRuntimeDisplayName,
   supportsSubtleCrypto,
 } from "@workspace/runtime";
+import { loadQuickCrypto } from "./load-quick-crypto";
 
 const log = createLogger("native:crypto");
 const runtime = detectRuntime({ platformOs: Platform.OS });
@@ -140,6 +141,23 @@ function createSubtleCryptoProvider(subtle: SubtleCrypto): CryptoProvider {
     },
   };
 }
+
+/** Password-envelope Argon2id in OpenSSL; there is no JS fallback, since 64 MiB of Argon2 in Hermes is far too slow. */
+export const nativeArgon2id: Argon2idDerive = async (password, salt, params) => {
+  const argon2Sync = loadQuickCrypto()?.argon2Sync;
+  if (typeof argon2Sync !== "function") {
+    throw new Error("Argon2id is unavailable: rebuild the app with react-native-quick-crypto.");
+  }
+  const derived = argon2Sync("argon2id", {
+    message: password,
+    nonce: salt,
+    parallelism: params.parallelism,
+    tagLength: 32,
+    memory: params.memoryKiB,
+    passes: params.passes,
+  });
+  return new Uint8Array(derived);
+};
 
 /** Build the CryptoProvider for this runtime; throws when no native crypto.subtle is linked. */
 export function createNativeCryptoProvider(): CryptoProvider {

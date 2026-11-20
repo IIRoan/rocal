@@ -17,6 +17,7 @@ import { readMailDisplaySettings } from "@/lib/mail/mail-display-settings";
 jest.mock("lucide-react", () => {
   const Icon = () => null;
   return {
+    ExternalLink: Icon,
     Image: Icon,
     Paperclip: Icon,
     ShieldCheck: Icon,

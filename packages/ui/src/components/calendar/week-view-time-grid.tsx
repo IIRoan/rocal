@@ -10,7 +10,10 @@ import { cn } from "../../lib/utils";
 import { CurrentTimeIndicator } from "./current-time-indicator";
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
+import { EventResizeHandles } from "./event-resize-handle";
 import { StartHour } from "./constants";
+import { TimeGridSelection } from "./time-grid-selection";
+import { useTimeGridPointerRange } from "./use-time-grid-pointer-range";
 import type { PositionedTimelineEvent } from "./timeline-layout";
 import { WEEK_HOUR_VALUES, formatWeekHourLabel } from "./week-view-hours";
 import type { WeekEventHandlers } from "./week-view-types";
@@ -34,10 +37,19 @@ export function WeekViewTimeGrid({
   timeFormat: TimeFormat;
   timezone: string;
 }) {
+  const pointer = useTimeGridPointerRange({
+    timezone,
+    onCreate: handlers.onEventCreate,
+  });
+
   return (
     <div
       ref={scrollRef}
-      className="grid flex-1 grid-cols-[3rem_repeat(7,minmax(0,1fr))] overflow-y-auto [scrollbar-gutter:stable] min-h-0"
+      // Focusable so keyboard users can scroll an empty week (WCAG 2.1.1).
+      role="region"
+      aria-label="Week schedule"
+      tabIndex={0}
+      className="grid flex-1 grid-cols-[3rem_repeat(7,minmax(0,1fr))] overflow-y-auto [scrollbar-gutter:stable] min-h-0 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       style={{ scrollBehavior: "auto" }}
     >
       <div className="grid auto-cols-fr">
@@ -58,7 +70,8 @@ export function WeekViewTimeGrid({
       {days.map((day, dayIndex) => (
         <div
           key={formatCalendarDayKey(day)}
-          className={`border-border/70 relative border-r last:border-r-0 grid auto-cols-fr ${
+          {...pointer.columnProps(day)}
+          className={`border-border/70 relative border-r last:border-r-0 grid auto-cols-fr select-none ${
             isTodayInTimezone(day, timezone)
               ? "bg-[var(--calendar-accent-bg)]/20"
               : ""
@@ -100,8 +113,20 @@ export function WeekViewTimeGrid({
                   />
                 )}
               </div>
+              <EventResizeHandles
+                event={positionedEvent.event}
+                onResizeStart={(pointerEvent, edge) =>
+                  pointer.startResize(pointerEvent, positionedEvent.event, edge, day)
+                }
+              />
             </div>
           ))}
+          {pointer.selection?.dayKey === formatCalendarDayKey(day) ? (
+            <TimeGridSelection
+              startQuarter={pointer.selection.startQuarter}
+              endQuarter={pointer.selection.endQuarter}
+            />
+          ) : null}
 
           {currentTimeVisible && isTodayInTimezone(day, timezone) && (
             <CurrentTimeIndicator

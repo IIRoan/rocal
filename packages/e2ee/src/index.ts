@@ -7,20 +7,25 @@ export { createE2eeModule } from "./e2ee-module";
 export {
   lockWithoutDeviceKeys,
   resolveDeviceEnvelopeSalt,
+  shouldUpgradePasswordEnvelope,
   type E2eeLock,
   type UnlockPassword,
 } from "./device-key";
 export type {
+  Argon2idDerive,
+  Argon2idParams,
   E2eeModule,
   EncryptedJsonPayload,
   EncryptedBinaryPayload,
   PasswordEnvelopePayload,
   PasswordEnvelopeInput,
+  RecoveryEnvelopePayload,
 } from "./e2ee-module";
 export {
+  PASSWORD_ARGON2ID_ALGORITHM,
+  PASSWORD_ARGON2ID_PARAMS,
   PASSWORD_KDF_ALGORITHM,
   PASSWORD_WRAP_ALGORITHM,
-  DEFAULT_PASSWORD_KDF_ITERATIONS,
   bytesToBase64Url,
   base64UrlToArrayBuffer,
 } from "./e2ee-module";
@@ -48,12 +53,14 @@ export {
 
 export {
   decryptEntityName,
+  decryptEventContent,
   ENCRYPTION_NOT_READY_MESSAGE,
   encryptEventContentRequest,
   encryptNameRequest,
   hydrateEncryptedName,
   hydrateEncryptedNameWithoutSession,
   isEncryptedJsonPayload,
+  openEncryptedEvent,
   parseEncryptedJsonPayload,
   shouldEncryptEventContent,
   withoutPlaintextEventContent,

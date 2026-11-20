@@ -126,6 +126,9 @@ jest.mock("@/components/calendar-data-provider", () => ({
 jest.mock("@/components/riftbound-calendar-sync", () => ({
   RiftboundCalendarSync: () => null,
 }));
+jest.mock("@/hooks/use-subscriptions", () => ({
+  useFeedSyncWhileOpen: () => undefined,
+}));
 jest.mock("@/components/calendar-provider-wrapper", () => ({
   CalendarProviderWrapper: MockContainer,
 }));

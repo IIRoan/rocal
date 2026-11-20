@@ -16,6 +16,10 @@ jest.mock("../../components/calendar-data-provider", () => ({
   useSharedCalendarData: jest.fn(),
 }));
 
+jest.mock("../../hooks/use-settings", () => ({
+  useSettings: () => ({ settings: null }),
+}));
+
 jest.mock("../../components/command-palette/recurring-scope-modal", () => ({
   RecurringScopeModal: () => null,
 }));

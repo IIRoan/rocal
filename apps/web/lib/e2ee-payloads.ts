@@ -62,11 +62,11 @@ export async function attachCategoryEncryptionShadow<
 
 export async function attachEventEncryptionShadow<
   T extends CreateEventRequest | UpdateEventRequest,
->(request: T): Promise<EventWireRequest<T>> {
+>(request: T, eventId: string): Promise<EventWireRequest<T>> {
   const session = await getEncryptionSession();
   if (!session) {
     return withoutPlaintextEventContent(request);
   }
 
-  return encryptEventContentRequest(contentEncrypter, session, request);
+  return encryptEventContentRequest(contentEncrypter, session, request, eventId);
 }

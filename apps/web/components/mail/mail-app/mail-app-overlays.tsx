@@ -49,6 +49,7 @@ export function MailAppOverlays({
     accountEmail,
     handleDismissCompose,
     handleSendMessage,
+    composeScheduling,
     handleComposeImageUpload,
     handleExpandCompose,
     isBusy,
@@ -93,6 +94,11 @@ export function MailAppOverlays({
             log.error("Failed to open message", error),
           )
         }
+        mailConnection={
+          activeMailbox
+            ? { client: activeMailbox.client, session: activeMailbox.session }
+            : null
+        }
       />
 
       <ComposeDialog
@@ -110,6 +116,7 @@ export function MailAppOverlays({
             : null
         }
         onExpand={handleExpandCompose}
+        scheduling={composeScheduling}
         isBusy={isBusy}
       />
 

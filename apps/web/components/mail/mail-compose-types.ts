@@ -40,6 +40,8 @@ export type MailComposeBridge = {
   ) => void;
   seedForward: (message: JmapEmailMessage, plaintext: string | null) => void;
   seedNewMessage: (recipient: { email: string; name?: string | null }) => void;
+  /** Reopens compose from the snapshot taken before an undone send; `draftId` is its sealed copy in Drafts. */
+  restoreDraft: (draft: ComposeDraft, draftId: string | null) => void;
   seedDraft: (
     message: JmapEmailMessage,
     overrides?: {

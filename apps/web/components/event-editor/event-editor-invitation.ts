@@ -11,6 +11,7 @@ import type { CalendarEvent } from "@workspace/ui/components/calendar";
 import { toast } from "@workspace/ui/lib/toast";
 
 import { calendarApiService } from "@/lib/calendar-api-service";
+import { saveIcsFile } from "@/lib/ics-download";
 
 import type { EventEditorInvitationResponseStatus } from "./types";
 
@@ -36,17 +37,7 @@ export function downloadEventIcs(
   options: { calendarName?: string | null; timezone?: string | null },
 ): void {
   try {
-    const { icsContent, filename } = buildEventIcsExport(event, options);
-    const objectUrl = URL.createObjectURL(
-      new Blob([icsContent], { type: "text/calendar" }),
-    );
-    const anchor = document.createElement("a");
-    anchor.href = objectUrl;
-    anchor.download = filename;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(objectUrl);
+    saveIcsFile(buildEventIcsExport(event, options));
   } catch (error: unknown) {
     toast.error(
       error instanceof EventIcsExportError

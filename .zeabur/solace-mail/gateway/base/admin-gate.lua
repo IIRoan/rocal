@@ -27,7 +27,7 @@ end
 
 local function valid_auth_url()
     local host = auth_url:match("^http://([^/:]+):%d+/api/internal/stalwart/admin%-access$")
-    return host and (host == "127.0.0.1" or host:match("^[%w.-]+%.railway%.internal$"))
+    return host and (host == "127.0.0.1" or host:match("^[%w.-]+%.internal$"))
 end
 
 local function valid_login_url()

@@ -2,8 +2,7 @@ import {
   applyMailListFilters,
   fieldSearchConditions,
   LOCAL_MAIL_SEARCH_LIMIT,
-  orderByIds,
-  searchIndexedMailbox,
+  searchIndexedMailboxMessages,
   type MailListFilters,
   type MailSearchFieldValues,
   type PrivateMailSearchResult,
@@ -33,30 +32,22 @@ export async function searchMailboxLocally(input: {
     (document) => document.source === "mail",
   );
 
-  const ids = searchIndexedMailbox(documents, {
+  const result = await searchIndexedMailboxMessages({
+    documents,
     mailboxId: input.mailboxId,
     conditions: fieldSearchConditions(input.fields),
     timezone: input.timezone,
     limit: LOCAL_MAIL_SEARCH_LIMIT,
-  });
-  const messages =
-    ids.length > 0
-      ? await input.runtime.client.getMessagesByIds(input.runtime.session, ids, {
-          view: "row",
-        })
-      : [];
-  // The index can still list a message in a folder it has left, such as one moved to Trash.
-  const current = orderByIds(messages, ids).filter(
-    (message) => message.mailboxIds?.[input.mailboxId] === true,
-  );
-  const filtered = applyMailListFilters(current, input.listFilters, {
-    now: new Date(),
-    timezone: input.timezone,
+    getMessagesByIds: (ids) =>
+      input.runtime.client.getMessagesByIds(input.runtime.session, ids, { view: "row" }),
   });
   return {
-    messages: filtered,
+    messages: applyMailListFilters(result.messages, input.listFilters, {
+      now: new Date(),
+      timezone: input.timezone,
+    }),
     coverage: snapshot?.coverage ?? unknownPrivateSearchCoverage(),
-    matchCount: ids.length,
+    matchCount: result.matchCount,
     limit: LOCAL_MAIL_SEARCH_LIMIT,
   };
 }

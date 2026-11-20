@@ -43,6 +43,10 @@ import {
   type PendingComposeAttachment,
 } from "../../lib/mail/compose-attachments";
 import { decodeBase64ToBytes } from "../../lib/mail/binary-utils";
+import {
+  stripPickedImageMetadata,
+  type StrippedImageFile,
+} from "../../lib/mail/strip-image-metadata";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { useMailComposeSettings } from "../../hooks/use-mail-settings";
@@ -64,6 +68,7 @@ import { ComposeHeader } from "./ComposeHeader";
 import { ComposeFormatBar } from "./ComposeFormatBar";
 import { ComposeAttachmentList } from "./ComposeAttachmentList";
 import { ComposeIdentitySheet } from "./ComposeIdentitySheet";
+import { ComposeScheduleSheet } from "./ComposeScheduleSheet";
 import {
   useMailSkin,
   type MailSkin,
@@ -77,6 +82,7 @@ interface ComposeSheetProps {
   presentKey: number;
   onClose: () => void;
   onCloseComplete: () => void;
+  onRestore: (request: ComposeRequest) => void;
 }
 
 /** Compose drawer: new messages, replies, forwards, and drafts. */
@@ -86,6 +92,7 @@ export function ComposeSheet({
   presentKey,
   onClose,
   onCloseComplete,
+  onRestore,
 }: ComposeSheetProps) {
   if (!request) {
     return null;
@@ -98,6 +105,7 @@ export function ComposeSheet({
       presentKey={presentKey}
       onClose={onClose}
       onCloseComplete={onCloseComplete}
+      onRestore={onRestore}
     />
   );
 }
@@ -108,6 +116,7 @@ function ComposeSession({
   presentKey,
   onClose,
   onCloseComplete,
+  onRestore,
 }: Omit<ComposeSheetProps, "request"> & { params: ComposeRequest }) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
@@ -127,6 +136,7 @@ function ComposeSession({
   const [draftSaveStatus, setDraftSaveStatus] =
     useState<DraftSaveStatus>("idle");
   const [bodyFocused, setBodyFocused] = useState(false);
+  const [schedule, setSchedule] = useState({ open: false, key: 0 });
   const subjectInputRef = useRef<TextInputInstance>(null);
   const focusSubject = () => subjectInputRef.current?.focus();
   const bodyEditorRef = useRef<ComposeBodyEditorHandle>(null);
@@ -204,6 +214,7 @@ function ComposeSession({
     signatureOptions,
     settleDraftSave,
     setError,
+    onRestore,
     onSent: () => {
       if (!isMailSendScopeOpen(`compose:${sendSessionId}`)) return;
       closeSendSession();
@@ -224,39 +235,16 @@ function ComposeSession({
     onClose: closeSendSession,
   });
 
-  const handleInsertSignature = () => {
-    if (!getPlainTextSignature(selectedIdentity)) return;
-    dispatch({
-      type: "editBody",
-      update: (current) =>
-        hasPlainTextSignatureBlock(current, selectedIdentity)
-          ? current
-          : appendPlainTextSignature(
-              current,
-              selectedIdentity,
-              signatureOptions,
-            ),
-    });
-  };
-
-  const handleSelectIdentity = (id: string) => {
-    const nextIdentity = identities.find((entry) => entry.id === id) ?? null;
-    dispatch({
-      type: "editBody",
-      update: (current) =>
-        replacePlainTextSignatureBlock(
-          current,
-          selectedIdentity,
-          nextIdentity,
-          signatureOptions,
-        ) ?? current,
-    });
-    identity.pick(id);
-  };
+  const { handleInsertSignature, handleSelectIdentity } = useComposeSignatureActions(
+    dispatch,
+    identity,
+    signatureOptions,
+  );
 
   const handleAttach = async () => {
     await pickComposeAttachment(
       runtime?.mailServerPolicy.limits.maxOutgoingAttachmentBytes,
+      composeSettings.stripImageMetadata ? setError : null,
     )
       .then((attachment) => {
         if (attachment) dispatch({ type: "attach", attachment });
@@ -286,7 +274,8 @@ function ComposeSession({
             onAttach={() => {
               void handleAttach();
             }}
-            onSend={send}
+            onSend={() => send()}
+            onSchedule={runtime?.mailServerPolicy.maxDelayedSendSeconds ? () => setSchedule((current) => ({ open: true, key: current.key + 1 })) : undefined}
           />
         </BottomSheetHeader>
         <View
@@ -391,6 +380,15 @@ function ComposeSession({
         </View>
       </BottomSheet>
 
+      <ComposeScheduleSheet
+        key={schedule.key}
+        visible={schedule.open}
+        runtime={runtime}
+        recipients={{ to, cc, bcc }}
+        onSchedule={send}
+        onDismiss={() => setSchedule((current) => ({ ...current, open: false }))}
+      />
+
       <ComposeIdentitySheet
         visible={identity.pickerOpen}
         identities={identities}
@@ -402,9 +400,50 @@ function ComposeSession({
   );
 }
 
-/** Picks one file; the picker's cache copy is plaintext, so it is deleted once read or refused. */
+/** Signature insert and identity switch, keeping the signature block in step with the sender. */
+function useComposeSignatureActions(
+  dispatch: ReturnType<typeof useComposeForm>[1],
+  identity: ReturnType<typeof useComposeIdentity>,
+  signatureOptions: { separator: boolean },
+) {
+  const { identities, selectedIdentity } = identity;
+  const handleInsertSignature = () => {
+    if (!getPlainTextSignature(selectedIdentity)) return;
+    dispatch({
+      type: "editBody",
+      update: (current) =>
+        hasPlainTextSignatureBlock(current, selectedIdentity)
+          ? current
+          : appendPlainTextSignature(
+              current,
+              selectedIdentity,
+              signatureOptions,
+            ),
+    });
+  };
+
+  const handleSelectIdentity = (id: string) => {
+    const nextIdentity = identities.find((entry) => entry.id === id) ?? null;
+    dispatch({
+      type: "editBody",
+      update: (current) =>
+        replacePlainTextSignatureBlock(
+          current,
+          selectedIdentity,
+          nextIdentity,
+          signatureOptions,
+        ) ?? current,
+    });
+    identity.pick(id);
+  };
+
+  return { handleInsertSignature, handleSelectIdentity };
+}
+
+/** Picks one file; the picker's cache copy is plaintext, so it is deleted once read or refused; photos are re-encoded unless `reportStripNotice` is null. */
 async function pickComposeAttachment(
   maxBytes: number | undefined,
+  reportStripNotice: ((notice: string) => void) | null,
 ): Promise<PendingComposeAttachment | null> {
   const result = await DocumentPicker.getDocumentAsync({
     type: "*/*",
@@ -421,20 +460,26 @@ async function pickComposeAttachment(
       maxBytes,
     );
     if (sizeError) throw new Error(sizeError);
-    return FileSystem.readAsStringAsync(asset.uri, {
+    const base64 = await FileSystem.readAsStringAsync(asset.uri, {
       encoding: FileSystem.EncodingType.Base64,
     });
+    const file: StrippedImageFile = {
+      name: asset.name ?? "attachment",
+      type: asset.mimeType,
+      bytes: decodeBase64ToBytes(base64),
+    };
+    return reportStripNotice ? stripPickedImageMetadata(asset.uri, file) : file;
   };
-  const base64 = await readAsset().finally(() =>
+  const { notice, ...file } = await readAsset().finally(() =>
     FileSystem.deleteAsync(asset.uri, { idempotent: true }).catch(
       () => undefined,
     ),
   );
-  return createPendingComposeAttachment({
-    name: asset.name ?? "attachment",
-    type: asset.mimeType,
-    bytes: decodeBase64ToBytes(base64),
-  });
+  if (notice) reportStripNotice?.(notice);
+  // Re-encoding can grow a photo, so the limit is checked again on what is sent.
+  const sizeError = getOutgoingAttachmentSizeError(file.name, file.bytes.length, maxBytes);
+  if (sizeError) throw new Error(sizeError);
+  return createPendingComposeAttachment(file);
 }
 
 const EMPTY_COMPOSE_FIELDS: ComposeTextFields = {

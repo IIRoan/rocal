@@ -1,7 +1,9 @@
 import { describe, expect, it, jest } from "@jest/globals";
+import type { ScopedOutgoingJmapMessage } from "../mail-jmap-email-set";
 import {
   sealMailForSelf,
   sealOutgoingMessageBody,
+  sendJmapMailCommand,
   type MailSealer,
 } from "../mail-outgoing-crypto";
 
@@ -55,6 +57,58 @@ describe("sealMailForSelf", () => {
     expect(plaintext).toContain("<p>Draft body</p>");
     expect(plaintext).toContain('filename="notes.txt"');
     expect(upload).toHaveBeenCalledWith("ARMOR(self-key)");
+  });
+});
+
+describe("sendJmapMailCommand", () => {
+  const sender = {
+    identityId: "identity",
+    fromEmail: "owner@solace.test",
+    fromName: "Owner",
+    draftsMailboxId: "drafts",
+    sentMailboxId: "sent",
+  };
+  const command = { to: "leave@news.example", subject: "stop", body: "Please unsubscribe me." };
+
+  it("submits the command in plaintext with a Sent copy sealed to the sender alone", async () => {
+    const { encrypt, sealer } = createSealer();
+    const session = { id: "synthetic-session" };
+    const ensureEncryptOnAppendDisabled = jest.fn(async (_session: typeof session) => undefined);
+    const sendMessage = jest.fn(async (_session: typeof session, _input: ScopedOutgoingJmapMessage) => undefined);
+
+    await sendJmapMailCommand(
+      { client: { ensureEncryptOnAppendDisabled, sendMessage }, session, accountId: "command-owner", createSealer: async () => sealer },
+      sender,
+      "unsubscribe:opaque-message",
+      command,
+    );
+
+    expect(ensureEncryptOnAppendDisabled).toHaveBeenCalledWith(session);
+    expect(encrypt.mock.calls[0]?.[0].recipientPublicKeysArmored).toEqual(["self-key"]);
+    expect(sendMessage).toHaveBeenCalledWith(
+      session,
+      expect.objectContaining({
+        ...sender,
+        to: ["leave@news.example"],
+        subject: "stop",
+        textBody: "Please unsubscribe me.",
+        sentCopyCiphertext: { blobId: "sealed-blob", size: 321 },
+        sendScope: expect.stringMatching(/^action:/),
+      }),
+    );
+  });
+
+  it("refuses to send without a mail account", async () => {
+    const sendMessage = jest.fn(async () => undefined);
+    await expect(
+      sendJmapMailCommand(
+        { client: { ensureEncryptOnAppendDisabled: async () => undefined, sendMessage }, session: {}, accountId: null, createSealer: () => createSealer().sealer },
+        sender,
+        "unsubscribe:opaque-message",
+        command,
+      ),
+    ).rejects.toThrow("Your mailbox is not connected.");
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 });
 

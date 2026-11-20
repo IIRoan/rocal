@@ -7,7 +7,7 @@ Chainguard Guardener maintains the hardened Actions and container migrations in 
 | CodeQL | Rust API and notifications, JavaScript/TypeScript web and Expo apps and shared packages, Python helpers, Actions workflows, and the Swift notification extension |
 | Bun audit | Every JavaScript workspace in `bun.lock`, including transitive and development dependencies |
 | Trivy repository | Cargo dependencies including development dependencies, and Dockerfile and Kubernetes misconfigurations |
-| Trivy containers | Images built from the backend, notifications, Stalwart, and Gatus Dockerfiles |
+| Trivy containers | Images built from the backend, notifications and Stalwart Dockerfiles |
 | GitHub secret protection | Repository secret scanning and push protection, enabled in repository settings |
 | Dependabot | Dependency alerts and security updates, plus weekly Bun, Cargo, and Actions update PRs |
 | Dependency review | High or critical vulnerabilities introduced by dependency changes that GitHub's dependency graph can compare, including development dependencies |
@@ -32,4 +32,4 @@ trivy fs --scanners vuln,misconfig --include-dev-deps --config-data .github/triv
 trivy convert --format table --scanners vuln,misconfig --table-mode summary /tmp/solace-security.json
 ```
 
-Native `bun audit` returns exit code 1 for advisories. CI accepts that result only with a valid nonempty advisory response; missing, malformed or error responses still fail. Reports need not be committed. Secrets are handled by GitHub secret protection, and no raw secret-scan output is uploaded as a public artifact. The workflows use SHA-pinned Chainguard hardened Actions; Dependabot proposes updates. If the repository becomes private, revisit GitHub feature eligibility and runner billing before retaining this setup.
+Native `bun audit` returns exit code 1 for advisories. CI accepts that result only with a valid nonempty advisory response; missing, malformed or error responses still fail. Reports need not be committed. Secrets are handled by GitHub secret protection, and no raw secret-scan output is uploaded as a public artifact. The workflows use SHA-pinned Chainguard hardened Actions, which the `pinned-workflow-actions` repo rule enforces. They run `bun install` before the step that adds a release credential, which keeps it only from that install's lifecycle scripts: `eas build --local` and OTA bundling still run dependency code beside `EXPO_TOKEN`. Dependabot proposes updates. If the repository becomes private, revisit GitHub feature eligibility and runner billing before retaining this setup.

@@ -23,6 +23,8 @@ type ComposeHeaderProps = {
   onClose: () => void;
   onAttach: () => void;
   onSend: () => void;
+  /** Absent when the mail server can't hold messages. */
+  onSchedule?: () => void;
 };
 
 export function ComposeHeader({
@@ -32,6 +34,7 @@ export function ComposeHeader({
   onClose,
   onAttach,
   onSend,
+  onSchedule,
 }: ComposeHeaderProps) {
   const { theme } = useTheme();
   const skin = useMailSkin();
@@ -57,6 +60,15 @@ export function ComposeHeader({
             color={theme.colors.foreground}
             styles={styles}
           />
+          {onSchedule ? (
+            <ComposeIconButton
+              icon="clock"
+              label="Schedule send"
+              onPress={onSchedule}
+              color={theme.colors.foreground}
+              styles={styles}
+            />
+          ) : null}
           <Pressable
             onPress={onSend}
             disabled={sendDisabled}

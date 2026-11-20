@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { createLogger } from "@workspace/logger";
 import {
-  canCurrentUserEditEvent,
   getErrorMessage,
+  getEventDeleteConfirmCopy,
   isCancelledCalendarEvent,
   type RecurrenceDeleteScope,
 } from "@workspace/calendar-core";
@@ -12,12 +12,12 @@ import type { CalendarEvent } from "@workspace/ui/components/calendar";
 import { toast } from "@workspace/ui/lib/toast";
 
 import {
-  getEventDeleteConfirmCopy,
   isRecurringEventDeleteCandidate,
   RECURRING_DELETE_FAILURE_MESSAGES,
   RECURRING_DELETE_SUCCESS_MESSAGES,
 } from "@/lib/event-editor-view-model";
 import type { UseCalendarDataReturn } from "./use-calendar-data";
+import { useEventTrashUndo } from "./use-event-trash";
 
 const log = createLogger("event-delete-prompt");
 
@@ -27,6 +27,7 @@ export function useEventDeletePrompt(
 ) {
   const [target, setTarget] = useState<CalendarEvent | null>(null);
   const [open, setOpen] = useState(false);
+  const showTrashUndo = useEventTrashUndo();
   const asksScope =
     target !== null &&
     !isCancelledCalendarEvent(target) &&
@@ -46,8 +47,9 @@ export function useEventDeletePrompt(
     const event = target;
     setOpen(false);
     calendarData.deleteEvent(event.id).then(
-      () => {
-        toast.success(`Event "${event.title}" deleted`);
+      (trashId) => {
+        if (trashId) showTrashUndo({ trashId, calendarId: event.calendarId });
+        else toast.success(`Event "${event.title}" deleted`);
       },
       (error: unknown) => {
         log.error("Failed to delete event:", error);
@@ -61,8 +63,9 @@ export function useEventDeletePrompt(
     const event = target;
     setOpen(false);
     calendarData.deleteRecurringEvent({ event, scope }).then(
-      () => {
-        toast.success(RECURRING_DELETE_SUCCESS_MESSAGES[scope]);
+      (trashId) => {
+        if (trashId) showTrashUndo({ trashId, calendarId: event.calendarId });
+        else toast.success(RECURRING_DELETE_SUCCESS_MESSAGES[scope]);
       },
       (error: unknown) => {
         log.error("Failed to delete recurring event:", error);
@@ -80,12 +83,9 @@ export function useEventDeletePrompt(
     confirmPrompt: {
       open: open && !asksScope,
       onOpenChange,
-      ...getEventDeleteConfirmCopy(
-        eventTitle,
-        target !== null &&
-          !canCurrentUserEditEvent(target) &&
-          isCancelledCalendarEvent(target),
-      ),
+      ...(target
+        ? getEventDeleteConfirmCopy(target)
+        : { title: "", description: "", confirmLabel: "" }),
       onConfirm: confirmDelete,
     },
     scopePrompt: {

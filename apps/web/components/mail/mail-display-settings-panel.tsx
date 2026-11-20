@@ -1,6 +1,6 @@
 "use client";
 
-import { Image, Paperclip, ShieldCheck } from "lucide-react";
+import { ExternalLink, Image, Paperclip, ShieldCheck } from "lucide-react";
 import { SettingToggleRow } from "../command-palette/setting-toggle-row";
 import { useMailDisplaySettings } from "@/lib/mail/mail-display-settings";
 import {
@@ -87,11 +87,23 @@ export function MailDisplaySettingsPanel({
         <SettingToggleRow
           icon={Image}
           label="Block tracking pixels"
-          description="Remove tiny invisible tracker images from HTML email"
+          description="Blocks known trackers and tiny tracking images."
           checked={settings.blockTrackingPixels}
           onToggle={() =>
             updateSettings({
               blockTrackingPixels: !settings.blockTrackingPixels,
+            })
+          }
+        />
+
+        <SettingToggleRow
+          icon={ExternalLink}
+          label="Confirm links before opening"
+          description="Shows where a link goes. Suspicious links always ask."
+          checked={settings.confirmExternalLinks}
+          onToggle={() =>
+            updateSettings({
+              confirmExternalLinks: !settings.confirmExternalLinks,
             })
           }
         />

@@ -19,6 +19,8 @@ export type MailPaletteView =
   | "trusted-senders"
   | "mail-list"
   | "contacts"
+  | "auto-reply"
+  | "scheduled"
   | "mail-settings";
 
 export type MailPaletteChromeState = {

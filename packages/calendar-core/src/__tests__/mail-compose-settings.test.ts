@@ -28,6 +28,22 @@ describe("mail compose settings", () => {
     ).toEqual(["ok"]);
   });
 
+  it("strips image metadata by default and keeps an explicit choice and unknown keys", () => {
+    expect(DEFAULT_MAIL_COMPOSE_SETTINGS.stripImageMetadata).toBe(true);
+    expect(parseMailComposeSettings(JSON.stringify({ stripImageMetadata: "no" })).stripImageMetadata).toBe(true);
+    expect(
+      parseMailComposeSettings(JSON.stringify({ stripImageMetadata: false, futureKey: 1 })),
+    ).toMatchObject({ stripImageMetadata: false, futureKey: 1 });
+  });
+
+  it("defaults the undo window to 5 seconds and accepts only the offered options", () => {
+    expect(DEFAULT_MAIL_COMPOSE_SETTINGS.undoSendSeconds).toBe(5);
+    expect(parseMailComposeSettings(JSON.stringify({ undoSendSeconds: 0 })).undoSendSeconds).toBe(0);
+    expect(parseMailComposeSettings(JSON.stringify({ undoSendSeconds: 30 })).undoSendSeconds).toBe(30);
+    expect(parseMailComposeSettings(JSON.stringify({ undoSendSeconds: 7 })).undoSendSeconds).toBe(5);
+    expect(parseMailComposeSettings(JSON.stringify({ undoSendSeconds: "10" })).undoSendSeconds).toBe(5);
+  });
+
   it("adds lowercase keywords once", () => {
     expect(addAttachmentReminderKeyword(["attached"], " Enclosed ")).toEqual([
       "attached",

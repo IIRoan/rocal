@@ -1,5 +1,9 @@
 import React from "react";
-import type { ListDensity, TimeFormat } from "@workspace/calendar-core";
+import type {
+  ListDensity,
+  MailSwipeAction,
+  TimeFormat,
+} from "@workspace/calendar-core";
 import {
   sameItems,
   sameMailConversation,
@@ -10,14 +14,17 @@ import type {
   JmapIdentity,
   LabelDef,
 } from "../../lib/mail/types";
+import {
+  resolveMailSwipeAccessibilityActions,
+  resolveMailSwipeSpec,
+  type MailSwipeHandlers,
+} from "../../lib/mail/mail-swipe-actions";
 import { MailMessageRow } from "./MailMessageRow";
 import { MailSwipeRow } from "./MailSwipeRow";
 
-export interface MailThreadRowHandlers {
+export interface MailThreadRowHandlers extends MailSwipeHandlers {
   onOpen: (message: JmapEmailMessage) => void;
   onToggleSelect: (message: JmapEmailMessage, selectableIds: string[]) => void;
-  onToggleRead: (ids: string[], read: boolean) => void;
-  onTrash?: (ids: string[]) => void | Promise<unknown>;
 }
 
 interface MailThreadListRowProps {
@@ -34,9 +41,12 @@ interface MailThreadListRowProps {
   identities: JmapIdentity[];
   timeFormat: TimeFormat;
   timezone?: string;
+  scheduledSendAt?: string;
   density: ListDensity;
   showLabelChips: boolean;
   threadExpandable: boolean;
+  swipeRight: MailSwipeAction;
+  swipeLeft: MailSwipeAction;
   handlers: MailThreadRowHandlers;
 }
 
@@ -53,26 +63,36 @@ function MailThreadListRowComponent({
   identities,
   timeFormat,
   timezone,
+  scheduledSendAt,
   density,
   showLabelChips,
   threadExpandable,
+  swipeRight,
+  swipeLeft,
   handlers,
 }: MailThreadListRowProps) {
-  const { onOpen, onToggleSelect, onToggleRead, onTrash } = handlers;
-  const read = unreadCount === 0;
+  const { onOpen, onToggleSelect } = handlers;
   const latestId = row.latestMessage.id;
-  const swipeIds = (selectableIds.length > 0 ? selectableIds : [latestId]);
+  const swipeRow = {
+    ids: selectableIds.length > 0 ? selectableIds : [latestId],
+    latestId,
+    read: unreadCount === 0,
+    flagged: Boolean(row.latestMessage.keywords?.["$flagged"]),
+  };
 
-  const handleToggleRead = () => onToggleRead(swipeIds, read);
-  const handleTrash = () => onTrash?.(swipeIds);
   const handleToggleSelect = (message: JmapEmailMessage) => onToggleSelect(message, selectableIds);
 
   return (
     <MailSwipeRow
       enabled={!selectionActive}
-      read={read}
-      onToggleRead={handleToggleRead}
-      onTrash={onTrash ? handleTrash : undefined}
+      right={resolveMailSwipeSpec(swipeRight, swipeRow, handlers)}
+      left={resolveMailSwipeSpec(swipeLeft, swipeRow, handlers)}
+      accessibilityActions={resolveMailSwipeAccessibilityActions(
+        swipeRight,
+        swipeLeft,
+        swipeRow,
+        handlers,
+      )}
     >
       <MailMessageRow
         message={row.latestMessage}
@@ -88,6 +108,7 @@ function MailThreadListRowComponent({
         selected={selected}
         timeFormat={timeFormat}
         timezone={timezone}
+        scheduledSendAt={scheduledSendAt}
         density={density}
         showLabelChips={showLabelChips}
         threadExpandable={threadExpandable}

@@ -127,6 +127,33 @@ describe("mail-synced-settings", () => {
     });
   });
 
+  it("keeps keys from a newer client at the top level and inside each group through a push and pull", async () => {
+    let stored = "";
+    const api: MailSettingsApi = {
+      getMailSettings: async () => record(stored),
+      putMailSettings: async (request) => {
+        stored = request.encryptedContent;
+        return null;
+      },
+    };
+    const newer = {
+      vacation: { enabled: true },
+      display: { confirmExternalLinks: false, futureDisplay: 1 },
+      compose: { stripImageMetadata: false, futureCompose: ["x"] },
+      list: { swipeLeft: "archive", futureList: { a: true } },
+    };
+    await pushMailSyncedSettings(api, plainCipher, sanitizeMailSyncedSettings(newer));
+    const pulled = await pullMailSyncedSettings(api, plainCipher);
+    expect(pulled).toMatchObject({ status: "loaded", settings: newer });
+  });
+
+  it("still validates known fields when it keeps unknown ones", () => {
+    const sanitized = sanitizeMailSyncedSettings({
+      list: { autoAdvance: "sideways", swipeRight: "explode", futureList: 2 },
+    });
+    expect(sanitized.list).toEqual({ ...DEFAULT_MAIL_LIST_SETTINGS, futureList: 2 });
+  });
+
   it("assembles from local cache parts", () => {
     expect(
       assembleMailSyncedSettings({

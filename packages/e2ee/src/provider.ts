@@ -19,11 +19,12 @@ import {
 
 /** Platform-agnostic interface for E2EE operations; web and native each supply their own crypto backend. */
 export interface E2eeProvider {
-  /** Swaps title, description and location for ciphertext; throws instead of sending plaintext when no session is active. */
+  /** Swaps the content for ciphertext bound to the stored row `eventId`; throws instead of sending plaintext when no session is active. */
   attachEventEncryptionShadow<
     T extends CreateEventRequest | UpdateEventRequest,
   >(
     request: T,
+    eventId: string,
   ): Promise<EventWireRequest<T>>;
 
   /** Swaps the calendar name for ciphertext; a rename throws when no session is active. */
@@ -48,7 +49,13 @@ export interface E2eeProvider {
   /** Resolves once any pending bootstrap settles. */
   hasActiveSession(): Promise<boolean>;
 
-  /** Decrypt a single encrypted event for display, or return a placeholder when no E2EE session is active. */
+  /** Refuses unbound event content and feed URLs on this device from now on, also after a restart, until sign-out. */
+  markEventContentBound(): Promise<void>;
+
+  /** True once this device refuses unbound content for the signed-in account. */
+  refusesUnboundContent(): Promise<boolean>;
+
+  /** Decrypt a single encrypted event for display, or a read-only placeholder when it does not open here. */
   hydrateEncryptedEvent(event: CalendarEvent): Promise<CalendarEvent>;
 
   hydrateEncryptedEvents(events: CalendarEvent[]): Promise<CalendarEvent[]>;
@@ -79,7 +86,7 @@ export interface E2eeProvider {
 export class NoopE2eeProvider implements E2eeProvider {
   async attachEventEncryptionShadow<
     T extends CreateEventRequest | UpdateEventRequest,
-  >(request: T): Promise<EventWireRequest<T>> {
+  >(request: T, _eventId: string): Promise<EventWireRequest<T>> {
     return withoutPlaintextEventContent(request);
   }
 
@@ -106,6 +113,12 @@ export class NoopE2eeProvider implements E2eeProvider {
   }
 
   async hasActiveSession(): Promise<boolean> {
+    return false;
+  }
+
+  async markEventContentBound(): Promise<void> {}
+
+  async refusesUnboundContent(): Promise<boolean> {
     return false;
   }
 

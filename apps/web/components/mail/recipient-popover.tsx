@@ -62,10 +62,11 @@ export function RecipientPopover({
       align="start"
       width={300}
       trigger={
+        // Padding cancelled by margin gives the inline name a 24px target (WCAG 2.5.8) without moving the text.
         <button
           type="button"
           className={cn(
-            "min-w-0 cursor-pointer text-left transition-colors",
+            "-my-1 min-w-0 cursor-pointer py-1 text-left transition-colors",
             className,
           )}
         >
@@ -139,15 +140,19 @@ export function RecipientPopoverList({
   const visible = expanded ? recipients : recipients.slice(0, maxVisible);
   const remaining = recipients.length - visible.length;
   const account = { email: currentUserEmail, name: currentUserName };
+  // A header can repeat an address, so the key counts earlier repeats instead of using the index.
+  const emailCounts = new Map<string, number>();
 
   return (
     <span className={cn("inline-flex min-w-0 flex-wrap items-center", className)}>
       {visible.map((recipient, index) => {
         const enriched = enrichSelfMailRecipient(recipient, account);
         const isMe = isCurrentUserMailAddress(recipient.email, currentUserEmail);
+        const seen = emailCounts.get(recipient.email) ?? 0;
+        emailCounts.set(recipient.email, seen + 1);
 
         return (
-          <span key={`${recipient.email}-${index}`} className="inline-flex items-center">
+          <span key={`${seen}:${recipient.email}`} className="inline-flex items-center">
             {index > 0 ? (
               <span className="mr-1 text-muted-foreground">,</span>
             ) : null}

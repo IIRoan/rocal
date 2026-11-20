@@ -37,6 +37,8 @@ pub enum Relation {
     EventCategory,
     #[sea_orm(has_many = "super::event_participant::Entity")]
     EventParticipant,
+    #[sea_orm(has_many = "super::event_trash::Entity")]
+    EventTrash,
     #[sea_orm(has_many = "super::invite::Entity")]
     Invite,
     #[sea_orm(has_one = "super::mail_directory_entry::Entity")]
@@ -59,6 +61,8 @@ pub enum Relation {
     UserMailTrust,
     #[sea_orm(has_one = "super::user_recent_contacts::Entity")]
     UserRecentContacts,
+    #[sea_orm(has_one = "super::user_recovery_kit::Entity")]
+    UserRecoveryKit,
     #[sea_orm(has_one = "super::user_settings::Entity")]
     UserSettings,
 }
@@ -96,6 +100,12 @@ impl Related<super::event_category::Entity> for Entity {
 impl Related<super::event_participant::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::EventParticipant.def()
+    }
+}
+
+impl Related<super::event_trash::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::EventTrash.def()
     }
 }
 
@@ -162,6 +172,12 @@ impl Related<super::user_mail_trust::Entity> for Entity {
 impl Related<super::user_recent_contacts::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::UserRecentContacts.def()
+    }
+}
+
+impl Related<super::user_recovery_kit::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::UserRecoveryKit.def()
     }
 }
 

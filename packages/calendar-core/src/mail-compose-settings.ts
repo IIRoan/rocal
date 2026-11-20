@@ -7,7 +7,23 @@ export type MailComposeSettings = {
   signaturePosition: MailSignaturePosition;
   signatureSeparatorEnabled: boolean;
   autoSelectReplyIdentity: boolean;
+  stripImageMetadata: boolean;
+  undoSendSeconds: UndoSendSeconds;
 };
+
+export const UNDO_SEND_SECONDS_OPTIONS = [
+  { value: 0, label: "Off" },
+  { value: 5, label: "5 seconds" },
+  { value: 10, label: "10 seconds" },
+  { value: 20, label: "20 seconds" },
+  { value: 30, label: "30 seconds" },
+] as const;
+
+export type UndoSendSeconds = (typeof UNDO_SEND_SECONDS_OPTIONS)[number]["value"];
+
+function normalizeUndoSendSeconds(value: unknown): UndoSendSeconds {
+  return UNDO_SEND_SECONDS_OPTIONS.find((option) => option.value === value)?.value ?? 5;
+}
 
 export const DEFAULT_ATTACHMENT_REMINDER_KEYWORDS = [
   "attached",
@@ -46,18 +62,22 @@ export const DEFAULT_MAIL_COMPOSE_SETTINGS: MailComposeSettings = {
   signaturePosition: "below_quote",
   signatureSeparatorEnabled: true,
   autoSelectReplyIdentity: false,
+  stripImageMetadata: true,
+  undoSendSeconds: 5,
 };
 
 function booleanOr(value: unknown, fallback: boolean): boolean {
   return typeof value === "boolean" ? value : fallback;
 }
 
+/** Unknown keys from newer clients are kept beside the validated fields. */
 export function normalizeMailComposeSettings(input: unknown): MailComposeSettings {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     return DEFAULT_MAIL_COMPOSE_SETTINGS;
   }
   const parsed = input as Record<string, unknown>;
   return {
+    ...parsed,
     plainTextMode: booleanOr(parsed.plainTextMode, DEFAULT_MAIL_COMPOSE_SETTINGS.plainTextMode),
     attachmentReminderEnabled: booleanOr(
       parsed.attachmentReminderEnabled,
@@ -81,6 +101,11 @@ export function normalizeMailComposeSettings(input: unknown): MailComposeSetting
       parsed.autoSelectReplyIdentity,
       DEFAULT_MAIL_COMPOSE_SETTINGS.autoSelectReplyIdentity,
     ),
+    stripImageMetadata: booleanOr(
+      parsed.stripImageMetadata,
+      DEFAULT_MAIL_COMPOSE_SETTINGS.stripImageMetadata,
+    ),
+    undoSendSeconds: normalizeUndoSendSeconds(parsed.undoSendSeconds),
   };
 }
 

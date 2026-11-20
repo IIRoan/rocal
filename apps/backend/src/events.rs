@@ -9,6 +9,7 @@ pub mod recurrence;
 pub mod routes;
 pub mod rsvp;
 pub mod service;
+pub mod trash;
 pub mod view;
 
 pub use routes::routes;

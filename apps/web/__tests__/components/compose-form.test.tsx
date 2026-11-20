@@ -32,6 +32,13 @@ jest.mock("@/hooks/use-recent-contacts", () => ({
 }));
 
 const mockEditorFocus = jest.fn();
+const mockPrepareOutgoingImageFiles = jest.fn(async (files: File[]) =>
+  files.map((file) => new File(["clean"], `clean-${file.name}`, { type: file.type })),
+);
+
+jest.mock("@/lib/mail/strip-image-metadata", () => ({
+  prepareOutgoingImageFiles: (files: File[]) => mockPrepareOutgoingImageFiles(files),
+}));
 
 jest.mock("../../components/mail/quoted-html", () => ({
   ...jest.requireActual<object>("../../components/mail/quoted-html"),
@@ -179,6 +186,19 @@ describe("ComposeForm", () => {
 
   it("shows the send shortcut the way this platform writes it", () => {
     expect(container.textContent).toContain("Ctrl+↵to send");
+  });
+
+  it("attaches picked photos only after removing their metadata", async () => {
+    const input = container.querySelector<HTMLInputElement>('input[aria-label="Attach files"]');
+    if (!input) throw new Error("No attach input");
+    const photo = new File(["exif"], "trip.jpg", { type: "image/jpeg" });
+    Object.defineProperty(input, "files", { value: [photo], configurable: true });
+    await act(async () => {
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(mockPrepareOutgoingImageFiles).toHaveBeenCalledWith([photo]);
+    expect(container.textContent).toContain("clean-trip.jpg");
+    expect(container.textContent).not.toContain("Remove trip.jpg");
   });
 });
 

@@ -4,7 +4,7 @@ use regex_lite::Regex;
 use serde_json::{Value, json};
 use solace_api_tests::client::ApiResponse;
 
-use crate::helpers::{Mode, TestApp, TestUser, ok};
+use crate::helpers::{Mode, TestApp, TestUser, hex, ok};
 
 const PLAINTEXT_EVENT: &str = "Unrecognized key(s) in object: 'title'";
 const PLAINTEXT_NAME: &str = "Unrecognized key(s) in object: 'name'";
@@ -293,7 +293,7 @@ async fn ics_subscriptions_to_private_addresses_are_refused() {
         let response = user
             .post(
                 "/api/subscriptions",
-                json!({"name": "e2e ssrf probe", "url": url, "color": "#3b82f6"}),
+                json!({"id": hex(16), "name": "e2e ssrf probe", "url": url, "color": "#3b82f6"}),
             )
             .await;
         expect_rejected(&response, Some("not allowed"));

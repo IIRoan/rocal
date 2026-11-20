@@ -62,8 +62,10 @@ jest.mock("@workspace/e2ee", () => {
     encryptEventContentRequest: actual.encryptEventContentRequest,
     encryptNameRequest: actual.encryptNameRequest,
     hydrateEncryptedName: actual.hydrateEncryptedName,
+    openEncryptedEvent: actual.openEncryptedEvent,
     lockWithoutDeviceKeys: actual.lockWithoutDeviceKeys,
     resolveDeviceEnvelopeSalt: actual.resolveDeviceEnvelopeSalt,
+    shouldUpgradePasswordEnvelope: actual.shouldUpgradePasswordEnvelope,
     withoutPlaintextEventContent: actual.withoutPlaintextEventContent,
     withoutPlaintextName: actual.withoutPlaintextName,
   };
@@ -160,11 +162,16 @@ function createMockAuthContext(
 
 function storeDevice(
   envelopeSalt: string | null,
-  extra: Record<string, string> = {},
+  extra: Record<string, string | null> = {},
 ) {
   const stored: Record<string, string | null> = {
     E2EE_DEVICE_ID: "device-1",
     E2EE_PRIVATE_KEY: '{"kty":"RSA"}',
+    E2EE_DEVICE_KEYS: JSON.stringify({
+      deviceId: "device-1",
+      wrappedAccountKey: "own-account-key",
+      wrappedSearchKey: "own-search-key",
+    }),
     E2EE_ENVELOPE_SALT: envelopeSalt,
     ...extra,
   };
@@ -189,19 +196,31 @@ const storedDeviceRecord = {
   updatedAt: new Date(0),
 };
 
-function createPasswordRecord(): E2eePasswordRecord {
+const argon2idKdf = {
+  kdfAlgorithm: "Argon2id",
+  kdfIterations: 3,
+  kdfMemoryKiB: 65536,
+  kdfParallelism: 4,
+};
+
+function createPasswordRecord(
+  overrides?: Partial<E2eePasswordRecord>,
+): E2eePasswordRecord {
   return {
     id: "password-record-1",
     userId: "user-1",
     kdfAlgorithm: "PBKDF2-SHA-256",
     kdfSalt: "salt",
-    kdfIterations: 310000,
+    kdfIterations: 600000,
+    kdfMemoryKiB: null,
+    kdfParallelism: null,
     wrappedAccountKey: "wrapped-account",
     wrappedSearchKey: "wrapped-search",
     wrapAlgorithm: "AES-GCM-256",
     keyVersion: 1,
     createdAt: new Date("2025-01-01T00:00:00.000Z"),
     updatedAt: new Date("2025-01-01T00:00:00.000Z"),
+    ...overrides,
   };
 }
 
@@ -277,6 +296,7 @@ describe("E2eeProvider", () => {
     clearPendingAuthPassword = jest.fn();
 
     mockGetItemAsync.mockReset();
+    mockDeleteE2eeDevice.mockClear();
     mockSetItemAsync.mockReset();
     mockDeleteItemAsync.mockReset();
     mockCreateE2eeModule.mockReset();
@@ -334,9 +354,8 @@ describe("E2eeProvider", () => {
     mockE2eeModule.generateAccountKey.mockResolvedValue(accountKey);
     mockE2eeModule.generateBlindIndexKey.mockResolvedValue(blindIndexKey);
     mockE2eeModule.createPasswordEnvelope.mockResolvedValue({
-      kdfAlgorithm: "PBKDF2-SHA-256",
+      ...argon2idKdf,
       kdfSalt: "salt",
-      kdfIterations: 310000,
       wrappedAccountKey: "wrapped-account",
       wrappedSearchKey: "wrapped-search",
       wrapAlgorithm: "AES-GCM-256",
@@ -477,7 +496,7 @@ describe("E2eeProvider", () => {
     mockFetch.mockImplementation(async (url: string, options: RequestInit) => {
       if (url.endsWith("/bootstrap")) {
         return jsonResponse(createBootstrapResponse({
-          passwordEnvelope: envelopeStored ? createPasswordRecord() : null,
+          passwordEnvelope: envelopeStored ? createPasswordRecord(argon2idKdf) : null,
         }));
       }
       if (url.endsWith("/password")) {
@@ -829,6 +848,149 @@ describe("E2eeProvider", () => {
     },
   );
 
+  describe("rewrapping an older envelope with the sign-in password", () => {
+    function mockApi(passwordEnvelope: E2eePasswordRecord, devices: E2eeBootstrapResponse["devices"]) {
+      mockE2eeModule.createPasswordEnvelope.mockResolvedValue({
+        kdfAlgorithm: "Argon2id",
+        kdfSalt: "new-salt",
+        kdfIterations: 3,
+        kdfMemoryKiB: 65536,
+        kdfParallelism: 4,
+        wrappedAccountKey: "rewrapped-account",
+        wrappedSearchKey: "rewrapped-search",
+        wrapAlgorithm: "AES-GCM-256",
+        keyVersion: 1,
+      });
+      mockFetch.mockImplementation(async (url: string) => {
+        if (url.endsWith("/api/e2ee/bootstrap")) {
+          return jsonResponse(createBootstrapResponse({ devices, passwordEnvelope }));
+        }
+        if (url.endsWith("/api/e2ee/device") || url.endsWith("/api/e2ee/password")) {
+          return jsonResponse({});
+        }
+        throw new Error(`Unexpected fetch: ${url}`);
+      });
+    }
+
+    function storeUnlockableDevice(envelopeSalt: string | null) {
+      storeDevice(envelopeSalt);
+      mockCryptoProvider.subtle.importKey.mockResolvedValue({ kid: "private" });
+      mockE2eeModule.unwrapAccountKey.mockResolvedValue(accountKey);
+      mockE2eeModule.unwrapBlindIndexKey.mockResolvedValue(blindIndexKey);
+    }
+
+    async function bootstrapAndReadPasswordWrites() {
+      await renderProvider();
+      await act(async () => {
+        await getE2ee().bootstrap("user-1", "https://api.solace.test");
+      });
+      await flushBootstrap();
+      return mockFetch.mock.calls
+        .filter(([url]) => String(url).endsWith("/api/e2ee/password"))
+        .map(([, init]: [string, { body: string }]) => JSON.parse(init.body));
+    }
+
+    it.each([
+      ["after unlocking from it", null],
+      ["on a device whose key it is known to hold", "salt"],
+    ])("rewraps a PBKDF2 envelope to Argon2id %s", async (_case, deviceSalt) => {
+      peekPendingAuthPassword.mockReturnValue("secret-password");
+      if (deviceSalt) storeUnlockableDevice(deviceSalt);
+      mockApi(createPasswordRecord(), deviceSalt ? [storedDeviceRecord] : []);
+
+      const writes = await bootstrapAndReadPasswordWrites();
+
+      expect(mockE2eeModule.createPasswordEnvelope).toHaveBeenCalledWith(
+        accountKey,
+        blindIndexKey,
+        "secret-password",
+      );
+      expect(writes).toEqual([
+        expect.objectContaining({ kdfAlgorithm: "Argon2id", kdfMemoryKiB: 65536, kdfParallelism: 4 }),
+      ]);
+      expect(mockSetItemAsync).toHaveBeenLastCalledWith("E2EE_ENVELOPE_SALT", "new-salt");
+    });
+
+    it("does not rewrap when the device key is not the envelope's", async () => {
+      peekPendingAuthPassword.mockReturnValue("secret-password");
+      storeUnlockableDevice(null);
+      mockE2eeModule.unwrapPasswordEnvelope.mockResolvedValue({
+        accountKey: { type: "envelope-account-key" },
+        blindIndexKey,
+      });
+      mockE2eeModule.encryptJsonPayload.mockResolvedValue({ ciphertext: "probe" });
+      mockE2eeModule.decryptJsonPayload.mockRejectedValue(new Error("OperationError"));
+      mockApi(createPasswordRecord({ kdfIterations: 310000 }), [storedDeviceRecord]);
+
+      await expect(bootstrapAndReadPasswordWrites()).resolves.toEqual([]);
+      expect(getActiveE2eeSession()).toMatchObject({ deviceId: "device-1", accountKey });
+    });
+
+    it("leaves an Argon2id envelope", async () => {
+      peekPendingAuthPassword.mockReturnValue("secret-password");
+      storeUnlockableDevice("salt");
+      mockApi(
+        createPasswordRecord(argon2idKdf),
+        [storedDeviceRecord],
+      );
+
+      await expect(bootstrapAndReadPasswordWrites()).resolves.toEqual([]);
+    });
+
+    it("does not rewrap without a sign-in password", async () => {
+      storeUnlockableDevice("salt");
+      mockApi(createPasswordRecord({ kdfIterations: 310000 }), [storedDeviceRecord]);
+
+      await expect(bootstrapAndReadPasswordWrites()).resolves.toEqual([]);
+      expect(mockE2eeModule.createPasswordEnvelope).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["the envelope check", null],
+      ["the rewrap", "salt"],
+    ])("stores nothing when another account signs in during %s", async (_step, deviceSalt) => {
+      const otherAccountKey = { type: "other-account-key" } as unknown as CryptoKey;
+      peekPendingAuthPassword.mockReturnValueOnce("secret-password").mockReturnValue(null);
+      storeUnlockableDevice(deviceSalt);
+      mockE2eeModule.unwrapAccountKey
+        .mockResolvedValueOnce(accountKey)
+        .mockResolvedValueOnce(otherAccountKey);
+      mockApi(createPasswordRecord({ kdfIterations: 310000 }), [storedDeviceRecord]);
+      const held = deviceSalt
+        ? mockE2eeModule.createPasswordEnvelope
+        : mockE2eeModule.unwrapPasswordEnvelope;
+      const value = deviceSalt
+        ? { kdfSalt: "new-salt", kdfIterations: 600000 }
+        : { accountKey, blindIndexKey };
+      let release: () => void = () => undefined;
+      held.mockImplementationOnce(() => new Promise((resolve) => { release = () => resolve(value); }));
+      mockE2eeModule.encryptJsonPayload.mockResolvedValue({ ciphertext: "probe" });
+      mockE2eeModule.decryptJsonPayload.mockResolvedValue(true);
+      await renderProvider();
+
+      let first: Promise<unknown> = Promise.resolve();
+      await act(async () => {
+        first = getE2ee().bootstrap("user-1", "https://api.solace.test");
+      });
+      expect(held).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        await getE2ee().bootstrap("user-2", "https://api.solace.test");
+      });
+      await act(async () => {
+        release();
+        await first;
+      });
+
+      expect(mockFetch.mock.calls.filter(([url]) => String(url).endsWith("/api/e2ee/password"))).toEqual([]);
+      expect(mockE2eeModule.createPasswordEnvelope).not.toHaveBeenCalledWith(
+        otherAccountKey,
+        expect.anything(),
+        expect.anything(),
+      );
+      expect(getActiveE2eeSession()).toMatchObject({ userId: "user-2", accountKey: otherAccountKey });
+    });
+  });
+
   it("forgets the envelope check of a restored device key once the envelope changed", async () => {
     storeDevice("previous-salt");
     mockCryptoProvider.subtle.importKey.mockResolvedValue({ kid: "private" });
@@ -885,6 +1047,52 @@ describe("E2eeProvider", () => {
     expect(mockDeleteE2eeDevice).toHaveBeenCalledWith("device-1");
   });
 
+  it("keeps the server row of a stored key that no longer opens when the envelope is not known to hold it", async () => {
+    storeDevice("older-salt");
+    mockCryptoProvider.subtle.importKey.mockResolvedValue({ kid: "private" });
+    mockE2eeModule.unwrapAccountKey.mockRejectedValue(new Error("OperationError"));
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.endsWith("/api/e2ee/bootstrap")) {
+        return jsonResponse(
+          createBootstrapResponse({ devices: [storedDeviceRecord], passwordEnvelope: createPasswordRecord() }),
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    await renderProvider();
+    await act(async () => {
+      await getE2ee().bootstrap("user-1", "https://api.solace.test");
+    });
+
+    expect(mockDeleteE2eeDevice).not.toHaveBeenCalled();
+  });
+
+  it("keeps the device and its server row when its stored keys cannot be read", async () => {
+    storeDevice("salt");
+    const stored = mockGetItemAsync.getMockImplementation();
+    mockGetItemAsync.mockImplementation(async (key: string) => {
+      if (key === "E2EE_DEVICE_KEYS") throw new Error("Keychain unavailable");
+      return (await stored?.(key)) ?? null;
+    });
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.endsWith("/api/e2ee/bootstrap")) {
+        return jsonResponse(
+          createBootstrapResponse({ devices: [storedDeviceRecord], passwordEnvelope: createPasswordRecord() }),
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    await renderProvider();
+    await act(async () => {
+      await expect(getE2ee().bootstrap("user-1", "https://api.solace.test")).rejects.toThrow("Keychain unavailable");
+    });
+
+    expect(mockDeleteE2eeDevice).not.toHaveBeenCalled();
+    expect(mockSetItemAsync).not.toHaveBeenCalledWith("E2EE_DEVICE_ID", expect.anything());
+  });
+
   it.each([
     ["deletes the device key the envelope is known to hold", "salt", true],
     ["keeps a device key no envelope is known to hold", null, false],
@@ -896,45 +1104,18 @@ describe("E2eeProvider", () => {
     expect(mockDeleteItemAsync.mock.calls.map(([key]) => key)).toEqual(
       deleted
         ? [
+            "E2EE_EVENT_CONTENT_BOUND",
             "E2EE_DEVICE_ID",
             "E2EE_PRIVATE_KEY",
             "E2EE_DEVICE_KEYS",
             "E2EE_ENVELOPE_SALT",
           ]
-        : [],
+        : ["E2EE_EVENT_CONTENT_BOUND"],
     );
   });
 
-  it.each([
-    [
-      "unwraps its own copy of the keys, never the server's",
-      {
-        E2EE_DEVICE_KEYS: JSON.stringify({
-          deviceId: "device-1",
-          wrappedAccountKey: "own-account-key",
-          wrappedSearchKey: "own-search-key",
-        }),
-      },
-      "own-account-key",
-    ],
-    [
-      "keeps the server's copy once on an install that has none",
-      {},
-      "wrapped-account-key",
-    ],
-    [
-      "ignores a copy left by an earlier device",
-      {
-        E2EE_DEVICE_KEYS: JSON.stringify({
-          deviceId: "device-0",
-          wrappedAccountKey: "old-account-key",
-          wrappedSearchKey: "old-search-key",
-        }),
-      },
-      "wrapped-account-key",
-    ],
-  ])("%s", async (_case, extra, unwrapped) => {
-    storeDevice("salt", extra);
+  it("unwraps its own copy of the keys, never the server's", async () => {
+    storeDevice("salt");
     mockCryptoProvider.subtle.importKey.mockResolvedValue({ kid: "private" });
     mockE2eeModule.unwrapAccountKey.mockResolvedValue(accountKey);
     mockE2eeModule.unwrapBlindIndexKey.mockResolvedValue(blindIndexKey);
@@ -957,26 +1138,84 @@ describe("E2eeProvider", () => {
     });
     await flushBootstrap();
 
-    expect(getActiveE2eeSession()).toMatchObject({
-      deviceId: "device-1",
-      accountKey,
+    expect(getActiveE2eeSession()).toMatchObject({ deviceId: "device-1", accountKey });
+    expect(mockE2eeModule.unwrapAccountKey).toHaveBeenCalledWith("own-account-key", expect.anything());
+    expect(mockE2eeModule.unwrapAccountKey).not.toHaveBeenCalledWith("wrapped-account-key", expect.anything());
+  });
+
+  describe("a device without its own copy of its wrapped keys", () => {
+    const blankServerCopy = { ...storedDeviceRecord, wrappedAccountKey: "", wrappedSearchKey: "" };
+
+    function mockApi(passwordEnvelope: E2eePasswordRecord | null) {
+      mockFetch.mockImplementation(async (url: string) => {
+        if (url.endsWith("/api/e2ee/bootstrap")) {
+          return jsonResponse(createBootstrapResponse({ devices: [blankServerCopy], passwordEnvelope }));
+        }
+        if (url.endsWith("/api/e2ee/device")) return jsonResponse({});
+        throw new Error(`Unexpected fetch: ${url}`);
+      });
+    }
+
+    async function bootstrap() {
+      await renderProvider();
+      let lock: unknown;
+      await act(async () => {
+        lock = await getE2ee().bootstrap("user-1", "https://api.solace.test");
+      });
+      await flushBootstrap();
+      return lock;
+    }
+
+    it.each([
+      ["has none at all", { E2EE_DEVICE_KEYS: null }],
+      [
+        "has only an earlier device's",
+        {
+          E2EE_DEVICE_KEYS: JSON.stringify({
+            deviceId: "device-0",
+            wrappedAccountKey: "old-account-key",
+            wrappedSearchKey: "old-search-key",
+          }),
+        },
+      ],
+    ])("opens the envelope with the sign-in password when it %s", async (_case, extra) => {
+      storeDevice("salt", extra);
+      peekPendingAuthPassword.mockReturnValue("secret-password");
+      mockE2eeModule.generateDeviceId.mockReturnValue("device-2");
+      mockApi(createPasswordRecord());
+
+      await expect(bootstrap()).resolves.toBeNull();
+
+      expect(mockE2eeModule.unwrapAccountKey).not.toHaveBeenCalled();
+      expect(mockE2eeModule.unwrapPasswordEnvelope).toHaveBeenCalledWith("secret-password", expect.anything());
+      expect(mockDeleteE2eeDevice).toHaveBeenCalledWith("device-1");
+      expect(getActiveE2eeSession()).toMatchObject({ deviceId: "device-2", accountKey });
+      const registration = mockFetch.mock.calls.find(([url]) => String(url).endsWith("/api/e2ee/device"));
+      expect(JSON.parse(registration?.[1].body)).toEqual({ deviceId: "device-2", publicKey: "public-key" });
+      const writes = mockSetItemAsync.mock.calls.map(([key]) => key);
+      expect(writes.indexOf("E2EE_DEVICE_KEYS")).toBeLessThan(writes.indexOf("E2EE_DEVICE_ID"));
+      expect(JSON.parse(mockSetItemAsync.mock.calls.find(([key]) => key === "E2EE_DEVICE_KEYS")?.[1] ?? "null")).toEqual({
+        deviceId: "device-2",
+        wrappedAccountKey: "wrapped-account-key",
+        wrappedSearchKey: "wrapped-search-key",
+      });
     });
-    expect(mockE2eeModule.unwrapAccountKey).toHaveBeenCalledWith(
-      unwrapped,
-      expect.anything(),
-    );
-    const kept = mockSetItemAsync.mock.calls.find(
-      ([key]) => key === "E2EE_DEVICE_KEYS",
-    );
-    expect(kept ? JSON.parse(kept[1]) : null).toEqual(
-      unwrapped === "own-account-key"
-        ? null
-        : {
-            deviceId: "device-1",
-            wrappedAccountKey: "wrapped-account-key",
-            wrappedSearchKey: "wrapped-search-key",
-          },
-    );
+
+    it("asks for a sign-in without the password", async () => {
+      storeDevice("salt", { E2EE_DEVICE_KEYS: null });
+      mockApi(createPasswordRecord());
+
+      await expect(bootstrap()).resolves.toBe("sign-in-again");
+      expect(mockE2eeModule.unwrapAccountKey).not.toHaveBeenCalled();
+    });
+
+    it("keeps its server row when no envelope can stand in for it", async () => {
+      storeDevice(null, { E2EE_DEVICE_KEYS: null });
+      mockApi(null);
+
+      await expect(bootstrap()).resolves.toBe("cannot-open");
+      expect(mockDeleteE2eeDevice).not.toHaveBeenCalled();
+    });
   });
 
   it("wraps the active keys to a new password without storing the envelope itself", async () => {
@@ -1107,7 +1346,7 @@ describe("E2eeProvider", () => {
       start: "2026-06-01T09:00:00.000Z",
       end: "2026-06-01T10:00:00.000Z",
       calendarId: "calendar-1",
-    });
+    }, "event-1");
     const calendar = await provider.attachCalendarEncryptionShadow({
       name: "Therapy",
       color: "blue",
@@ -1140,6 +1379,39 @@ describe("E2eeProvider", () => {
         updatedAt: new Date(0),
       }),
     ).resolves.toMatchObject({ name: "Therapy" });
+
+    const legacy = {
+      id: "event-1",
+      title: "",
+      encryptedContent: event.encryptedContent,
+      encryptionState: "encrypted" as const,
+      encryptionKeyVersion: 1,
+      start: new Date(0),
+      end: new Date(0),
+      calendarId: "calendar-1",
+      userId: "user-1",
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+    };
+    expect(mockE2eeModule.encryptJsonPayload).toHaveBeenCalledWith(
+      accountKey,
+      expect.anything(),
+      "event-content:v2:event-1",
+    );
+    mockE2eeModule.decryptJsonPayload.mockResolvedValue({ title: "Therapy" });
+    await expect(provider.hydrateEncryptedEvent(legacy)).resolves.toMatchObject({
+      title: "Therapy",
+    });
+    await expect(provider.refusesUnboundContent()).resolves.toBe(false);
+    await provider.markEventContentBound();
+    expect(mockSetItemAsync).toHaveBeenCalledWith(
+      "E2EE_EVENT_CONTENT_BOUND",
+      "user-1",
+    );
+    await expect(provider.hydrateEncryptedEvent(legacy)).resolves.toMatchObject({
+      contentUnavailable: true,
+    });
+    await expect(provider.refusesUnboundContent()).resolves.toBe(true);
   });
 
   it("does not mint new keys when other devices hold them without a password envelope", async () => {

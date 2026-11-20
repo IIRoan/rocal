@@ -17,6 +17,7 @@ const PARENT_CHAINS: Partial<Record<PaletteView, PaletteView[]>> = {
   categories: ["main", "calendars"],
   "category-create": ["main", "calendars", "categories"],
   "category-edit": ["main", "calendars", "categories"],
+  trash: ["main", "calendars"],
   subscriptions: ["main"],
   "subscriptions-add-feed": ["main", "subscriptions"],
   "subscriptions-holidays": ["main", "subscriptions"],
@@ -74,6 +75,8 @@ export function getDialogTitle(currentView: PaletteView): string {
       return "Create Category";
     case "category-edit":
       return "Edit Category";
+    case "trash":
+      return "Trash";
     case "subscriptions":
       return "Calendar Subscriptions";
     case "subscriptions-add-feed":

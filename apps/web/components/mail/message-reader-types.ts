@@ -54,6 +54,7 @@ export interface MessageReaderProps {
   onToggleFlagged?: () => void;
   onSetLabel?: (labelId: string, assigned: boolean) => void;
   onSimpleLoginAction?: (message: JmapEmailMessage, mode?: SimpleLoginActionMode) => void;
+  onUnsubscribe?: (message: JmapEmailMessage) => void;
   onCreateLabel?: (name: string, color: string) => Promise<LabelDef | null>;
   onUpdateLabel?: (
     labelId: string,

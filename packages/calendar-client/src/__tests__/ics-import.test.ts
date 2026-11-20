@@ -23,11 +23,11 @@ class EncryptingProvider extends NoopE2eeProvider {
   }
   async attachEventEncryptionShadow<
     T extends CreateEventRequest | UpdateEventRequest,
-  >(request: T) {
+  >(request: T, eventId: string) {
     const { title, description, location, ...rest } = request;
     return {
       ...rest,
-      encryptedContent: "ciphertext",
+      encryptedContent: `ciphertext:${eventId}`,
       blindIndexTokens: [],
       encryptionKeyVersion: 1,
       invitationContent: {
@@ -58,13 +58,14 @@ describe("encrypted ICS import", () => {
       fileName: "private.ics",
       timezone: "UTC",
     });
-    const payload = post.mock.calls[0]?.[1];
+    const payload = post.mock.calls[0]?.[1] as { encryptedEvents: Array<{ id: string; encryptedContent: string }> };
     expect(payload).toMatchObject({
       calendarId: "cal",
-      encryptedEvents: [
-        { externalId: "opaque-import-id", encryptedContent: "ciphertext" },
-      ],
+      encryptedEvents: [{ externalId: "opaque-import-id" }],
     });
+    const [entry] = payload.encryptedEvents;
+    expect(entry?.id).toMatch(/^[0-9a-f]{32}$/);
+    expect(entry?.encryptedContent).toBe(`ciphertext:${entry?.id}`);
     for (const secret of [
       "Secret",
       "private",
@@ -82,8 +83,8 @@ describe("encrypted ICS import", () => {
   it("does not upload ciphertext after the import scope expires during encryption", async () => {
     let current = true;
     class CancellingProvider extends EncryptingProvider {
-      async attachEventEncryptionShadow<T extends CreateEventRequest | UpdateEventRequest>(request: T) {
-        const result = await super.attachEventEncryptionShadow(request);
+      async attachEventEncryptionShadow<T extends CreateEventRequest | UpdateEventRequest>(request: T, eventId: string) {
+        const result = await super.attachEventEncryptionShadow(request, eventId);
         current = false;
         return result;
       }

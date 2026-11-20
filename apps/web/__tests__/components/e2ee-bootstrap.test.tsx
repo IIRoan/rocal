@@ -109,6 +109,8 @@ function createPasswordEnvelope(userId = "user-1") {
     kdfAlgorithm: "PBKDF2-SHA-256",
     kdfSalt: "salt-1",
     kdfIterations: 310000,
+    kdfMemoryKiB: null,
+    kdfParallelism: null,
     wrappedAccountKey: "wrapped-account",
     wrappedSearchKey: "wrapped-search",
     wrapAlgorithm: "AES-GCM-256",

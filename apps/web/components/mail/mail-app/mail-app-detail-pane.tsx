@@ -53,6 +53,7 @@ export function MailAppDetailPane({
     handleToggleFlagged,
     handleSetMessageLabel,
     handleSimpleLoginAction,
+    handleUnsubscribe,
     handleCreateLabel,
     handleUpdateLabel,
     handleDeleteLabel,
@@ -75,6 +76,7 @@ export function MailAppDetailPane({
     accountEmail,
     accountDisplayName,
     composeMailPolicy,
+    composeScheduling,
     composeSessionId,
     handleDismissCompose,
     handleFullComposeSend,
@@ -162,6 +164,11 @@ export function MailAppDetailPane({
                 log.error("Failed to run SimpleLogin action", error),
               )
             }
+            onUnsubscribe={(message) =>
+              void handleUnsubscribe(message).catch((error) =>
+                log.error("Failed to unsubscribe", error),
+              )
+            }
             onCreateLabel={(name, color) => handleCreateLabel(name, color)}
             onUpdateLabel={(id, updates) =>
               void handleUpdateLabel(id, updates).catch((error) =>
@@ -246,6 +253,7 @@ export function MailAppDetailPane({
           fallbackFromEmail={activeMailbox.email ?? accountEmail}
           onClose={() => handleDismissCompose()}
           onSend={handleFullComposeSend}
+          scheduling={composeScheduling}
           onImageUpload={handleComposeImageUpload}
           activeMailbox={
             activeMailbox

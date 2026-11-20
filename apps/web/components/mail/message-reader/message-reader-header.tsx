@@ -16,6 +16,7 @@ import { AuthResultsBadge } from "../auth-results-badge";
 import { MessageReaderHeaderAttachments } from "./message-reader-header-attachments";
 import { MessageReaderMobileActionsDrawer } from "./message-reader-mobile-actions-drawer";
 import { MessageReaderSimpleLoginLine } from "./message-reader-simplelogin";
+import { MessageReaderUnsubscribeLine } from "./message-reader-unsubscribe";
 import type {
   MessageReaderController,
   MessageReaderViewModel,
@@ -47,7 +48,7 @@ export function MessageReaderHeader({
           name={enrichedSender.name ?? undefined}
           className={isMobile ? "size-7 text-[11px]" : undefined}
         />
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
               {senderEmail ? (
@@ -106,6 +107,7 @@ export function MessageReaderHeader({
             </div>
           )}
           <MessageReaderSimpleLoginLine controller={controller} />
+          <MessageReaderUnsubscribeLine controller={controller} />
         </div>
       </div>
 

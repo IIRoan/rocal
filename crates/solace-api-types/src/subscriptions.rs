@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::common::{CalendarId, SubscriptionId, Timestamp, UserId};
+use crate::common::{CalendarId, EventId, SubscriptionId, Timestamp, UserId};
 use crate::events::ParticipantInput;
 
 /// A feed subscription with its mirrored calendar; only the list carries `_count`.
@@ -14,7 +14,11 @@ pub struct CalendarSubscription {
     pub name: String,
     /// An opaque revision of the two stored names, bound to this subscription and never persisted.
     pub name_revision: String,
+    /// The feed URL, or `sealed:<id>` once `encryptedUrl` holds it.
     pub url: String,
+    /// The feed URL sealed on the device; the server cannot open it.
+    #[schema(required = true)]
+    pub encrypted_url: Option<String>,
     pub is_active: bool,
     pub sync_interval_minutes: i32,
     #[schema(required = true)]
@@ -77,6 +81,8 @@ pub struct SyncLogCount {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CreateSubscriptionRequest {
+    /// A client-proposed id (32 lowercase hex) that the sealed URL is bound to.
+    pub id: SubscriptionId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub name: Option<String>,
@@ -87,7 +93,11 @@ pub struct CreateSubscriptionRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub encryption_key_version: Option<i32>,
+    /// Probed and synced once, then stored only as `encryptedUrl` when that is sent.
     pub url: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub encrypted_url: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub color: Option<String>,
@@ -120,6 +130,19 @@ pub struct UpdateSubscriptionRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub sync_interval_minutes: Option<i32>,
+    /// Replaces the readable URL with this sealed one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub encrypted_url: Option<String>,
+}
+
+/// Body of `POST /api/subscriptions/:id/sync`; a sealed feed needs its URL, which is used once and never stored.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SyncSubscriptionRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub url: Option<String>,
 }
 
 /// Query of `DELETE /api/subscriptions/:id`; `true` also deletes the synced events and calendar.
@@ -171,6 +194,8 @@ pub struct EncryptedIcsImportRequest {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct EncryptedIcsEvent {
+    /// A client-proposed row id that the event content is bound to.
+    pub id: EventId,
     pub external_id: String,
     /// Set on an override, together with `occurrenceDate`.
     #[serde(default, skip_serializing_if = "Option::is_none")]

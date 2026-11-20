@@ -7,7 +7,7 @@ use crate::common::{
     CalendarId, CategoryId, EventId, OperationWarning, SubscriptionId, Timestamp, UserId,
 };
 
-crate::id_types!(EventParticipantId, RecurrenceExceptionId);
+crate::id_types!(EventParticipantId, RecurrenceExceptionId, TrashedEventId);
 
 /// A `calendar_event` row with its relations, as create, read, update and list return it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -247,6 +247,42 @@ pub struct EventDeleted {
     pub success: bool,
     pub message: String,
     pub deleted_event_id: EventId,
+    /// The trash entry that can restore the event for 30 days; absent when the delete was permanent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub trash_id: Option<TrashedEventId>,
+}
+
+/// A deleted event in the trash, read from its stored row: ciphertext only, restorable until `purgeAt`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TrashedEvent {
+    pub id: TrashedEventId,
+    /// The id the event keeps when restored.
+    pub event_id: EventId,
+    pub calendar_id: CalendarId,
+    /// The original calendar is gone or read-only, so a restore lands in the default calendar.
+    pub calendar_missing: bool,
+    pub title: String,
+    #[schema(required = true)]
+    pub encrypted_content: Option<String>,
+    pub encryption_state: String,
+    pub encryption_key_version: i32,
+    pub start: Timestamp,
+    pub end: Timestamp,
+    pub all_day: bool,
+    pub timezone: String,
+    #[schema(required = true)]
+    pub recurrence: Option<String>,
+    pub trashed_at: Timestamp,
+    pub purge_at: Timestamp,
+}
+
+/// `GET /api/events/trash`, newest first.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TrashedEventList {
+    pub events: Vec<TrashedEvent>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -340,6 +376,9 @@ pub struct EventSearchCorpusQuery {
     /// Only invitation copies still stored readable, declined ones included, for the device to seal.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub readable_invitations: Option<bool>,
+    /// Series rows carry `recurrenceExceptions`, for an export built on the device.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub include_exceptions: Option<bool>,
 }
 
 /// `GET /api/events/invitations/by-external-id`.
@@ -354,6 +393,8 @@ pub struct InvitationByExternalIdQuery {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CreateEventRequest {
+    /// A client-proposed row id (32 lowercase hex) that the event content is bound to.
+    pub id: EventId,
     pub start: String,
     pub end: String,
     pub calendar_id: CalendarId,
@@ -540,6 +581,8 @@ pub struct ImportInvitationRequest {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct InvitationEncryptionEntry {
     pub external_id: String,
+    /// The row id the content is bound to: a new copy takes it (32 lowercase hex), an existing copy is sealed only when it is its id.
+    pub event_id: EventId,
     pub encrypted_content: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]

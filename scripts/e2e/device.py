@@ -34,7 +34,6 @@ def ios():
     run(["xcrun", "simctl", "ui", identifier, "appearance", "light"])
     for app in APPS:
         run(["xcrun", "simctl", "install", identifier, directory() / f"binaries/{app}.app"])
-    run(["xcrun", "simctl", "addmedia", identifier, REPO / "crates/solace-api-tests/fixtures/avatar-512.png"])
 
 
 def android():
@@ -75,8 +74,6 @@ def android():
     run([*adb, "reverse", "tcp:59000", "tcp:59000"])
     for app in APPS:
         run([*adb, "install", "-r", directory() / f"binaries/{app}.apk"])
-    run([*adb, "push", REPO / "crates/solace-api-tests/fixtures/avatar-512.png", "/sdcard/Download/solace-fixture.png"])
-    run([*adb, "shell", "am", "broadcast", "-a", "android.intent.action.MEDIA_SCANNER_SCAN_FILE", "-d", "file:///sdcard/Download/solace-fixture.png"])
 
 
 if __name__ == "__main__":

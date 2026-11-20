@@ -34,6 +34,7 @@ export function toUpdateSettingsRequest(
     compactView: settings.compactView,
     showWeekNumbers: settings.showWeekNumbers,
     showDeclinedEvents: settings.showDeclinedEvents,
+    keyboardShortcuts: settings.keyboardShortcuts,
   };
 }
 

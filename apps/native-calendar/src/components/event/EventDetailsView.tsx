@@ -1,6 +1,7 @@
 import { Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import {
+  EVENT_CONTENT_UNAVAILABLE_MESSAGE,
   formatReminderShort,
   hasOptionalEventParticipants,
   isCancelledCalendarEvent,
@@ -99,6 +100,9 @@ export function EventDetailsView({
         <Text style={styles.viewSyncedHint}>
           Synced from an external calendar (view only)
         </Text>
+      ) : null}
+      {event.contentUnavailable ? (
+        <Text style={styles.viewSyncedHint}>{EVENT_CONTENT_UNAVAILABLE_MESSAGE}</Text>
       ) : null}
 
       <View style={styles.viewRows}>

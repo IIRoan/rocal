@@ -74,16 +74,19 @@ import type { StalwartJmapClient } from "@/lib/mail/jmap-client";
 import type { JmapSession } from "@/lib/mail/types";
 import { serializeEditorContent } from "./quoted-html";
 import { plainTextToComposerBody } from "@/lib/mail/compose-editor-utils";
+import { prepareOutgoingImageFiles } from "@/lib/mail/strip-image-metadata";
 import { toast } from "@workspace/ui/lib/toast";
 import { cn } from "@workspace/ui/lib/utils";
 import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
+import { ComposeSchedulePopover, type ComposeScheduling } from "./compose-schedule-popover";
 
 export interface ComposeDialogProps {
   identities: JmapIdentity[];
   fallbackFromEmail: string;
   onClose: () => void;
-  onSend: (options?: { skipAttachmentCheck?: boolean }) => Promise<void>;
+  onSend: (options?: { skipAttachmentCheck?: boolean; sendAt?: string }) => Promise<void>;
   onExpand?: () => void;
+  scheduling?: ComposeScheduling | null;
   isBusy: boolean;
   onImageUpload?: (file: File) => Promise<InlineImageUpload | null>;
   activeMailbox?: {
@@ -234,6 +237,7 @@ export function ComposeForm({
   isBusy,
   onImageUpload,
   activeMailbox = null,
+  scheduling = null,
   autoFocus = false,
 }: ComposeDialogProps & { autoFocus?: boolean }) {
   const {
@@ -264,7 +268,11 @@ export function ComposeForm({
   } = useMailCompose();
   const { settings: composeSettings, updateSettings } = useMailComposeSettings();
   const plainTextMode = composeSettings.plainTextMode;
-  const [attachmentWarning, setAttachmentWarning] = useState({
+  const [attachmentWarning, setAttachmentWarning] = useState<{
+    open: boolean;
+    keyword: string;
+    sendAt?: string;
+  }>({
     open: false,
     keyword: "",
   });
@@ -493,17 +501,23 @@ export function ComposeForm({
     isMobile ? "w-10" : "w-14",
   );
 
+  // Size limits apply to the re-encoded files.
+  const addAttachments = (files: File[]) => {
+    prepareOutgoingImageFiles(files)
+      .then((prepared) => {
+        const accepted = pickOutgoingAttachmentFiles(prepared, {
+          maxBytes: mailServerLimits.maxOutgoingAttachmentBytes,
+          onReject: (error) => toast.error(error),
+        });
+        if (accepted.length > 0) {
+          setComposeAttachments((prev) => [...prev, ...accepted]);
+        }
+      })
+      .catch(() => toast.error("Could not attach the file."));
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const accepted = pickOutgoingAttachmentFiles(
-      Array.from(e.target.files ?? []),
-      {
-        maxBytes: mailServerLimits.maxOutgoingAttachmentBytes,
-        onReject: (error) => toast.error(error),
-      },
-    );
-    if (accepted.length > 0) {
-      setComposeAttachments((prev) => [...prev, ...accepted]);
-    }
+    addAttachments(Array.from(e.target.files ?? []));
     e.target.value = "";
   };
 
@@ -512,16 +526,6 @@ export function ComposeForm({
       prev.filter((attachment) => attachment !== file),
     );
   };
-
-  function addDroppedFiles(files: File[]) {
-    const accepted = pickOutgoingAttachmentFiles(files, {
-      maxBytes: mailServerLimits.maxOutgoingAttachmentBytes,
-      onReject: (error) => toast.error(error),
-    });
-    if (accepted.length > 0) {
-      setComposeAttachments((prev) => [...prev, ...accepted]);
-    }
-  }
 
   function clearDragState() {
     if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
@@ -565,7 +569,7 @@ export function ComposeForm({
     event.stopPropagation();
     clearDragState();
     if (event.dataTransfer.files?.length) {
-      addDroppedFiles(Array.from(event.dataTransfer.files));
+      addAttachments(Array.from(event.dataTransfer.files));
     }
   }
 
@@ -584,7 +588,7 @@ export function ComposeForm({
     editorRef.current?.commands.focus();
   }
 
-  async function requestSend(skipAttachmentCheck = false) {
+  async function requestSend(skipAttachmentCheck = false, sendAt?: string) {
     if (isBusy) return;
     if (!canSend) {
       setFieldFeedback((current) => ({ ...current, sendAttempted: true }));
@@ -600,12 +604,12 @@ export function ComposeForm({
         keywords: composeSettings.attachmentReminderKeywords,
       });
       if (matched) {
-        setAttachmentWarning({ open: true, keyword: matched });
+        setAttachmentWarning({ open: true, keyword: matched, sendAt });
         return;
       }
     }
     try {
-      await onSend({ skipAttachmentCheck });
+      await onSend({ skipAttachmentCheck, sendAt });
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -723,6 +727,18 @@ export function ComposeForm({
           <Send size={12} />
           {isBusy ? "Sending…" : "Send"}
         </Button>
+        {scheduling ? (
+          <ComposeSchedulePopover
+            scheduling={scheduling}
+            recipients={parsedAddressesToEmails([
+              ...recipientValidation.to,
+              ...recipientValidation.cc,
+              ...recipientValidation.bcc,
+            ])}
+            disabled={isBusy}
+            onSchedule={(sendAt) => void requestSend(false, sendAt)}
+          />
+        ) : null}
       </div>
 
       <div
@@ -1140,7 +1156,7 @@ export function ComposeForm({
               size="sm"
               onClick={() => {
                 setAttachmentWarning((current) => ({ ...current, open: false }));
-                void requestSend(true);
+                void requestSend(true, attachmentWarning.sendAt);
               }}
             >
               Send anyway
@@ -1161,6 +1177,7 @@ export function ComposeDialog({
   isBusy,
   onImageUpload,
   activeMailbox,
+  scheduling,
 }: ComposeDialogProps) {
   const { isComposeOpen } = useMailComposeChrome();
   const { requestComposeClose } = useMailCompose();
@@ -1182,6 +1199,7 @@ export function ComposeDialog({
     isBusy,
     onImageUpload,
     activeMailbox,
+    scheduling,
   };
 
   function handleDismissRequest(event?: Event) {

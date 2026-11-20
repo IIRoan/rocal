@@ -1,6 +1,7 @@
 "use client";
 
 import { Keyboard, ListFilter } from "lucide-react";
+import { MAIL_AUTO_ADVANCE_OPTIONS } from "@workspace/calendar-core";
 import { SettingToggleRow } from "../command-palette/setting-toggle-row";
 import { useMailListSettings } from "@/lib/mail/mail-list-settings";
 import { getMailShortcutHelpItems } from "@/hooks/use-mail-keyboard-shortcuts";
@@ -91,6 +92,19 @@ export function MailListSettingsPanel({ goBack }: { goBack: () => void }) {
             onValueChange={(markAsReadDelay) =>
               updateSettings({ markAsReadDelay })
             }
+          />
+        </PaletteField>
+        <PaletteField
+          label="After archiving or deleting"
+          htmlFor="mail-auto-advance"
+          hint="What the reader shows after the open message leaves the list"
+        >
+          <PaletteSelect
+            id="mail-auto-advance"
+            label="After archiving or deleting"
+            value={settings.autoAdvance}
+            options={MAIL_AUTO_ADVANCE_OPTIONS}
+            onValueChange={(autoAdvance) => updateSettings({ autoAdvance })}
           />
         </PaletteField>
       </PaletteSection>

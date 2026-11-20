@@ -69,13 +69,14 @@ function DateChip({
   value: Date;
   weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6;
 }) {
+  const shownDate = formatPickerDate(value, "EEE, MMM d");
   const trigger = (
     <button
       type="button"
-      aria-label={`${label}: ${formatPickerDate(value, "EEEE, MMMM d")}`}
+      aria-label={`${label}: ${shownDate}`}
       className={cn(chipClass(desktop), muted && "text-muted-foreground")}
     >
-      {formatPickerDate(value, "EEE, MMM d")}
+      {shownDate}
     </button>
   );
   const calendar = (

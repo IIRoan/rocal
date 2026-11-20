@@ -6,7 +6,12 @@ import type {
   UnifiedSearchResult,
 } from "@workspace/calendar-core";
 import {
+  CALENDAR_SEARCH_OPERATOR_KEYS,
+  CALENDARS_QUERY_KEY,
+  MAIL_SEARCH_OPERATOR_KEYS,
+  hasSearchOperators,
   mergeUnifiedSearchResults,
+  parseSearchQuery,
   searchCalendarEvents,
   searchTitleIndex,
   titleHitToUnifiedResult,
@@ -34,6 +39,10 @@ const MAILBOX_PRIORITY: Record<string, number> = {
 const RECENT_MESSAGES_PER_MAILBOX = 40;
 const MAX_SEARCHABLE_MAILBOXES = 6;
 const MAX_SHARED_MAIL_MESSAGES = 240;
+const SEARCH_OPERATOR_KEYS: ReadonlySet<string> = new Set([
+  ...CALENDAR_SEARCH_OPERATOR_KEYS,
+  ...MAIL_SEARCH_OPERATOR_KEYS,
+]);
 
 type UseUnifiedSearchOptions = {
   query: string;
@@ -42,6 +51,8 @@ type UseUnifiedSearchOptions = {
   mailMessages?: JmapEmailMessage[];
   includeMail?: boolean;
   includeCalendar?: boolean;
+  /** Account time zone that after: and before: days are read in. */
+  timezone?: string | null;
 };
 
 function sortMailboxPriority(role?: string | null) {
@@ -112,6 +123,7 @@ export function useUnifiedSearch({
   mailMessages = [],
   includeMail = true,
   includeCalendar = true,
+  timezone,
 }: UseUnifiedSearchOptions) {
   const titleIndex = usePrivateTitleIndex();
   const normalizedQuery = query.trim();
@@ -119,6 +131,8 @@ export function useUnifiedSearch({
   const perSourceLimit = Math.max(limit, 1);
   const shouldLoadSharedMailMessages =
     canSearch && includeMail && mailMessages.length === 0;
+  const parsedQuery = parseSearchQuery(normalizedQuery, SEARCH_OPERATOR_KEYS);
+  const hasOperators = hasSearchOperators(parsedQuery);
 
   // The decrypted corpus stays in memory and is searched here, so search words never reach the server.
   const calendarQuery = useQuery({
@@ -126,6 +140,15 @@ export function useUnifiedSearch({
     queryFn: ({ signal }) =>
       loadEventSearchCorpus(calendarApiService, {}, signal),
     enabled: canSearch && includeCalendar,
+    staleTime: 30_000,
+  });
+  const calendarsQuery = useQuery({
+    queryKey: CALENDARS_QUERY_KEY,
+    queryFn: () => calendarApiService.getCalendars(),
+    enabled:
+      canSearch &&
+      includeCalendar &&
+      parsedQuery.operators.some((operator) => operator.key === "calendar"),
     staleTime: 30_000,
   });
   const mailQuery = useQuery({
@@ -146,26 +169,31 @@ export function useUnifiedSearch({
 
     const searchableMailMessages =
       mailMessages.length > 0 ? mailMessages : (mailQuery.data ?? []);
-    const mailResults = includeMail
-      ? searchMailMessages(searchableMailMessages, normalizedQuery, perSourceLimit)
-      : [];
+    // Mail here matches text only, and index stubs cannot be filtered, so both sit out an operator query instead of text-matching it.
+    const mailResults =
+      includeMail && !hasOperators
+        ? searchMailMessages(searchableMailMessages, normalizedQuery, perSourceLimit)
+        : [];
     const calendarResults = includeCalendar
       ? searchCalendarEvents(
           calendarQuery.data ?? [],
-          normalizedQuery,
+          parsedQuery,
           perSourceLimit,
+          { timezone, calendars: calendarsQuery.data },
         )
       : [];
-    const localHits = searchTitleIndex(
-      titleIndex.documents.filter((document) => {
-        if (document.source === "mail") return includeMail;
-        return includeCalendar;
-      }),
-      normalizedQuery,
-      Math.max(limit * 2, perSourceLimit),
-    ).map((hit) =>
-      titleHitToUnifiedResult(hit, mailDocumentToMessageStub),
-    ) as UnifiedSearchResult<JmapEmailMessage>[];
+    const localHits = hasOperators
+      ? []
+      : (searchTitleIndex(
+          titleIndex.documents.filter((document) => {
+            if (document.source === "mail") return includeMail;
+            return includeCalendar;
+          }),
+          normalizedQuery,
+          Math.max(limit * 2, perSourceLimit),
+        ).map((hit) =>
+          titleHitToUnifiedResult(hit, mailDocumentToMessageStub),
+        ) as UnifiedSearchResult<JmapEmailMessage>[]);
     // Live calendar hits go first so a tie keeps the full event over the index's stub.
     const results = mergeUnifiedSearchResults(
       [calendarResults, localHits, mailResults],

@@ -30,7 +30,7 @@ import {
 } from "./event-calendar-mutations";
 import { MobileEventCalendarToolbar } from "./mobile-event-calendar-toolbar";
 import { MobileEventCalendarViews } from "./mobile-event-calendar-views";
-import { useCalendarViewShortcuts } from "./use-calendar-view-shortcuts";
+import { useCalendarShortcuts } from "./use-calendar-view-shortcuts";
 import type { EventNotification } from "./notification-manager";
 import type { CalendarEvent, CalendarView, User } from "./types";
 import { addMinutesToDate } from "./utils";
@@ -56,7 +56,6 @@ export interface MobileEventCalendarProps {
   onCreateEvent?: (event: unknown) => Promise<unknown>;
   onUpdateEvent?: (id: string, event: unknown) => Promise<unknown>;
   onMoveRecurringEvent?: MoveRecurringCalendarEvent;
-  onDeleteEvent?: (id: string) => Promise<void>;
   onCreateCategory?: (category: unknown) => Promise<unknown>;
   onDateRangeChange?: (dateRange: { start: Date; end: Date }) => void;
   showWeekNumbers?: boolean;
@@ -86,6 +85,8 @@ export interface MobileEventCalendarProps {
   onSidebarToggle?: () => void;
   onViewChange?: (view: CalendarView) => void;
   user?: User;
+  /** Single-key view shortcuts; the account's sealed preference, on unless turned off. */
+  keyboardShortcuts?: boolean;
 }
 
 export function MobileEventCalendar({
@@ -96,7 +97,6 @@ export function MobileEventCalendar({
   error = null,
   onUpdateEvent,
   onMoveRecurringEvent,
-  onDeleteEvent,
   showWeekNumbers = false,
   compactView = false,
   timeFormat,
@@ -109,6 +109,7 @@ export function MobileEventCalendar({
   onEventEdit,
   onViewChange,
   currentDateOverride,
+  keyboardShortcuts = true,
 }: MobileEventCalendarProps) {
   const { currentDate: contextCurrentDate, currentView, setCurrentDate, setCurrentView } =
     useCalendarContext();
@@ -123,7 +124,7 @@ export function MobileEventCalendar({
     onViewChange?.(nextView);
   };
 
-  useCalendarViewShortcuts(setView);
+  useCalendarShortcuts({ onViewChange: setView }, keyboardShortcuts);
 
   const navigateTo = (newDate: Date) => {
     setCurrentDate(newDate);
@@ -141,7 +142,7 @@ export function MobileEventCalendar({
     onEventEdit?.(event);
   };
 
-  const handleEventCreate = (startTime: Date) => {
+  const handleEventCreate = (startTime: Date, endTime?: Date) => {
     startTime.setSeconds(0);
     startTime.setMilliseconds(0);
 
@@ -149,7 +150,7 @@ export function MobileEventCalendar({
       id: "",
       title: "",
       start: startTime,
-      end: addMinutesToDate(startTime, defaultEventDuration),
+      end: endTime ?? addMinutesToDate(startTime, defaultEventDuration),
       allDay: false,
       calendarId: defaultCalendarId || "",
       userId: "",
@@ -221,7 +222,7 @@ export function MobileEventCalendar({
         }
       >
         <CalendarDndProvider
-          onEventUpdate={(updatedEvent) =>
+          onEventUpdate={(updatedEvent, verb) =>
             persistDraggedCalendarEvent({
               timezone: resolvedTimezone,
               timeFormat,
@@ -231,6 +232,7 @@ export function MobileEventCalendar({
                 (event) => event.id === updatedEvent.id,
               ),
               updatedEvent,
+              verb,
             })
           }
           timezone={timezone}

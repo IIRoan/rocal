@@ -15,7 +15,9 @@ use crate::calendars::queries as calendars;
 use crate::db::entities::{calendar, calendar_event, event_participant};
 use crate::entity_metadata::is_mail_invitation_staging_calendar;
 use crate::error::AppError;
+use crate::events::encryption::{BOUND_EVENT_CONTENT_VERSION, require_bound_content};
 use crate::events::{participants, queries as events};
+use crate::http::schemas::is_client_entity_id;
 use crate::http::zod::js_trim;
 use crate::instant;
 use crate::integrations::ics::parse::{self, ParsedEvent};
@@ -116,17 +118,6 @@ struct Ingest {
     encryption: HashMap<String, InvitationEncryptionEntry>,
 }
 
-impl Ingest {
-    /// A moved occurrence (`UID::RECURRENCE::...`) the client did not seal on its own takes its series' sealed content.
-    fn seal_for(&self, external_id: &str) -> Option<&InvitationEncryptionEntry> {
-        self.encryption.get(external_id).or_else(|| {
-            external_id
-                .split_once("::RECURRENCE::")
-                .and_then(|(series, _)| self.encryption.get(series))
-        })
-    }
-}
-
 fn summary(messages_scanned: usize, parts: usize) -> InvitationImportSummary {
     InvitationImportSummary {
         messages_scanned: messages_scanned as i64,
@@ -153,10 +144,14 @@ pub async fn import_ics(
         id: "Decrypted mail invitation".into(),
         ics: request.ics_content,
     };
+    let encryption = request.encryption.unwrap_or_default();
+    for entry in &encryption {
+        require_bound_content(Some(&entry.encrypted_content), entry.encryption_key_version)?;
+    }
     let options = Ingest {
         status,
         calendar_id: request.calendar_id.map(|id| id.0),
-        encryption: index_encryption(request.encryption.unwrap_or_default()),
+        encryption: index_encryption(encryption),
     };
     ingest(state, user_id, 1, vec![source], options).await
 }
@@ -355,7 +350,7 @@ async fn ingest(
             && parsed
                 .events
                 .iter()
-                .any(|event| options.seal_for(&event.uid).is_none())
+                .any(|event| !options.encryption.contains_key(&event.uid))
         {
             summary.errors.push(format!(
                 "{}: This calendar requires encrypted event details; automatic server-side mail import is unavailable.",
@@ -461,7 +456,9 @@ fn local_data(
     data.content = Some((String::new(), None, None));
     data.sealed = Some(Sealed {
         encrypted_content: entry.encrypted_content.clone(),
-        encryption_key_version: entry.encryption_key_version.unwrap_or(1),
+        encryption_key_version: entry
+            .encryption_key_version
+            .unwrap_or(BOUND_EVENT_CONTENT_VERSION),
     });
     data
 }
@@ -556,15 +553,17 @@ async fn upsert(
         .collect();
     let (mut created, mut updated) = (0, 0);
     for parsed in parsed_events {
-        let encryption = options.seal_for(&parsed.uid);
+        let encryption = options.encryption.get(&parsed.uid);
         let inputs = participant_inputs(parsed.participants.as_deref());
         let Some(existing) = by_uid.get(parsed.uid.as_str()).copied() else {
+            // A new copy takes the id its content is bound to; content bound to any other id stays out.
+            let encryption = encryption.filter(|entry| is_client_entity_id(&entry.event_id.0));
             let data = local_data(parsed, encryption, None);
-            let row = events::insert(
-                &state.db,
-                data.new_row(parsed, user_id, &target.calendar.id),
-            )
-            .await?;
+            let mut new_row = data.new_row(parsed, user_id, &target.calendar.id);
+            if let Some(entry) = encryption {
+                new_row.id = Set(entry.event_id.0.clone());
+            }
+            let row = events::insert(&state.db, new_row).await?;
             participants::sync(&state.db, &row.id, &inputs, None).await?;
             if let Some(status) = options.status {
                 apply_attendee_status(state, user_id, &row.id, status).await?;
@@ -572,6 +571,8 @@ async fn upsert(
             created += 1;
             continue;
         };
+        // Content bound to another row id would not open on this copy, so the copy stays readable for the sweep.
+        let encryption = encryption.filter(|entry| entry.event_id.0 == existing.id);
         let stored = rows.get(&existing.id).map_or(&[][..], Vec::as_slice);
         if user_declined(user_id, stored) && options.status.is_none() {
             continue;
@@ -756,6 +757,7 @@ mod tests {
     fn encryption_entries_are_indexed_by_trimmed_uid() {
         let entry = |uid: &str, content: &str| InvitationEncryptionEntry {
             external_id: uid.into(),
+            event_id: "0123456789abcdef0123456789abcdef".to_owned().into(),
             encrypted_content: content.into(),
             blind_index_tokens: None,
             encryption_key_version: Some(2),

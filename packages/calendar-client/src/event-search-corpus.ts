@@ -10,7 +10,7 @@ const SEAL_BATCH_SIZE = 4;
 /** Every page of the owner's events, decrypted on the device, so searching them sends no words to the server. */
 export async function loadEventSearchCorpus(
   api: Pick<CalendarApiService, "getEventSearchCorpus">,
-  params: Pick<EventSearchCorpusParams, "readableInvitations"> = {},
+  params: Pick<EventSearchCorpusParams, "readableInvitations" | "includeExceptions"> = {},
   signal?: AbortSignal,
 ): Promise<CalendarEvent[]> {
   const events: CalendarEvent[] = [];

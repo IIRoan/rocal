@@ -13,6 +13,7 @@
     "@workspace/logger": "workspace:*"
   },
   "devDependencies": {
+    "@noble/hashes": "^2.4.0",
     "fast-check": "^4.10.2",
     "typescript": "^5.9.3"
   },

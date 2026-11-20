@@ -1,0 +1,22 @@
+appId: ${APP_ID}
+---
+# An iOS system banner can cover the header and swallow the tap, so swipe it away and tap again.
+- repeat:
+    while:
+      visible: Go back
+    times: 4
+    commands:
+      - tapOn:
+          text: Go back
+          retryTapIfNoChange: false
+      - waitForAnimationToEnd:
+          timeout: 5000
+      - runFlow:
+          when:
+            visible: Go back
+          commands:
+            - swipe:
+                start: 50%,9%
+                end: 50%,1%
+                duration: 300
+            - waitForAnimationToEnd

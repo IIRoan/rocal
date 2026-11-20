@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use sea_orm::ConnectionTrait;
 use solace_api_types::events::{
     Event, EventList, EventParticipant, EventSearchCorpus, EventSearchCorpusQuery,
-    EventSearchQuery, EventSearchResults, SearchEvent, SearchLabel,
+    EventSearchQuery, EventSearchResults, RecurrenceException, SearchEvent, SearchLabel,
 };
 
 use super::queries;
@@ -95,6 +95,14 @@ pub async fn list(
     })
 }
 
+fn exceptions_of(relations: &Relations, series_id: &str) -> Vec<RecurrenceException> {
+    relations
+        .exceptions
+        .get(series_id)
+        .map(|rows| rows.iter().map(view::exception_dto).collect())
+        .unwrap_or_default()
+}
+
 /// A series' rows for the range: the series itself when its first occurrence falls inside, and one row per later instance.
 fn expand(
     series: &calendar_event::Model,
@@ -103,13 +111,7 @@ fn expand(
     range_end: time::PrimitiveDateTime,
 ) -> Result<Vec<(time::PrimitiveDateTime, Event)>, AppError> {
     let mut base = view::with_participants(series, relations)?;
-    base.recurrence_exceptions = Some(
-        relations
-            .exceptions
-            .get(&series.id)
-            .map(|rows| rows.iter().map(view::exception_dto).collect())
-            .unwrap_or_default(),
-    );
+    base.recurrence_exceptions = Some(exceptions_of(relations, &series.id));
     let original = |base: &Event| {
         let mut event = base.clone();
         event.is_recurring_instance = Some(false);
@@ -340,11 +342,19 @@ pub async fn search_corpus(
         u64::try_from(offset).unwrap_or(0),
     )
     .await?;
-    let relations = Relations::load(&state.db, &rows.iter().collect::<Vec<_>>(), false).await?;
+    let with_exceptions = query.include_exceptions == Some(true);
+    let relations =
+        Relations::load(&state.db, &rows.iter().collect::<Vec<_>>(), with_exceptions).await?;
     let events = rows
         .iter()
-        .map(|row| view::with_participants(row, &relations))
-        .collect::<Result<Vec<_>, _>>()?;
+        .map(|row| {
+            let mut event = view::with_participants(row, &relations)?;
+            if with_exceptions && row.recurrence.is_some() {
+                event.recurrence_exceptions = Some(exceptions_of(&relations, &row.id));
+            }
+            Ok(event)
+        })
+        .collect::<Result<Vec<_>, AppError>>()?;
     let total = i64::try_from(total).unwrap_or(i64::MAX);
     let consumed = offset + i64::try_from(events.len()).unwrap_or(0);
     Ok(EventSearchCorpus {

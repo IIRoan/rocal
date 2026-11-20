@@ -1,9 +1,7 @@
 import {
   buildJmapFilter,
-  LOCAL_MAIL_SEARCH_LIMIT,
-  matchesMessageConditions,
-  orderByIds,
-  searchIndexedMailbox,
+  resolveMailSearchScope,
+  searchIndexedMailboxMessages,
   type MailSearchFilters,
   type PrivateMailSearchResult,
   unknownPrivateSearchCoverage,
@@ -25,36 +23,25 @@ export async function searchMailbox(input: {
   limit: number;
 }): Promise<PrivateMailSearchResult<JmapEmailMessage>> {
   const { client, session, mailboxId, text, filters, timezone, limit } = input;
+  const scope = resolveMailSearchScope(mailboxId, filters);
 
   if (isPrivateContentIndexEnabled()) {
     const accountId = getActiveE2eeSession()?.userId;
     // While the index builds or recovers this finds nothing, rather than sending the words to the server.
     const snapshot = accountId ? await loadPrivateTitleIndex(accountId) : null;
-    const documents = snapshot?.documents ?? [];
-    const conditions = filters?.conditions ?? [];
-    const filtersMessages = conditions.some(
-      (condition) => condition.hasAttachment || condition.isFlagged || condition.isUnread,
-    );
-    const ids = searchIndexedMailbox(documents, {
-      mailboxId,
+    const result = await searchIndexedMailboxMessages({
+      documents: snapshot?.documents ?? [],
+      mailboxId: scope,
       text: text || filters?.text,
-      conditions,
+      conditions: filters?.conditions ?? [],
       timezone,
-      limit: filtersMessages ? LOCAL_MAIL_SEARCH_LIMIT : limit,
+      limit,
+      getMessagesByIds: (ids) =>
+        client.getMessagesByIds(session, ids, { includeBodies: false }),
     });
-    const messages =
-      ids.length > 0
-        ? await client.getMessagesByIds(session, ids, { includeBodies: false })
-        : [];
-    const filtered = orderByIds(messages, ids)
-      // The index can still list a message in a folder it has left, such as one moved to Trash.
-      .filter((message) => message.mailboxIds?.[mailboxId] === true)
-      .filter((message) => matchesMessageConditions(message, conditions))
-      .slice(0, limit);
     return {
-      messages: filtered,
+      ...result,
       coverage: snapshot?.coverage ?? unknownPrivateSearchCoverage(),
-      matchCount: ids.length,
       limit,
     };
   }
@@ -80,7 +67,7 @@ export async function searchMailbox(input: {
   );
   const result = await client.searchMailboxMessagesWithFilter(
     session,
-    mailboxId,
+    scope,
     jmapFilter,
     limit,
   );

@@ -58,5 +58,7 @@ export type MessageListRowPresentation = {
   threadUi: MessageListThreadUiState;
   timeFormat: TimeFormat;
   timezone?: string;
+  /** Sealed copies of pending scheduled sends, by email id. */
+  scheduledSendAtById?: ReadonlyMap<string, string>;
   mailboxActions: MessageListRowMailboxActions;
 };

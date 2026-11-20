@@ -2,7 +2,10 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Stack } from "expo-router";
 import "@workspace/native-core/lib/install-native-crypto";
 import { QueryProvider } from "@workspace/native-core/providers/QueryProvider";
-import { AuthProvider } from "@workspace/native-core/providers/AuthProvider";
+import {
+  AuthProvider,
+  type AuthLifecycle,
+} from "@workspace/native-core/providers/AuthProvider";
 import { PushProvider } from "@workspace/native-core/providers/PushProvider";
 import { ThemeProvider } from "@workspace/native-core/providers/ThemeProvider";
 import { AppErrorBoundary } from "@workspace/native-core/components/AppErrorBoundary";
@@ -27,6 +30,7 @@ import {
   CALENDAR_HOME_ROUTE,
   CALENDAR_PUSH_TAP_HANDLER,
 } from "../src/lib/calendar-routes";
+import { clearIcsExportCache } from "../src/lib/event-ics-share";
 
 /** Calendar pushes are reminders, so the extension only needs the title key, never the session cookie. */
 const NOTIFICATION_EXTENSION_SECRETS: NotificationExtensionSecrets = {
@@ -34,11 +38,14 @@ const NOTIFICATION_EXTENSION_SECRETS: NotificationExtensionSecrets = {
   notificationKey: true,
 };
 
+/** A plaintext .ics a killed share sheet left behind goes with the session. */
+const CALENDAR_AUTH_LIFECYCLE: AuthLifecycle = { onSignedOut: clearIcsExportCache };
+
 function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryProvider>
-        <AuthProvider>
+        <AuthProvider lifecycle={CALENDAR_AUTH_LIFECYCLE}>
           <PushProvider>
             <ThemeProvider>
               <AppErrorBoundary>
@@ -48,6 +55,7 @@ function RootLayout() {
                     <CalendarViewProvider>
                       <NavigationGuard
                         homeRoute={CALENDAR_HOME_ROUTE}
+                        prepareSession={clearIcsExportCache}
                         pushTapHandler={CALENDAR_PUSH_TAP_HANDLER}
                         notificationExtensionSecrets={
                           NOTIFICATION_EXTENSION_SECRETS

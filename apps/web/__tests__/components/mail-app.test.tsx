@@ -1664,6 +1664,47 @@ describe("MailApp", () => {
     });
   });
 
+  it("lifts typed operators out of the search box on Enter and searches with them as a filter", async () => {
+    mockJmapClient.searchMailboxMessagesWithFilter.mockResolvedValue({
+      messages: [{ id: "mail-search-operator", subject: "Operator matched" }],
+      total: 1,
+    });
+
+    await renderApp();
+
+    await waitForExpectation(() => {
+      expect(container.textContent).toContain("Encrypted hello");
+    });
+
+    const searchInput = await openMailboxSearch();
+
+    await act(async () => {
+      setInputValue(searchInput!, "budget from:alice");
+      searchInput!.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitForExpectation(() => {
+      expect(searchInput?.value).toBe("budget");
+      expect(mockJmapClient.searchMailboxMessagesWithFilter.mock.calls).toContainEqual([
+        expect.anything(),
+        "inbox-1",
+        { inMailbox: "inbox-1", text: "budget*", from: "alice" },
+        40,
+      ]);
+      expect(container.textContent).toContain("Operator matched");
+    });
+    expect(mockJmapClient.searchMailboxMessages).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.stringContaining("from:"),
+      expect.anything(),
+    );
+  });
+
   it("does not run search for whitespace-only input", async () => {
     await renderApp();
 

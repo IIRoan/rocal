@@ -51,6 +51,12 @@ describe("resolveEventSheetViewActions", () => {
     });
   });
 
+  it("keeps delete but hides edit for an event whose content did not open here", () => {
+    expect(
+      resolveEventSheetViewActions(makeEvent({ contentUnavailable: true })),
+    ).toMatchObject({ showDelete: true, showEdit: false });
+  });
+
   it("shows delete without edit for an accepted attendee invitation", () => {
     expect(
       resolveEventSheetViewActions(

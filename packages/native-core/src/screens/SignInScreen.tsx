@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -17,13 +16,13 @@ import {
 import { Link } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createLogger } from "@workspace/logger";
-import { FORGOT_PASSWORD_NOTICE } from "@workspace/calendar-core/product-info";
 import { useAuth } from "@workspace/native-core/providers/AuthProvider";
 import { AUTH_SIGN_UP_ROUTE } from "@workspace/native-core/lib/auth-routing";
 import { resolvePasskeyAutoPromptAction } from "@workspace/native-core/lib/passkey-step-up-prompt";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { ThemeToggle } from "@workspace/native-core/components/ThemeToggle";
 import { AppInformationLinks } from "@workspace/native-core/components/AppInformationLinks";
+import { RecoverAccountSheet } from "@workspace/native-core/components/auth/RecoverAccountSheet";
 import type { ThemeTokens } from "@workspace/design-tokens";
 
 const log = createLogger("auth:sign-in");
@@ -59,6 +58,7 @@ export function SignInScreen() {
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<SignInErrors>(NO_ERRORS);
   const [pending, setPending] = useState<"sign-in" | "passkey" | null>(null);
+  const [recovery, setRecovery] = useState({ visible: false, lostPasskey: false });
   const hasStartedPasskeyPromptRef = useRef(false);
   const signInInFlightRef = useRef(false);
 
@@ -207,11 +207,10 @@ export function SignInScreen() {
               <View style={styles.inlineLabelRow}>
                 <Text style={styles.label}>Password</Text>
                 <Pressable
-                  onPress={() =>
-                    Alert.alert("Forgot your password?", FORGOT_PASSWORD_NOTICE)
-                  }
+                  onPress={() => setRecovery({ visible: true, lostPasskey: false })}
                   accessibilityRole="button"
                   accessibilityLabel="Forgot password"
+                  hitSlop={12}
                 >
                   <Text style={styles.inlineLink}>Forgot password?</Text>
                 </Pressable>
@@ -285,6 +284,19 @@ export function SignInScreen() {
               </Pressable>
             ) : null}
 
+            {requiresPasskeyStepUp ? (
+              <Pressable
+                style={styles.recoveryLink}
+                onPress={() => setRecovery({ visible: true, lostPasskey: true })}
+                accessibilityRole="button"
+                accessibilityLabel="Lost your passkey? Use your recovery kit"
+              >
+                <Text style={styles.inlineLink}>
+                  Lost your passkey? Use your recovery kit
+                </Text>
+              </Pressable>
+            ) : null}
+
             <View style={styles.footer}>
               <Text style={styles.footerText}>Don&apos;t have an account? </Text>
               <Link href={AUTH_SIGN_UP_ROUTE} asChild>
@@ -297,6 +309,12 @@ export function SignInScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      <RecoverAccountSheet
+        visible={recovery.visible}
+        initialEmail={email.trim()}
+        lostPasskey={recovery.lostPasskey}
+        onDismiss={() => setRecovery((current) => ({ ...current, visible: false }))}
+      />
     </SafeAreaView>
   );
 }
@@ -376,6 +394,12 @@ function createStyles(theme: ThemeTokens) {
     },
     buttonDisabled: {
       opacity: 0.6,
+    },
+    recoveryLink: {
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      minHeight: 44,
+      marginTop: theme.spacing["2"],
     },
     footer: {
       flexDirection: "row" as const,

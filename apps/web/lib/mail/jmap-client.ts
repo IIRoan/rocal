@@ -42,12 +42,26 @@ import {
   buildEmailDestroyMethodCall,
   destroyMailboxMessagesInBatches,
   AUTH_RESULTS_JMAP_PROPERTY,
+  LIST_UNSUBSCRIBE_POST_JMAP_PROPERTY,
   SIMPLELOGIN_JMAP_PROPERTIES,
   openMailboxNames,
   sealPlaintextMailboxNames,
   type MailboxNameCipher,
   type MailServerPolicy,
   type MailServerPolicyConfig,
+  buildVacationResponseGetCall,
+  buildVacationResponseSetCall,
+  parseVacationResponseGet,
+  assertVacationResponseSet,
+  vacationResponseAccountId,
+  VACATION_RESPONSE_USING,
+  type VacationResponse,
+  cancelHeldJmapSubmission,
+  type HeldSubmissionCancelResult,
+  listScheduledJmapSends,
+  moveCanceledJmapCopyToDrafts,
+  type ScheduledMailSend,
+  type VacationResponseUpdate,
 } from "@workspace/calendar-core";
 import { sanitizeContext } from "@workspace/calendar-core/report-redaction";
 import { createLogger } from "@workspace/logger";
@@ -222,6 +236,7 @@ const EMAIL_LIST_GET_PROPERTIES = [
   "receivedAt",
   "from",
   "to",
+  "cc",
   "subject",
   "preview",
   "hasAttachment",
@@ -250,6 +265,7 @@ const EMAIL_FULL_GET_PROPERTIES = [
   "htmlBody",
   "attachments",
   ...SIMPLELOGIN_JMAP_PROPERTIES,
+  LIST_UNSUBSCRIBE_POST_JMAP_PROPERTY,
   AUTH_RESULTS_JMAP_PROPERTY,
   "header:Received",
   "header:DKIM-Signature",
@@ -732,6 +748,29 @@ export class StalwartJmapClient {
       "Identity/get",
     );
     return result.list ?? [];
+  }
+
+  async getVacationResponse(session: JmapSession): Promise<VacationResponse | null> {
+    const accountId = vacationResponseAccountId(session, this.requirePrimaryAccountId(session));
+    const envelope = await this.call(session, VACATION_RESPONSE_USING, [
+      buildVacationResponseGetCall(accountId),
+    ]);
+    return parseVacationResponseGet(
+      this.getMethodResult<unknown>(envelope, "VacationResponse/get"),
+    );
+  }
+
+  async setVacationResponse(
+    session: JmapSession,
+    update: VacationResponseUpdate,
+  ): Promise<void> {
+    const accountId = vacationResponseAccountId(session, this.requirePrimaryAccountId(session));
+    const envelope = await this.call(session, VACATION_RESPONSE_USING, [
+      buildVacationResponseSetCall(accountId, update),
+    ]);
+    assertVacationResponseSet(
+      this.getMethodResult<unknown>(envelope, "VacationResponse/set"),
+    );
   }
 
   /** One round-trip for bootstrap metadata; policy singletons are optional and must not fail mailbox load. */
@@ -1521,6 +1560,39 @@ export class StalwartJmapClient {
           },
         },
       );
+    });
+  }
+
+  async cancelHeldSubmission(
+    session: JmapSession,
+    input: { submissionId: string; copyEmailId: string; draftsMailboxId: string },
+  ): Promise<HeldSubmissionCancelResult> {
+    const mailAccountId = this.requirePrimaryAccountId(session);
+    return cancelHeldJmapSubmission({
+      ...input,
+      mailAccountId,
+      submissionAccountId: getSubmissionAccountId(session, mailAccountId),
+      request: (using, calls) => this.call(session, using, calls),
+      onMoveError: (error) => {
+        log.warn("Canceled send move to Drafts failed", sanitizeContext({ error }));
+      },
+    });
+  }
+
+  async moveCanceledSendToDrafts(session: JmapSession, input: { copyEmailId: string; draftsMailboxId: string }): Promise<void> {
+    return moveCanceledJmapCopyToDrafts({
+      ...input,
+      mailAccountId: this.requirePrimaryAccountId(session),
+      request: (using, calls) => this.call(session, using, calls),
+    });
+  }
+
+  async listScheduledSends(session: JmapSession): Promise<ScheduledMailSend[]> {
+    const mailAccountId = this.requirePrimaryAccountId(session);
+    return listScheduledJmapSends({
+      mailAccountId,
+      submissionAccountId: getSubmissionAccountId(session, mailAccountId),
+      request: (using, calls) => this.call(session, using, calls),
     });
   }
 
