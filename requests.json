@@ -6,9 +6,9 @@
     "namespace": "solace-gitops"
   },
   "data": {
-    "sourceRevision": "d51260e9c7a9ac80c706f7c268002f498afb87d1",
+    "sourceRevision": "42fc42384fa0ae9c338fcca46588fcab7a8aef2c",
     "notifications": "d51260e9c7a9ac80c706f7c268002f498afb87d1",
     "api": "d51260e9c7a9ac80c706f7c268002f498afb87d1",
-    "stalwart": "d51260e9c7a9ac80c706f7c268002f498afb87d1"
+    "stalwart": "42fc42384fa0ae9c338fcca46588fcab7a8aef2c"
   }
 }
