@@ -13,8 +13,6 @@ from common import APPS, REPO, directory, output, run, spawn, unpack
 def ios():
     developer = Path(os.environ.get("DEVELOPER_DIR") or output(["xcode-select", "-p"]))
     simulator = developer / "Applications/Simulator.app"
-    if not simulator.is_dir():
-        raise RuntimeError("The selected Xcode must include Simulator.app")
     available = json.loads(output(["xcrun", "simctl", "list", "-j"]))
     runtimes = [runtime for runtime in available["runtimes"] if runtime.get("isAvailable") and ".SimRuntime.iOS-" in runtime["identifier"]]
     requested = os.environ.get("SOLACE_E2E_IOS_RUNTIME")
@@ -30,7 +28,9 @@ def ios():
     run(["defaults", "write", "com.apple.iphonesimulator", "ConnectHardwareKeyboard", "-bool", "false"])
     run(["xcrun", "simctl", "boot", identifier])
     run(["xcrun", "simctl", "bootstatus", identifier, "-b"])
-    run(["open", "-a", simulator, "--args", "-CurrentDeviceUDID", identifier, "-ConnectHardwareKeyboard", "NO"])
+    # Xcode 27 replaced Simulator.app with Device Hub; a headless simulator has no host keyboard to disconnect.
+    if simulator.is_dir():
+        run(["open", "-a", simulator, "--args", "-CurrentDeviceUDID", identifier, "-ConnectHardwareKeyboard", "NO"])
     run(["xcrun", "simctl", "ui", identifier, "appearance", "light"])
     for app in APPS:
         run(["xcrun", "simctl", "install", identifier, directory() / f"binaries/{app}.app"])

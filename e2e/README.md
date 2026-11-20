@@ -6,7 +6,7 @@ Each device job owns a disposable `solace_test_e2e` database, the real Rust API,
 
 The apps use separate `.e2e` bundle IDs, App Groups and keychains. `SOLACE_E2E=1` is accepted only for a locally configured preview build pointing at a loopback HTTP API; remote updates are disabled. The test-only transport settings cannot be enabled for an EAS or production build. Android Release builds exercise minification as well as the real native modules.
 
-iOS journeys use Xcode 27.1 and the iOS 27.1 runtime on GitHub's `xcode-27` image. Setup opens Simulator with hardware-keyboard input disabled, and text entry waits for the software keyboard. These explicit settings keep input independent of the runner's default simulator preferences and newer toolchains.
+iOS journeys use Xcode 27.1 and the iOS 27.1 runtime on GitHub's `xcode-27` image. Xcode 27 replaced Simulator.app with Device Hub, so setup boots the simulator headless, with no host keyboard attached; older Xcodes open Simulator with hardware-keyboard input disabled. Text entry waits for the software keyboard. These explicit settings keep input independent of the runner's default simulator preferences and newer toolchains.
 
 ## Coverage
 
