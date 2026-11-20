@@ -209,6 +209,46 @@ def check_public_ingress(network, workloads):
         "proxyProtocol": {"version": 2},
         "servers": [{"address": "mail-live.solace-mail.svc.cluster.local:8443"}],
     }
+    check_zeabur_application_gateway(routes["tcp"])
+
+
+def check_zeabur_application_gateway(tcp):
+    bootstrap = ROOT / "bootstrap"
+    projects = read(bootstrap / "zeabur-project-public.yaml")
+    resources = read(bootstrap / "zeabur-application-gateway.yaml")
+    namespace = "traefik"
+    tls = find_resource(resources, "Certificate", namespace, "zeabur-apps")["spec"]
+    issuer = find_resource(projects, "ClusterIssuer", None, tls["issuerRef"]["name"])
+    gateway = find_resource(resources, "Gateway", namespace, "webdock-apps")
+    (listener,) = gateway["spec"]["listeners"]
+    assert tls["dnsNames"] == [listener["hostname"]] == ["*.roan.dev"]
+    assert listener["tls"]["certificateRefs"] == [{"name": tls["secretName"]}]
+    assert tls["dnsNames"][0] in issuer["spec"]["acme"]["solvers"][0]["selector"]["dnsNames"]
+
+    (helm,) = read(bootstrap / "zeabur-traefik-helm.yaml")
+    ports = yaml.safe_load(helm["spec"]["valuesContent"])["ports"]
+    service = find_resource(resources, "Service", namespace, "zeabur-app-gateway")
+    (port,) = service["spec"]["ports"]
+    assert listener["port"] == port["port"] == ports[port["targetPort"]]["port"]
+    assert ports[port["targetPort"]]["expose"] == {"default": False}
+    policy = find_resource(resources, "NetworkPolicy", namespace, "zeabur-app-gateway")
+    (app_ingress,) = [rule for rule in policy["spec"]["ingress"] if "from" in rule]
+    assert app_ingress["from"] == [{
+        "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "solace-mail"}},
+        "podSelector": {"matchLabels": {"app.kubernetes.io/name": "solace-public-ingress"}},
+    }]
+    assert app_ingress["ports"] == [{"port": port["port"], "protocol": "TCP"}]
+    router = tcp["routers"]["zeabur-apps"]
+    assert router["tls"] == {"passthrough": True}
+    protected_hosts = set(re.findall(r"`([^`]+)`", router["rule"].split("&& !", 1)[-1]))
+    public = projects + read(bootstrap / "ente-public.yaml")
+    static_hosts = {rule["host"] for obj in public if obj["kind"] == "Ingress"
+                    for rule in obj["spec"]["rules"] if rule["host"].endswith(".roan.dev")}
+    assert static_hosts | {"zeabur.roan.dev", "login.roan.dev", "ingress.roan.dev"} <= protected_hosts
+    assert tcp["services"][router["service"]]["loadBalancer"] == {
+        "proxyProtocol": {"version": 2},
+        "servers": [{"address": f"zeabur-app-gateway.traefik.svc.cluster.local:{port['port']}"}],
+    }
 
 
 def check_gateway(deployment, configs, volume):

@@ -132,6 +132,7 @@ The shared Webdock Traefik deployment serves the public routes below. The DNS-on
 | `objects.roan.dev` | `demo/files-s3:8333` |
 | `errors.roan.dev` | `errors/errex:8080` |
 | `builds.roan.dev` | `builder-system/zeabur-builder-webhooks:http` on `/hooks/` |
+| `ente.roan.dev`, `enteweb.roan.dev` | `ente/museum:8080`, `ente/ente-web:3000` |
 
 cert-manager issues and renews the Let's Encrypt certificates using DNS-01. Provision `rift-public-acme-dns` in `riftbound` for `solace.onl` and `zeabur-roan-acme-dns` in `cert-manager` for `roan.dev`. Each Secret has one `api-token` key. Use separate Cloudflare tokens with DNS write and zone read on the corresponding zone. The issuers select the exact hostnames listed above.
 
@@ -142,10 +143,19 @@ Apply the bootstrap manifests after the projects and their Services exist. The p
 ```sh
 kubectl apply --server-side --field-manager=rocal-solace-bootstrap -f .zeabur/bootstrap/riftbound-public.yaml
 kubectl apply --server-side --field-manager=rocal-solace-bootstrap -f .zeabur/bootstrap/zeabur-project-public.yaml
+kubectl apply --server-side --field-manager=rocal-solace-bootstrap -f .zeabur/bootstrap/ente-public.yaml
 kubectl -n solace-gitops patch kustomization solace --field-manager=rocal-solace-bootstrap \
   --type=merge --patch-file .zeabur/bootstrap/riftbound-traefik-patch.json
 ```
 
 Use the Zeabur domain trace and probe each address with TLS hostname validation. Test the Riftbound API health and web CORS, anonymous S3 access denial, and GitHub webhook routing. `ingress.roan.dev` is a DNS target for the public ingress. The only public Cloudflare Tunnel routes are `zeabur.roan.dev` and `login.roan.dev`.
 
-The platform Traefik Helm release advertises `zeabur.roan.dev` with `providers.kubernetesIngress.ingressEndpoint.hostname`. The login and dashboard routes share the tunnel address. In the Builder Helm release, keep `webhooks.enabled=true` and set `webhooks.ingress.enabled=false`. The bootstrap manifests provide the Builder's public Ingress.
+The platform Traefik Helm release advertises `zeabur.roan.dev` for its Ingress objects. The login and dashboard routes share the tunnel address. In the Builder Helm release, keep `webhooks.enabled=true` and set `webhooks.ingress.enabled=false`. The bootstrap manifests provide the Builder's public Ingress.
+
+### Add an application domain from Zeabur
+
+In **Networking → Add domain**, enter a first-level hostname under `roan.dev` and select **traefik/webdock-apps → https** for the route. Zeabur creates an HTTPRoute in the service's project. The project must have the standard `zeabur.com/project=true` label. New Zeabur projects receive it on creation.
+
+The DNS-only wildcard CNAME points to `ingress.roan.dev`. The public Webdock edge passes matching TLS connections and the original client IP to the Gateway's private listener. That listener uses the platform Traefik deployment's replica count and placement. cert-manager renews the Gateway's `*.roan.dev` certificate through the DNS-01 issuer in the public-project manifests. The file-provider route excludes the existing Git-managed hosts and both management hostnames. When adding a Git-managed first-level hostname, add it to the same exclusion before publishing it.
+
+Apply the administrator-owned [Traefik Helm values](bootstrap/zeabur-traefik-helm.yaml) and [Gateway resources](bootstrap/zeabur-application-gateway.yaml) after the public-project issuer is available. Wait for the Certificate to be Ready and the Gateway to be Programmed, then verify HTTPS on both public addresses before publishing the wildcard CNAME. To withdraw wildcard publishing, first remove the wildcard CNAME, then remove the public TLS passthrough rule and restore the previous Helm values.
