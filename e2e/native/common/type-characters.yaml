@@ -1,12 +1,18 @@
 appId: ${APP_ID}
 ---
 - evalScript: ${output.nativeTextIndex = 0}
+- evalScript: ${output.nativeTextChunkSize = 2}
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - evalScript: ${output.nativeTextChunkSize = 1}
 - repeat:
     times: 1000
     while:
       true: ${output.nativeTextIndex < String(TEXT).length}
     commands:
-      - inputText: ${String(TEXT).slice(output.nativeTextIndex, output.nativeTextIndex + 2)}
+      - inputText: ${String(TEXT).slice(output.nativeTextIndex, output.nativeTextIndex + output.nativeTextChunkSize)}
       - runFlow:
           when:
             true: ${typeof VERIFY_TEXT !== "undefined" && VERIFY_TEXT === "true"}
@@ -17,10 +23,10 @@ appId: ${APP_ID}
                 commands:
                   - assertVisible:
                       id: ${VERIFY_ID}
-                      text: ${String(TEXT).slice(0, output.nativeTextIndex + 2)}
+                      text: ${String(TEXT).slice(0, output.nativeTextIndex + output.nativeTextChunkSize)}
             - runFlow:
                 when:
                   true: ${typeof VERIFY_ID === "undefined"}
                 commands:
-                  - assertVisible: ${String(TEXT).slice(0, output.nativeTextIndex + 2)}
-      - evalScript: ${output.nativeTextIndex = output.nativeTextIndex + 2}
+                  - assertVisible: ${String(TEXT).slice(0, output.nativeTextIndex + output.nativeTextChunkSize)}
+      - evalScript: ${output.nativeTextIndex += output.nativeTextChunkSize}
