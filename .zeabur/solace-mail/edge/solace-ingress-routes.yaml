@@ -17,6 +17,7 @@ tcp:
         && !(HostSNI(`builds.roan.dev`) || HostSNI(`demo.roan.dev`)
         || HostSNI(`errors.roan.dev`) || HostSNI(`objects.roan.dev`)
         || HostSNI(`www.roan.dev`) || HostSNI(`ingress.roan.dev`)
+        || HostSNI(`ente.roan.dev`) || HostSNI(`enteweb.roan.dev`)
         || HostSNI(`zeabur.roan.dev`) || HostSNI(`login.roan.dev`))
       service: zeabur-apps
       tls:

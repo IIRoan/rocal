@@ -1,0 +1,142 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: ente-roan-public
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: ente-roan-acme-account
+    solvers:
+      - selector:
+          dnsNames: [ente.roan.dev, enteweb.roan.dev]
+        dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: zeabur-roan-acme-dns
+              key: api-token
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ente-public
+  namespace: ente
+spec:
+  dnsNames: [ente.roan.dev, enteweb.roan.dev]
+  issuerRef:
+    name: ente-roan-public
+    kind: ClusterIssuer
+  secretName: ente-public-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ente-public
+  namespace: ente
+  annotations:
+    kubernetes.io/ingress.class: solace-public
+    traefik.ingress.kubernetes.io/router.entrypoints: public
+spec:
+  tls:
+    - hosts: [ente.roan.dev, enteweb.roan.dev]
+      secretName: ente-public-tls
+  rules:
+    - host: ente.roan.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: museum
+                port: {number: 8080}
+    - host: enteweb.roan.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ente-web
+                port: {number: 3000}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: solace-public-traefik
+  namespace: ente
+rules:
+  - apiGroups: [""]
+    resources: [services, endpoints, secrets]
+    verbs: [get, list, watch]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses/status]
+    verbs: [update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: solace-public-traefik
+  namespace: ente
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: solace-public-traefik
+subjects:
+  - kind: ServiceAccount
+    name: solace-tunnel-ingress
+    namespace: solace-mail
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: from-public-traefik
+  namespace: ente
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: [museum, ente-web]
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: solace-mail
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: solace-public-ingress
+      ports:
+        - {port: 3000, protocol: TCP}
+        - {port: 8080, protocol: TCP}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: solace-traefik-to-ente
+  namespace: solace-mail
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: solace-public-ingress
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ente
+          podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values: [museum, ente-web]
+      ports:
+        - {port: 3000, protocol: TCP}
+        - {port: 8080, protocol: TCP}

@@ -241,7 +241,8 @@ def check_zeabur_application_gateway(tcp):
     router = tcp["routers"]["zeabur-apps"]
     assert router["tls"] == {"passthrough": True}
     protected_hosts = set(re.findall(r"`([^`]+)`", router["rule"].split("&& !", 1)[-1]))
-    static_hosts = {rule["host"] for obj in projects if obj["kind"] == "Ingress"
+    public = projects + read(bootstrap / "ente-public.yaml")
+    static_hosts = {rule["host"] for obj in public if obj["kind"] == "Ingress"
                     for rule in obj["spec"]["rules"] if rule["host"].endswith(".roan.dev")}
     assert static_hosts | {"zeabur.roan.dev", "login.roan.dev", "ingress.roan.dev"} <= protected_hosts
     assert tcp["services"][router["service"]]["loadBalancer"] == {

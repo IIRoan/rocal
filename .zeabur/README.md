@@ -132,6 +132,7 @@ The shared Webdock Traefik deployment serves the public routes below. The DNS-on
 | `objects.roan.dev` | `demo/files-s3:8333` |
 | `errors.roan.dev` | `errors/errex:8080` |
 | `builds.roan.dev` | `builder-system/zeabur-builder-webhooks:http` on `/hooks/` |
+| `ente.roan.dev`, `enteweb.roan.dev` | `ente/museum:8080`, `ente/ente-web:3000` |
 
 cert-manager issues and renews the Let's Encrypt certificates using DNS-01. Provision `rift-public-acme-dns` in `riftbound` for `solace.onl` and `zeabur-roan-acme-dns` in `cert-manager` for `roan.dev`. Each Secret has one `api-token` key. Use separate Cloudflare tokens with DNS write and zone read on the corresponding zone. The issuers select the exact hostnames listed above.
 
@@ -142,6 +143,7 @@ Apply the bootstrap manifests after the projects and their Services exist. The p
 ```sh
 kubectl apply --server-side --field-manager=rocal-solace-bootstrap -f .zeabur/bootstrap/riftbound-public.yaml
 kubectl apply --server-side --field-manager=rocal-solace-bootstrap -f .zeabur/bootstrap/zeabur-project-public.yaml
+kubectl apply --server-side --field-manager=rocal-solace-bootstrap -f .zeabur/bootstrap/ente-public.yaml
 kubectl -n solace-gitops patch kustomization solace --field-manager=rocal-solace-bootstrap \
   --type=merge --patch-file .zeabur/bootstrap/riftbound-traefik-patch.json
 ```
