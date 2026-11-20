@@ -34,7 +34,7 @@ jobs:
           persist-credentials: false
 
       - name: Review dependency changes
-        uses: chainguard-actions/actions-dependency-review-action@9c300baf8189a413594de0217a5119aa9c5982b2 # v5.0.0
+        uses: chainguard-actions/actions-dependency-review-action@41239d5987c30e57ad63f7f907bef94df96fec01 # v5.0.1
         with:
           fail-on-severity: high
           fail-on-scopes: runtime,development,unknown
