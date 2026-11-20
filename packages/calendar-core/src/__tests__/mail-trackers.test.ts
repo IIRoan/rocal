@@ -8,12 +8,14 @@ describe("matchKnownTracker", () => {
     ["https://u123.ct.sendgrid.net/wf/open?upn=abc", "u123.ct.sendgrid.net"],
     ["https://abc.r.us-east-1.awstrack.me/I0/0100abc/xyz", "abc.r.us-east-1.awstrack.me"],
     ["https://e.customeriomail.com/e/o/eyJ", "e.customeriomail.com"],
+    ["https://track-eu.customer.io/e/o/eyJ", "track-eu.customer.io"],
     ["https://mailtrack.io/trace/mail/abc.png", "mailtrack.io"],
     ["https://abc123.emltrk.com/abc123?d=x", "abc123.emltrk.com"],
     ["https://r.superhuman.com/abc.png", "r.superhuman.com"],
     ["https://t.yesware.com/t/abc/def.png", "t.yesware.com"],
     ["https://mailfoogae.appspot.com/t?sender=x", "mailfoogae.appspot.com"],
     ["https://www.getnotify.com/notify/abc", "www.getnotify.com"],
+    ["http://www.email81.com/case/abc", "www.email81.com"],
     ["https://www.google-analytics.com/collect?v=1&tid=UA-1&t=event", "www.google-analytics.com"],
     ["https://ad.doubleclick.net/ddm/ad/abc", "ad.doubleclick.net"],
     ["https://www.facebook.com/tr?id=1&ev=PageView", "www.facebook.com"],
@@ -27,6 +29,7 @@ describe("matchKnownTracker", () => {
     expect(matchKnownTracker("https://us5.list-manage.com/track/click")).toBeNull();
     expect(matchKnownTracker("https://www.facebook.com/tracking.png")).toBeNull();
     expect(matchKnownTracker("https://abc.awstrack.me/L0/link")).toBeNull();
+    expect(matchKnownTracker("https://e.customeriomail.com/e/c/eyJ")).toBeNull();
     expect(matchKnownTracker("cid:list-manage.com/track/open.php")).toBeNull();
     expect(matchKnownTracker("data:image/png;base64,AAAA")).toBeNull();
   });
