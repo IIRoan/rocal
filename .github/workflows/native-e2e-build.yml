@@ -40,7 +40,7 @@ jobs:
       - uses: chainguard-actions/oven-sh-setup-bun@5817dfcd47d1008cf4cce29ca319c0bdd77e2eed # v2.2.0
         with:
           bun-version-file: .bun-version
-      - uses: chainguard-actions/actions-setup-java@85062aee0f74838a204ba15f5ffcf69e60651582 # v6.1.0
+      - uses: chainguard-actions/actions-setup-java@85062aee0f74838a204ba15f5ffcf69e60651582 # v6.3.0
         with:
           distribution: temurin
           java-version: "21"
