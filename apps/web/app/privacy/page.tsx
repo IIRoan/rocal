@@ -334,7 +334,7 @@ function PrivacyOverview() {
       >
         Overview
       </h2>
-      <p className="mt-2">Last updated 19 November 2026.</p>
+      <p className="mt-2">Last updated 20 November 2026.</p>
       <p className="mt-3">
         This policy covers the Solace website and the Solace Calendar and
         Solace Mail apps. Solace is run by Roan van Westerop, the controller
@@ -477,11 +477,6 @@ const SUBPROCESSORS: ReadonlyArray<readonly [string, string, string]> = [
     "Webdock.io ApS",
     "Denmark, where your data is stored",
     "Hosts the API, databases, mail storage, notification worker and profile pictures, and runs the relay servers that send and receive internet mail; their connection and delivery logs include IP and email addresses",
-  ],
-  [
-    "Cloudflare, Inc.",
-    "United States",
-    "Routes connections to the API and mail server and decrypts them in transit, so it sees IP addresses and request details; end-to-end encrypted content stays encrypted",
   ],
   ["Vercel Inc.", "United States", "Serves the website"],
   [
