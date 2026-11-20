@@ -36,6 +36,7 @@ import {
   Search,
   Settings,
   SquarePen,
+  Clock,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { createElement } from "react";
@@ -189,6 +190,8 @@ function ExpandedMailboxNav({
   labels,
   onSelectLabel,
   onOpenLabels,
+  scheduledCount,
+  onOpenScheduled,
 }: {
   visibleItems: JmapMailbox[];
   sensors: ReturnType<typeof useSensors>;
@@ -201,6 +204,8 @@ function ExpandedMailboxNav({
   labels: LabelDef[];
   onSelectLabel?: (labelId: string) => void;
   onOpenLabels?: () => void;
+  scheduledCount: number;
+  onOpenScheduled?: () => void;
 }) {
   return (
     <>
@@ -249,6 +254,16 @@ function ExpandedMailboxNav({
             </SidebarMenu>
           </SortableContext>
         </DndContext>
+        {scheduledCount > 0 && onOpenScheduled ? (
+          <SidebarMenu className="mt-1">
+            <SidebarMenuItem>
+              <SidebarMenuButton onClick={onOpenScheduled}>
+                <Clock size={16} strokeWidth={2} />
+                <span className="truncate">Scheduled ({scheduledCount})</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        ) : null}
 
         {onSelectLabel ? (
           <MailSidebarLabels
@@ -333,6 +348,8 @@ export interface MailSidebarProps {
   activeLabelId?: string | null;
   onSelectLabel?: (labelId: string) => void;
   onOpenLabels?: () => void;
+  scheduledCount?: number;
+  onOpenScheduled?: () => void;
 }
 
 export function MailSidebar({
@@ -350,6 +367,8 @@ export function MailSidebar({
   activeLabelId = null,
   onSelectLabel,
   onOpenLabels,
+  scheduledCount = 0,
+  onOpenScheduled,
 }: MailSidebarProps) {
   const { hiddenIds } = useHiddenMailboxIds();
 
@@ -426,6 +445,17 @@ export function MailSidebar({
                     </SidebarMenuItem>
                   );
                 })}
+                {scheduledCount > 0 && onOpenScheduled ? (
+                  <SidebarMenuItem className="flex justify-center">
+                    <SidebarIconButton
+                      label={`Scheduled (${scheduledCount})`}
+                      onClick={onOpenScheduled}
+                      className="text-muted-foreground"
+                    >
+                      <Clock size={16} strokeWidth={2} />
+                    </SidebarIconButton>
+                  </SidebarMenuItem>
+                ) : null}
               </SidebarMenu>
             ) : (
               <ExpandedMailboxNav
@@ -440,6 +470,8 @@ export function MailSidebar({
                 labels={labels}
                 onSelectLabel={onSelectLabel}
                 onOpenLabels={onOpenLabels}
+                scheduledCount={scheduledCount}
+                onOpenScheduled={onOpenScheduled}
               />
             )}
             </nav>

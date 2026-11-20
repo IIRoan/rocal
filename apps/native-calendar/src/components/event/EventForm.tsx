@@ -46,6 +46,7 @@ import {
 } from "./use-event-form-state";
 import { useEventFormParticipants } from "./use-event-form-participants";
 import { useEventFormDateTime } from "./use-event-form-date-time";
+import { useEventFormQuickAdd } from "./use-event-form-quick-add";
 import { EventFormDateTimeRows } from "./EventFormDateTimeRows";
 import { EventFormRepeatRows } from "./EventFormRepeatRows";
 import { EventFormCalendarRows } from "./EventFormCalendarRows";
@@ -75,11 +76,32 @@ interface EventFormProps {
   onSubmit: (submission: EventFormSubmission) => void;
   onCancel?: () => void;
   actionsPlacement?: "footer" | "external";
+  /** A new event offers the date and time typed into its title. */
+  isCreate?: boolean;
+  defaultDurationMinutes?: number;
 }
 
 export interface EventFormHandle {
   submit: () => void;
   isDirty: () => boolean;
+}
+
+/** Scrolls a focused field into view above the keyboard. */
+function useScrollFieldIntoView() {
+  const scrollRef = useRef<ScrollViewInstance>(null);
+  const handleInputFocus = useCallback((input: TextInputInstance | null) => {
+    if (!input || !scrollRef.current) return;
+    const scrollNativeRef = scrollRef.current.getNativeScrollRef();
+    if (!scrollNativeRef) return;
+    input.measureLayout(
+      scrollNativeRef,
+      (_x: number, y: number) => {
+        scrollRef.current?.scrollTo({ y: Math.max(0, y - 80), animated: true });
+      },
+      () => undefined,
+    );
+  }, []);
+  return { scrollRef, handleInputFocus };
 }
 
 export function EventForm({
@@ -95,12 +117,14 @@ export function EventForm({
   onSubmit,
   onCancel,
   actionsPlacement = "footer",
+  isCreate = false,
+  defaultDurationMinutes = 60,
 }: EventFormProps & { ref?: Ref<EventFormHandle> }) {
   const { theme } = useTheme();
   const resolvedTimezone = resolveTimezone(initialValues?.timezone ?? timezone);
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createEventFormStyles(theme), [theme]);
-  const scrollRef = useRef<ScrollViewInstance>(null);
+  const { scrollRef, handleInputFocus } = useScrollFieldIntoView();
 
   const [fields, updateFields] = useEventFormFields({
     initialValues,
@@ -140,24 +164,20 @@ export function EventForm({
     [theme],
   );
 
+  const quickAdd = useEventFormQuickAdd({
+    enabled: isCreate,
+    title: fields.title,
+    timezone: resolvedTimezone,
+    timeFormat,
+    defaultDurationMinutes,
+    updateFields,
+  });
+
   const repeatPresets = useMemo(
     () => getRepeatPresets(startWallClock),
     [startWallClock],
   );
   const activePreset = findRepeatPreset(repeatPresets, recurrenceRule);
-
-  const handleInputFocus = useCallback((input: TextInputInstance | null) => {
-    if (!input || !scrollRef.current) return;
-    const scrollNativeRef = scrollRef.current.getNativeScrollRef();
-    if (!scrollNativeRef) return;
-    input.measureLayout(
-      scrollNativeRef,
-      (_x: number, y: number) => {
-        scrollRef.current?.scrollTo({ y: Math.max(0, y - 80), animated: true });
-      },
-      () => undefined,
-    );
-  }, []);
 
   const openPicker = (open: () => void) => {
     Keyboard.dismiss();
@@ -227,7 +247,9 @@ export function EventForm({
               title={fields.title}
               error={ui.fieldErrors.title}
               styles={styles}
+              suggestionLabel={quickAdd.label}
               onChange={(title) => updateFields({ title })}
+              onApplySuggestion={quickAdd.apply}
               onFieldFocus={handleInputFocus}
             />
 

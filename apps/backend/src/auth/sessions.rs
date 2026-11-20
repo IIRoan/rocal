@@ -70,6 +70,20 @@ pub(super) async fn require_session(
     lookup.session.ok_or_else(ApiError::unauthorized)
 }
 
+/// The guard's passkey step-up for a Better Auth endpoint, answered as Better Auth's 403.
+pub(super) async fn require_step_up(
+    state: &AppState,
+    headers: &HeaderMap,
+    active: &ActiveSession,
+) -> Result<(), ApiError> {
+    super::guard::step_up(state, headers, active)
+        .await
+        .map_err(|error| match error {
+            crate::error::AppError::StepUpRequired => super::api::codes::passkey_step_up_required(),
+            _ => ApiError::internal(),
+        })
+}
+
 /// `freshSessionMiddleware`: a session created within the last day, else 403 `SESSION_NOT_FRESH`.
 pub(super) async fn require_fresh_session(
     state: &AppState,

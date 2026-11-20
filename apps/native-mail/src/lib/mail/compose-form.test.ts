@@ -11,6 +11,16 @@ describe("composeFormReducer", () => {
     expect(state).toMatchObject({ ...replyAll, seed: replyAll, showCcBcc: true, draftId: null });
   });
 
+  it("restores an undone send as edited, with its attachments and sealed copy", () => {
+    const fields = { to: "ann@example.com", cc: "", bcc: "", subject: "Plans", body: "Hi" };
+    const attachments = [{ id: "a", name: "a.txt", type: "text/plain", size: 1, bytes: new Uint8Array([1]) }];
+    const state = composeFormReducer(INITIAL_COMPOSE_FORM, {
+      type: "seed",
+      plan: { kind: "fields", fields, draftId: "copy", restoredAttachments: attachments },
+    });
+    expect(state).toMatchObject({ ...fields, draftId: "copy", attachments, seed: { to: "", cc: "", bcc: "", subject: "", body: "" } });
+  });
+
   it("holds an encrypted draft's id while it decrypts, then seeds the decrypted fields", () => {
     const decrypting = composeFormReducer(INITIAL_COMPOSE_FORM, {
       type: "seed",

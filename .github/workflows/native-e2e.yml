@@ -1,5 +1,5 @@
 name: Native end-to-end
-run-name: ${{ inputs.diagnostic && 'iOS authentication, calendar and photo diagnostics' || 'Native end-to-end' }}
+run-name: ${{ inputs.diagnostic && 'iOS authentication and calendar diagnostics' || 'Native end-to-end' }}
 
 on:
   pull_request:
@@ -29,7 +29,7 @@ on:
   workflow_dispatch:
     inputs:
       diagnostic:
-        description: Run only iOS authentication, calendar management and photo selection for diagnosis
+        description: Run only iOS authentication and calendar management for diagnosis
         type: boolean
         default: false
 

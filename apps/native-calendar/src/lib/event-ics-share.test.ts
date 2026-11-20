@@ -1,23 +1,33 @@
 import type { CalendarEvent } from "@workspace/calendar-core";
 import * as Sharing from "expo-sharing";
-import { shareEventIcs } from "./event-ics-share";
+import { clearIcsExportCache, shareEventIcs, shareIcsFile } from "./event-ics-share";
 
 interface MockFile {
   uri: string;
+  name: string;
   exists: boolean;
   content: string;
+  create: () => void;
 }
 
 jest.mock("react-native", () => ({ Platform: { OS: "ios" } }));
+jest.mock("@workspace/logger", () => ({
+  createLogger: () => ({ warn: jest.fn() }),
+}));
 jest.mock("expo-file-system", () => {
   const created: MockFile[] = [];
+  const looseFiles: MockFile[] = [];
+  const directoryLog: string[] = [];
+  const directories = new Set<string>();
   const write = jest.fn<Promise<void>, [MockFile, string]>();
   class File implements MockFile {
     uri: string;
+    name: string;
     exists = false;
     content = "";
     constructor(directory: { uri: string }, name: string) {
       this.uri = `${directory.uri}/${name}`;
+      this.name = name;
       created.push(this);
     }
     create() {
@@ -30,17 +40,42 @@ jest.mock("expo-file-system", () => {
       this.exists = false;
     }
   }
-  return { File, Paths: { cache: { uri: "file:///cache" } }, created, write };
+  class Directory {
+    uri: string;
+    constructor(parent: { uri: string }, name: string) {
+      this.uri = `${parent.uri}/${name}`;
+    }
+    get exists() {
+      return directories.has(this.uri);
+    }
+    create() {
+      directories.add(this.uri);
+      directoryLog.push(`create ${this.uri}`);
+    }
+    delete() {
+      directories.delete(this.uri);
+      directoryLog.push(`delete ${this.uri}`);
+    }
+  }
+  const cache = { uri: "file:///cache", list: jest.fn(() => looseFiles) };
+  return { File, Directory, Paths: { cache }, created, directories, directoryLog, looseFiles, write };
 });
 jest.mock("expo-sharing", () => ({
   isAvailableAsync: jest.fn(),
   shareAsync: jest.fn(),
 }));
 
-const { created: files, write } = jest.requireMock<{
+const fileSystem = jest.requireMock<{
+  File: new (directory: { uri: string }, name: string) => MockFile;
+  Paths: { cache: { list: jest.Mock } };
   created: MockFile[];
+  directories: Set<string>;
+  directoryLog: string[];
+  looseFiles: MockFile[];
   write: jest.Mock<Promise<void>, [MockFile, string]>;
 }>("expo-file-system");
+const { created: files, directories, directoryLog, looseFiles, write } = fileSystem;
+const EXPORT_DIRECTORY = "file:///cache/ics-export";
 const isAvailableAsync = Sharing.isAvailableAsync as jest.Mock;
 const shareAsync = Sharing.shareAsync as jest.Mock;
 
@@ -74,7 +109,7 @@ describe("shareEventIcs", () => {
 
     await shareEventIcs(event, { calendarName: "Personal" });
 
-    expect(shareAsync).toHaveBeenCalledWith("file:///cache/dentist.ics", {
+    expect(shareAsync).toHaveBeenCalledWith("file:///cache/ics-export/dentist.ics", {
       mimeType: "text/calendar",
       dialogTitle: "dentist.ics",
       UTI: "com.apple.ical.ics",
@@ -145,5 +180,57 @@ describe("shareEventIcs", () => {
     ).rejects.toThrow("still encrypted");
     expect(files).toHaveLength(0);
     expect(shareAsync).not.toHaveBeenCalled();
+  });
+});
+
+describe("shareIcsFile", () => {
+  beforeEach(() => {
+    files.length = 0;
+    directories.clear();
+    directoryLog.length = 0;
+    write.mockReset().mockResolvedValue(undefined);
+    isAvailableAsync.mockReset().mockResolvedValue(true);
+    shareAsync.mockReset().mockResolvedValue(undefined);
+  });
+
+  it("wipes what an earlier share left, then writes only inside the export folder and deletes after sharing", async () => {
+    directories.add(EXPORT_DIRECTORY);
+
+    await shareIcsFile({ icsContent: "BEGIN:VCALENDAR", filename: "work.ics" });
+
+    expect(directoryLog).toEqual([`delete ${EXPORT_DIRECTORY}`, `create ${EXPORT_DIRECTORY}`]);
+    expect(shareAsync).toHaveBeenCalledWith(`${EXPORT_DIRECTORY}/work.ics`, expect.anything());
+    expect(files[0]?.exists).toBe(false);
+  });
+});
+
+describe("clearIcsExportCache", () => {
+  beforeEach(() => {
+    files.length = 0;
+    directories.clear();
+    looseFiles.length = 0;
+  });
+
+  it("removes the export folder and the loose .ics files earlier builds left in the cache root", async () => {
+    directories.add(EXPORT_DIRECTORY);
+    const leftover = new fileSystem.File({ uri: "file:///cache" }, "dentist.ics");
+    const unrelated = new fileSystem.File({ uri: "file:///cache" }, "avatar.jpg");
+    leftover.create();
+    unrelated.create();
+    looseFiles.push(leftover, unrelated);
+
+    await clearIcsExportCache();
+
+    expect(directories.has(EXPORT_DIRECTORY)).toBe(false);
+    expect(leftover.exists).toBe(false);
+    expect(unrelated.exists).toBe(true);
+  });
+
+  it("never rejects, so launch and sign-out are not blocked", async () => {
+    fileSystem.Paths.cache.list.mockImplementationOnce(() => {
+      throw new Error("io");
+    });
+
+    await expect(clearIcsExportCache()).resolves.toBeUndefined();
   });
 });

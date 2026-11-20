@@ -5,12 +5,12 @@ use axum::extract::{Path, State};
 use solace_api_types::SuccessMessage;
 use solace_api_types::e2ee::{
     E2eeBootstrap, EncryptionDevice, EncryptionUpgrades, PasswordEnvelope, PasswordEnvelopeRequest,
-    RegisterDeviceRequest, ResetSnapshot,
+    RecoveryKitRequest, RecoveryKitStatus, RegisterDeviceRequest, ResetSnapshot,
 };
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
-use super::{service, upgrades};
+use super::{recovery, service, upgrades};
 use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::http::extract::ValidJson;
@@ -20,14 +20,16 @@ use crate::request_schema;
 use crate::state::AppState;
 
 const DELETE_DEVICE_LIMIT: Limit = Limit::per_minute(30);
+/// Each store checks the password, so it shares the hashing slots every sign-in needs.
+const RECOVERY_KIT_LIMIT: Limit = Limit::per_minute(5);
 
 request_schema!(RegisterDeviceRequest => zod::object([
     ("deviceId", zod::string().min(1).max(128)),
     ("deviceLabel", zod::string().max(120).optional()),
     ("publicKey", zod::string().min(1).max(32768)),
     ("publicKeyAlgorithm", zod::string().max(64).optional()),
-    ("wrappedAccountKey", zod::string().min(1).max(32768)),
-    ("wrappedSearchKey", zod::string().min(1).max(32768)),
+    ("wrappedAccountKey", zod::string().min(1).max(32768).optional()),
+    ("wrappedSearchKey", zod::string().min(1).max(32768).optional()),
     ("wrapAlgorithm", zod::string().max(64).optional()),
     ("keyVersion", zod::number().int().min(1).max(1000).optional()),
 ]).strict());
@@ -35,10 +37,20 @@ request_schema!(RegisterDeviceRequest => zod::object([
 request_schema!(PasswordEnvelopeRequest => zod::object([
     ("kdfAlgorithm", zod::string().max(64).optional()),
     ("kdfSalt", zod::string().min(1).max(512)),
-    ("kdfIterations", zod::number().int().min(100_000).max(5_000_000).optional()),
+    ("kdfIterations", zod::number().int().min(1).max(5_000_000).optional()),
+    ("kdfMemoryKiB", zod::number().int().min(65_536).max(131_072).optional()),
+    ("kdfParallelism", zod::number().int().min(1).max(4).optional()),
     ("wrappedAccountKey", zod::string().min(1).max(32768)),
     ("wrappedSearchKey", zod::string().min(1).max(32768)),
     ("wrapAlgorithm", zod::string().max(64).optional()),
+    ("keyVersion", zod::number().int().min(1).max(1000).optional()),
+]).strict());
+
+request_schema!(RecoveryKitRequest => zod::object([
+    ("currentPassword", zod::string().min(1).max(128)),
+    ("recoveryAuthKey", zod::string().min(1).max(64)),
+    ("wrappedAccountKey", zod::string().min(1).max(32768)),
+    ("wrappedSearchKey", zod::string().min(1).max(32768)),
     ("keyVersion", zod::number().int().min(1).max(1000).optional()),
 ]).strict());
 
@@ -50,6 +62,11 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(register_device))
         .routes(routes!(delete_device))
         .routes(routes!(store_password_envelope))
+        .routes(routes!(
+            recovery_kit,
+            store_recovery_kit,
+            delete_recovery_kit
+        ))
 }
 
 /// The caller's devices, password envelope and calendars, for unlocking on a device.
@@ -118,4 +135,36 @@ pub async fn store_password_envelope(
     Ok(Json(
         service::store_password_envelope(&state, &user, body).await?,
     ))
+}
+
+/// Whether the caller has a recovery kit.
+#[utoipa::path(get, path = "/api/e2ee/recovery-kit", operation_id = "getRecoveryKit", tag = "E2EE", responses((status = 200, body = RecoveryKitStatus)))]
+#[tracing::instrument(skip_all)]
+pub async fn recovery_kit(
+    State(state): State<AppState>,
+    user: RouteUser,
+) -> Result<Json<RecoveryKitStatus>, AppError> {
+    Ok(Json(recovery::status(&state, &user).await?))
+}
+
+/// Stores a new recovery kit after checking the current password, replacing any earlier one.
+#[utoipa::path(put, path = "/api/e2ee/recovery-kit", operation_id = "putRecoveryKit", tag = "E2EE", request_body = RecoveryKitRequest, responses((status = 200, body = RecoveryKitStatus)))]
+#[tracing::instrument(skip_all)]
+pub async fn store_recovery_kit(
+    State(state): State<AppState>,
+    user: RouteUser,
+    ValidJson(body): ValidJson<RecoveryKitRequest>,
+) -> Result<Json<RecoveryKitStatus>, AppError> {
+    rate_limit::enforce("recovery-kit", &user.id, RECOVERY_KIT_LIMIT)?;
+    Ok(Json(recovery::store(&state, &user, body).await?))
+}
+
+/// Removes the caller's recovery kit, so it can no longer reset the password.
+#[utoipa::path(delete, path = "/api/e2ee/recovery-kit", operation_id = "deleteRecoveryKit", tag = "E2EE", responses((status = 200, body = SuccessMessage), (status = 404, description = "The caller has no recovery kit")))]
+#[tracing::instrument(skip_all)]
+pub async fn delete_recovery_kit(
+    State(state): State<AppState>,
+    user: RouteUser,
+) -> Result<Json<SuccessMessage>, AppError> {
+    Ok(Json(recovery::remove(&state, &user).await?))
 }

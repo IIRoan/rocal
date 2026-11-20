@@ -35,6 +35,8 @@ export interface EventSearchCorpusParams {
   offset?: number;
   updatedAfter?: string;
   readableInvitations?: boolean;
+  /** Series carry `recurrenceExceptions`, which a calendar export needs. */
+  includeExceptions?: boolean;
 }
 
 export type EventColor =
@@ -105,6 +107,8 @@ export interface CalendarEvent {
   blindIndexTokens?: string[] | null;
   encryptionState?: EncryptionState;
   encryptionKeyVersion?: number;
+  /** Client-only: the content did not open on this device, so the event is read-only here. */
+  contentUnavailable?: boolean;
   start: Date;
   end: Date;
   timezone?: string | null;
@@ -133,6 +137,11 @@ export interface CalendarEvent {
   stalwartUid?: string | null;
   stalwartSyncedAt?: string | null;
   participants?: EventParticipant[];
+  recurrenceExceptions?: Array<{
+    exceptionDate: string;
+    modifiedEventId: string | null;
+    type: string;
+  }>;
 }
 
 export interface EventParticipant {
@@ -344,6 +353,25 @@ export interface DeleteResponse {
   success: boolean;
   message: string;
   deletedEventId?: string;
+  /** Set when the event went to the trash, where `restoreTrashedEvent` can bring it back for 30 days. */
+  trashId?: string;
+}
+
+/** A trash entry with its title opened on this device; `id` is the entry, `eventId` the id a restore keeps. */
+export interface TrashedCalendarEvent {
+  id: string;
+  eventId: string;
+  calendarId: string;
+  /** The original calendar is gone or read-only, so a restore lands in the default calendar. */
+  calendarMissing: boolean;
+  title: string;
+  start: Date;
+  end: Date;
+  allDay: boolean;
+  timezone: string;
+  recurrence: string | null;
+  trashedAt: Date;
+  purgeAt: Date;
 }
 
 export interface ApiError {
@@ -392,6 +420,10 @@ export interface UserSettings {
   showDeclinedEvents: boolean;
   riftbound?: import("./riftbound-settings").RiftboundPreferences;
   riftboundImportedIds?: string[];
+  /** Absent means on; off disables every single-key shortcut (WCAG 2.1.4). */
+  keyboardShortcuts?: boolean;
+  /** Set once every event is bound to its row id; from then on unbound event content is refused. */
+  eventContentBound?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -467,10 +499,13 @@ export interface NotificationTestRequest {
 }
 
 export type CalendarSubscription = CalendarSubscriptionSummary &
-  Partial<Pick<Schema<"CalendarSubscription">, "nameRevision">>;
+  Partial<Pick<Schema<"CalendarSubscription">, "nameRevision" | "encryptedUrl">>;
 export type CreateSubscriptionRequest = CreateCalendarSubscriptionRequest;
+/** `url` never leaves the device readable: the client sends it sealed as `encryptedUrl`. */
 export type UpdateSubscriptionRequest = UpdateCalendarSubscriptionRequest &
-  Pick<Schema<"UpdateSubscriptionRequest">, "expectedNameRevision">;
+  Pick<Schema<"UpdateSubscriptionRequest">, "expectedNameRevision"> & {
+    url?: string;
+  };
 export type DeleteSubscriptionResponse = DeleteCalendarSubscriptionResponse;
 export type SyncSubscriptionResponse = CalendarSubscriptionSyncResponse;
 export type ImportICSRequest = ImportIcsRequest;
@@ -498,6 +533,8 @@ export interface E2eePasswordRecord {
   kdfAlgorithm: string;
   kdfSalt: string;
   kdfIterations: number;
+  kdfMemoryKiB: number | null;
+  kdfParallelism: number | null;
   wrappedAccountKey: string;
   wrappedSearchKey: string;
   wrapAlgorithm: string;
@@ -538,8 +575,8 @@ export interface UpsertE2eeDeviceRequest {
   deviceLabel?: string;
   publicKey: string;
   publicKeyAlgorithm?: string;
-  wrappedAccountKey: string;
-  wrappedSearchKey: string;
+  wrappedAccountKey?: string;
+  wrappedSearchKey?: string;
   wrapAlgorithm?: string;
   keyVersion?: number;
 }
@@ -548,6 +585,8 @@ export interface UpsertE2eePasswordRequest {
   kdfAlgorithm?: string;
   kdfSalt: string;
   kdfIterations?: number;
+  kdfMemoryKiB?: number;
+  kdfParallelism?: number;
   wrappedAccountKey: string;
   wrappedSearchKey: string;
   wrapAlgorithm?: string;

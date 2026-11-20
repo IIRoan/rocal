@@ -373,6 +373,81 @@ describe("EventEditorBody", () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
+  const renderEditForm = async (overrides: Record<string, unknown>) => {
+    await act(async () => {
+      root.render(
+        <EventEditorBody
+          categories={[]}
+          calendars={[]}
+          desktop={true}
+          isViewMode={false}
+          localSettings={
+            {
+              timeFormat: "24h",
+              timezone: "Europe/Amsterdam",
+              defaultEventDuration: 30,
+            } as any
+          }
+          onSubmit={() => {}}
+          eventForm={
+            {
+              eventAllDay: false,
+              eventCalendarId: "cal-1",
+              eventDescription: "",
+              eventEndDate: new Date(2026, 4, 27),
+              eventEndTime: "11:00",
+              eventLocation: "",
+              eventNotifications: [],
+              eventParticipants: [],
+              eventStartDate: new Date(2026, 4, 27),
+              eventStartTime: "10:00",
+              isRecurring: false,
+              notificationsLoading: false,
+              recurrenceRule: null,
+              setEventTitle: () => {},
+              ...overrides,
+            } as any
+          }
+        />,
+      );
+    });
+  };
+
+  it("offers the date and time typed into a new event's title", async () => {
+    const applyQuickAdd = jest.fn();
+    await renderEditForm({
+      eventTitle: "Lunch with Ana 2026-12-01 1pm",
+      selectedEvent: null,
+      applyQuickAdd,
+    });
+
+    const suggestion = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.startsWith("Use "),
+    );
+    expect(suggestion?.textContent).toBe("Use Tue 1 Dec · 13:00–13:30");
+    expect(suggestion?.parentElement?.getAttribute("aria-live")).toBe("polite");
+    await act(async () => {
+      suggestion?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(applyQuickAdd).toHaveBeenCalledWith({
+      title: "Lunch with Ana",
+      start: new Date("2026-12-01T12:00:00.000Z"),
+      end: new Date("2026-12-01T12:30:00.000Z"),
+      allDay: false,
+    });
+  });
+
+  it("offers nothing for plain titles or existing events", async () => {
+    await renderEditForm({ eventTitle: "Planning sync", selectedEvent: null });
+    expect(container.textContent).not.toContain("Use ");
+
+    await renderEditForm({
+      eventTitle: "Planning 2026-12-01 1pm",
+      selectedEvent: { id: "event-1" },
+    });
+    expect(container.textContent).not.toContain("Use ");
+  });
+
   it("shows the current category and clears it in edit mode", async () => {
     const setEventCategoryId = jest.fn();
     await act(async () => {

@@ -24,7 +24,7 @@ appId: ${APP_ID}
 - runFlow:
     file: ../common/conversation-body.yaml
     env:
-      BODY_TEXT: ".*Maestro primary reply.*"
+      BODY_TEXT: "Maestro primary reply.*wrote:.*"
       OPEN_TIMEOUT_MS: 10000
 - assertVisible: ".*Maestro conversation.*\\[2\\].*"
 - takeScreenshot: ${SCREENSHOT_DIR}/conversation-reply-delivered-to-peer
@@ -39,8 +39,8 @@ appId: ${APP_ID}
 - runFlow:
     file: ../common/conversation-body.yaml
     env:
-      BODY_TEXT: ".*Maestro peer final note.*"
+      BODY_TEXT: "Maestro peer final note.*wrote:.*"
       OPEN_TIMEOUT_MS: 10000
 - assertVisible: ".*Maestro conversation.*\\[3\\].*"
 - takeScreenshot: ${SCREENSHOT_DIR}/conversation-three-messages
-- tapOn: Go back
+- runFlow: ../common/go-back.yaml

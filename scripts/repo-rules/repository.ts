@@ -107,6 +107,29 @@ export const repositoryRules: Rule[] = [
     examples: { path: "apps/web/.env", bad: ["SECRET=1"], good: [] },
   },
   {
+    id: "pinned-workflow-actions",
+    summary: "Every action a workflow uses is a local ./ workflow or pinned to a full commit SHA.",
+    files: (file) => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(file),
+    check: (file) =>
+      matchLines(
+        file,
+        /^\s*(?:-\s+)?uses:\s*["']?(?!\.\/|[^\s"'#]+@[0-9a-f]{40}(?![^\s"'#]))([^\s"'#]+)/m,
+        (match) => `pin "${match[1]}" to a full commit SHA with a version comment`,
+      ),
+    examples: {
+      path: ".github/workflows/example.yml",
+      bad: [
+        "      - uses: actions/checkout@v4",
+        "      - uses: chainguard-actions/actions-checkout@37298d8 # v7.0.1",
+        '      - uses: "actions/cache@main"',
+      ],
+      good: [
+        "      - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1",
+        "    uses: ./.github/workflows/native-checks.yml",
+      ],
+    },
+  },
+  {
     id: "no-alternate-mail-transport",
     summary: "Mail runs over JMAP only: no SMTP/IMAP/POP3 URLs or Resend, and the provisioning token stays in the admin client.",
     files: sourceUnder([...CLIENT_SOURCE, "packages/"]),

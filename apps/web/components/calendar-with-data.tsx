@@ -10,6 +10,7 @@ import { useCalendarPresentation } from "@/hooks/use-calendar-presentation";
 import { useSettings } from "@/hooks/use-settings";
 import { useUserTimeFormat } from "@/hooks/use-user-time-format";
 import { useRecurringMovePrompt } from "@/hooks/use-recurring-move-prompt";
+import { useDashboardUserActions } from "@/hooks/use-dashboard-user-actions";
 import { useEventDeletePrompt } from "@/hooks/use-event-delete-prompt";
 import { useCommandPalette } from "./command-palette-context";
 import { RecurringScopeModal } from "./command-palette/recurring-scope-modal";
@@ -28,8 +29,14 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
   const { isCalendarVisible, currentDate, currentView } = useCalendarContext();
   const { settings, loading: settingsLoading } = useSettings();
   const timeFormat = useUserTimeFormat();
-  const { openEventEditor, previewEvent } = useCommandPalette();
+  const { openEventEditor, openSearchPalette, previewEvent } =
+    useCommandPalette();
   const calendarData = useSharedCalendarData();
+  const { openNewEventEditor } = useDashboardUserActions({
+    defaultCalendarId: settings?.defaultCalendarId,
+    fallbackCalendarId: calendarData.calendars?.[0]?.id,
+    openEventEditor,
+  });
   const workspace = useCalendarWorkspaceReady();
   const { moveRecurringEvent, scopePrompt } = useRecurringMovePrompt(
     calendarData.editRecurringEvent,
@@ -94,6 +101,9 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
         onEventEdit={openEventEditor}
         onSetPreview={handleSetPreview}
         onPrefetchRange={calendarData.prefetchRange}
+        keyboardShortcuts={settings?.keyboardShortcuts !== false}
+        onCreateShortcut={openNewEventEditor}
+        onSearchShortcut={openSearchPalette}
       />
       <RecurringScopeModal action="edit" {...scopePrompt} />
       <EventConfirmDialog {...deleteConfirmPrompt} />

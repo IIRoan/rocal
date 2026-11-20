@@ -10,8 +10,9 @@ import {
   removeTrustedSender,
   resolveMailContentIsDark,
   resolveReaderRemoteContent,
+  writeMailDisplaySettings,
 } from "@/lib/mail/mail-display-settings";
-import { emailHtmlHasRemoteContent } from "@workspace/calendar-core/mail-html";
+import { analyzeEmailHtml } from "@workspace/calendar-core/mail-html";
 import { clearLocalMailSettings } from "@/lib/mail/mail-settings-storage";
 
 describe("mail-display-settings", () => {
@@ -97,7 +98,7 @@ describe("mail-display-settings", () => {
       '<div style="background-image:url(&quot;https://example.com/bg.png&quot;)">Hi</div>',
     ],
   ])("offers to load remote content in a %s", (_label, html) => {
-    const hasRemoteContent = emailHtmlHasRemoteContent({
+    const { hasRemoteContent } = analyzeEmailHtml({
       html,
       isDark: false,
       blockTrackingPixels: true,
@@ -118,7 +119,7 @@ describe("mail-display-settings", () => {
     ["tracking pixel", '<img src="https://example.com/p.gif" width="1" height="1">'],
   ])("does not prompt for a %s", (_label, html) => {
     expect(
-      emailHtmlHasRemoteContent({ html, isDark: false, blockTrackingPixels: true }),
+      analyzeEmailHtml({ html, isDark: false, blockTrackingPixels: true }).hasRemoteContent,
     ).toBe(false);
   });
 
@@ -159,6 +160,18 @@ describe("mail-display-settings", () => {
     localStorage.setItem("mail:displaySettings", JSON.stringify({ trustedSenders: ["legacy@example.com"] }));
     expect(readMailDisplaySettings().trustedSenders).toEqual(["legacy@example.com"]);
     expect(localStorage.getItem("mail:displaySettings")).not.toContain("legacy@example.com");
+  });
+
+  it("keeps the link confirmation switch and a newer client's keys in local storage", () => {
+    expect(readMailDisplaySettings().confirmExternalLinks).toBe(true);
+    localStorage.setItem("mail:displaySettings", JSON.stringify({ futureKey: "kept" }));
+    writeMailDisplaySettings((current) => ({ ...current, confirmExternalLinks: false }), {
+      sync: false,
+    });
+    expect(readMailDisplaySettings()).toMatchObject({
+      confirmExternalLinks: false,
+      futureKey: "kept",
+    });
   });
 
   it("removes trusted senders case-insensitively", () => {

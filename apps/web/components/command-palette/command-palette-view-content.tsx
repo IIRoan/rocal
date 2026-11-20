@@ -26,6 +26,21 @@ import type { EventEditorMode } from "../command-palette-context";
 import type { EventEditorCloseHandle } from "../event-editor";
 import { PaletteViewHeader } from "./palette-ui";
 
+const CALENDAR_MANAGER_VIEWS = new Set<PaletteView>([
+  "calendars",
+  "calendar-create",
+  "calendar-edit",
+  "trash",
+]);
+
+const SUBSCRIPTION_VIEWS = new Set<PaletteView>([
+  "subscriptions",
+  "subscriptions-add-feed",
+  "subscriptions-holidays",
+  "subscriptions-import-ics",
+  "subscriptions-edit",
+]);
+
 type CommandPaletteViewContentProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -206,11 +221,7 @@ export function CommandPaletteViewContent({
     return <InviteSettings goBack={goBack} />;
   }
 
-  if (
-    currentView === "calendars" ||
-    currentView === "calendar-create" ||
-    currentView === "calendar-edit"
-  ) {
+  if (CALENDAR_MANAGER_VIEWS.has(currentView)) {
     return (
       <CalendarManager
         onBack={goBack}
@@ -242,13 +253,7 @@ export function CommandPaletteViewContent({
     );
   }
 
-  if (
-    currentView === "subscriptions" ||
-    currentView === "subscriptions-add-feed" ||
-    currentView === "subscriptions-holidays" ||
-    currentView === "subscriptions-import-ics" ||
-    currentView === "subscriptions-edit"
-  ) {
+  if (SUBSCRIPTION_VIEWS.has(currentView)) {
     return (
       <SubscriptionManagement
         open={open}

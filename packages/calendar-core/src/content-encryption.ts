@@ -34,11 +34,34 @@ export function encryptedNameAad(
   return `${kind}-name:v${keyVersion}`;
 }
 
-export function eventContentAad(
-  keyVersion: number = CONTENT_ENCRYPTION_KEY_VERSION,
-): string {
-  return `event-content:v${keyVersion}`;
+/** A feed URL sealed before it was bound to its feed; it opens only until the account is marked bound. */
+export const UNBOUND_SUBSCRIPTION_URL_AAD = "subscription-url:v1";
+
+/** Binding a sealed feed URL to its subscription id stops the server from moving it onto another feed; the server keeps only `sealed:<id>`. */
+export function subscriptionUrlAad(subscriptionId: string): string {
+  return `subscription-url:v2:${subscriptionId}`;
 }
+
+/** `encryptionKeyVersion` of event content bound to its stored row id; version 1 is the unbound legacy format. */
+export const BOUND_EVENT_CONTENT_VERSION = 2;
+
+/** Binding to the stored row id stops the server from moving one event's ciphertext onto another event. */
+export function eventContentAad(keyVersion: number, eventId: string): string {
+  return keyVersion < BOUND_EVENT_CONTENT_VERSION
+    ? `event-content:v${keyVersion}`
+    : `event-content:v${keyVersion}:${eventId}`;
+}
+
+/** A row id the client proposes: it cannot collide with server cuids or `<id>_<instant>` occurrence ids. */
+export const CLIENT_ENTITY_ID_PATTERN = /^[0-9a-f]{32}$/;
+
+export function newClientEntityId(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export const EVENT_CONTENT_UNAVAILABLE_MESSAGE =
+  "This event can't be opened on this device, so it can't be edited.";
 
 export const EVENT_CONTENT_FIELDS = [
   "title",

@@ -15,6 +15,8 @@ import {
 } from "@workspace/native-core/components/sheet/SheetSections";
 import { SettingsSheetPageProvider } from "@workspace/native-core/components/settings/SettingsPage";
 import { MailboxesSettingsContent } from "../settings/sections/MailboxesSettingsContent";
+import { MailScheduledContent } from "./MailScheduledContent";
+import { useScheduledMailSends } from "../../hooks/use-scheduled-mail-sends";
 import {
   getMailboxDisplayName,
   getMailboxIcon,
@@ -24,6 +26,7 @@ import type { JmapMailbox } from "../../lib/mail/types";
 
 const ROOT_PAGE = "root";
 const MANAGE_PAGE = "mailboxes";
+const SCHEDULED_PAGE = "scheduled";
 const SNAP_POINTS = [0.6, 0.92];
 
 interface MailboxDrawerSheetProps {
@@ -47,9 +50,9 @@ export function MailboxDrawerSheet({
   const pageStack = useSheetPageStack(ROOT_PAGE, visible);
   const { push, pop, reset } = pageStack;
 
-  const openManage = () => {
+  const openPage = (page: string) => {
     sheetRef.current?.snapTo(SNAP_POINTS.length - 1);
-    push(MANAGE_PAGE);
+    push(page);
   };
 
   return (
@@ -69,11 +72,16 @@ export function MailboxDrawerSheet({
               <SheetSubPage title="Mailboxes" backLabel="Back to mail">
                 <MailboxesSettingsContent />
               </SheetSubPage>
+            ) : pageId === SCHEDULED_PAGE ? (
+              <SheetSubPage title="Scheduled" backLabel="Back to mail">
+                <MailScheduledContent />
+              </SheetSubPage>
             ) : (
               <MailboxList
                 {...listProps}
                 onDismiss={onDismiss}
-                onManage={openManage}
+                onManage={() => openPage(MANAGE_PAGE)}
+                onOpenScheduled={() => openPage(SCHEDULED_PAGE)}
               />
             )
           }
@@ -86,13 +94,15 @@ export function MailboxDrawerSheet({
 function MailboxList({
   onDismiss,
   onManage,
+  onOpenScheduled,
   loading,
   mailboxes,
   selectedMailboxId,
   onSelectMailbox,
   onEmptyMailbox,
   emptyingMailboxId,
-}: Omit<MailboxDrawerSheetProps, "visible"> & { onManage: () => void }) {
+}: Omit<MailboxDrawerSheetProps, "visible"> & { onManage: () => void; onOpenScheduled: () => void }) {
+  const scheduledCount = useScheduledMailSends().sends.length;
   const emptyableMailboxes = mailboxes.filter(
     (mailbox) => mailbox.role === "trash" || isSpamMailboxRole(mailbox.role),
   );
@@ -123,6 +133,14 @@ function MailboxList({
                 />
               );
             })}
+            {scheduledCount > 0 ? (
+              <SheetItem
+                label={`Scheduled (${scheduledCount})`}
+                icon="clock"
+                chevron
+                onPress={onOpenScheduled}
+              />
+            ) : null}
           </SheetGroup>
         )}
       </SheetSection>

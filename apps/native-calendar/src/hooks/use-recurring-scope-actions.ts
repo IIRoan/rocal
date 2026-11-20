@@ -1,14 +1,19 @@
 import { useCallback, useState } from "react";
 import { Alert } from "react-native";
-import type {
-  CalendarEvent,
-  RecurrenceDeleteScope,
-  RecurrenceEditScope,
+import {
+  getEventDeleteConfirmCopy,
+  type CalendarEvent,
+  type RecurrenceDeleteScope,
+  type RecurrenceEditScope,
 } from "@workspace/calendar-core";
 import type { RecurringScope } from "../components/event/RecurringScopeModal";
 
-function confirmDelete(onConfirm: () => void) {
-  Alert.alert("Delete event?", "This action cannot be undone.", [
+function confirmDelete(
+  event: CalendarEvent,
+  scope: RecurrenceDeleteScope | undefined,
+  onConfirm: () => void,
+) {
+  Alert.alert("Delete event?", getEventDeleteConfirmCopy(event, scope).description, [
     { text: "Cancel", style: "cancel" },
     { text: "Delete", style: "destructive", onPress: onConfirm },
   ]);
@@ -38,22 +43,23 @@ export function useRecurringScopeActions({
   }, [isRecurring, onStartEdit]);
 
   const handleDeletePress = useCallback(() => {
+    if (!event) return;
     if (!isRecurring) {
-      confirmDelete(() => onDelete({}));
+      confirmDelete(event, undefined, () => onDelete({}));
       return;
     }
     setScopeAction("delete");
     setScopeVisible(true);
-  }, [isRecurring, onDelete]);
+  }, [event, isRecurring, onDelete]);
 
   const handleScopeSelect = useCallback(
     (scope: RecurringScope) => {
       if (!scopeVisible) return;
       setScopeVisible(false);
       if (scopeAction === "edit") onStartEdit(scope);
-      else confirmDelete(() => onDelete({ scope }));
+      else if (event) confirmDelete(event, scope, () => onDelete({ scope }));
     },
-    [scopeVisible, scopeAction, onStartEdit, onDelete],
+    [event, scopeVisible, scopeAction, onStartEdit, onDelete],
   );
 
   const closeScopePrompt = useCallback(() => setScopeVisible(false), []);

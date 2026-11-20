@@ -34,6 +34,8 @@ pub struct Model {
     pub calendar_id: String,
     pub created_at: TimeDateTime,
     pub updated_at: TimeDateTime,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub encrypted_url: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

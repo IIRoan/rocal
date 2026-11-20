@@ -6,6 +6,7 @@ import { createE2eeModule } from "../e2ee-module";
 import {
   ENCRYPTION_NOT_READY_MESSAGE,
   decryptEntityName,
+  decryptEventContent,
   encryptEventContentRequest,
   encryptNameRequest,
   hydrateEncryptedName,
@@ -56,7 +57,7 @@ describe("encryptEventContentRequest", () => {
       color: "rose",
       calendarId: "calendar-1",
       categoryId: "category-1",
-    });
+    }, "event-1");
 
     for (const field of ["title", "description", "location", "color", "categoryId"]) {
       expect(wire).not.toHaveProperty(field);
@@ -67,14 +68,14 @@ describe("encryptEventContentRequest", () => {
     expect(wire).toMatchObject({
       start: "2026-06-01T09:00:00.000Z",
       calendarId: "calendar-1",
-      encryptionKeyVersion: 1,
+      encryptionKeyVersion: 2,
       attributesEncrypted: true,
     });
 
     const decrypted = await e2ee.decryptJsonPayload(
       keys.accountKey,
       JSON.parse(wire.encryptedContent ?? "null"),
-      "event-content:v1",
+      "event-content:v2:event-1",
     );
     expect(decrypted).toEqual({
       title: "Therapy",
@@ -131,7 +132,7 @@ describe("encryptEventContentRequest", () => {
         { email: "owner@example.com", role: "organizer" },
         { email: "guest@example.com", role: "attendee" },
       ],
-    });
+    }, "event-1");
 
     expect(wire).not.toHaveProperty("title");
     expect(wire.invitationContent).toEqual({
@@ -148,18 +149,65 @@ describe("encryptEventContentRequest", () => {
 
     expect(shouldEncryptEventContent(request)).toBe(false);
     expect(shouldEncryptEventContent({ title: "  " })).toBe(false);
-    await expect(encryptEventContentRequest(e2ee, keys, request)).resolves.toEqual(
+    await expect(encryptEventContentRequest(e2ee, keys, request, "event-1")).resolves.toEqual(
       request,
     );
   });
 
   it("drops empty content keys and refuses plaintext it cannot encrypt", async () => {
     await expect(
-      encryptEventContentRequest(e2ee, keys, { title: " ", location: "", end: "x" }),
+      encryptEventContentRequest(e2ee, keys, { title: " ", location: "", end: "x" }, "event-1"),
     ).resolves.toEqual({ end: "x" });
     await expect(
-      encryptEventContentRequest(e2ee, keys, { description: "Session notes" }),
+      encryptEventContentRequest(e2ee, keys, { description: "Session notes" }, "event-1"),
     ).rejects.toThrow(ENCRYPTION_NOT_READY_MESSAGE);
+  });
+});
+
+describe("event content binding", () => {
+  const seal = async (id: string) => {
+    const wire = await encryptEventContentRequest(e2ee, keys, { title: "Therapy" }, id);
+    return { id, encryptedContent: wire.encryptedContent, encryptionKeyVersion: wire.encryptionKeyVersion };
+  };
+
+  it("opens bound content only under the row id it was sealed for", async () => {
+    const sealed = await seal("event-1");
+
+    await expect(decryptEventContent(e2ee, keys, sealed, true)).resolves.toMatchObject({ title: "Therapy" });
+    await expect(
+      decryptEventContent(e2ee, keys, { ...sealed, id: "event-2" }, false),
+    ).resolves.toBeNull();
+    await expect(
+      decryptEventContent(e2ee, keys, { ...sealed, encryptionKeyVersion: 1 }, false),
+    ).resolves.toBeNull();
+  });
+
+  it("opens a generated occurrence with its series' content", async () => {
+    const sealed = await seal("series-1");
+
+    await expect(
+      decryptEventContent(e2ee, keys, { ...sealed, id: "series-1_2027-03-01T09:00:00.000Z" }, true),
+    ).resolves.toMatchObject({ title: "Therapy" });
+  });
+
+  it("binds a write for an occurrence to its series row", async () => {
+    const sealed = await seal("series-1_2027-03-01T09:00:00.000Z");
+
+    await expect(decryptEventContent(e2ee, keys, { ...sealed, id: "series-1" }, true)).resolves.toMatchObject({
+      title: "Therapy",
+    });
+  });
+
+  it("opens unbound content until the account is marked bound", async () => {
+    const legacy = {
+      id: "event-1",
+      encryptedContent: JSON.stringify(
+        await e2ee.encryptJsonPayload(keys.accountKey, { title: "Gym" }, "event-content:v1"),
+      ),
+    };
+
+    await expect(decryptEventContent(e2ee, keys, legacy, false)).resolves.toEqual({ title: "Gym" });
+    await expect(decryptEventContent(e2ee, keys, legacy, true)).resolves.toBeNull();
   });
 });
 
@@ -168,7 +216,7 @@ describe("NoopE2eeProvider", () => {
 
   it("throws instead of sending plaintext content without a session", async () => {
     await expect(
-      provider.attachEventEncryptionShadow({ title: "Therapy", start: "s", end: "e", calendarId: "c" }),
+      provider.attachEventEncryptionShadow({ title: "Therapy", start: "s", end: "e", calendarId: "c" }, "event-1"),
     ).rejects.toThrow(ENCRYPTION_NOT_READY_MESSAGE);
     await expect(
       provider.attachCalendarEncryptionShadow({ name: "Health", color: "blue" }),
@@ -180,7 +228,7 @@ describe("NoopE2eeProvider", () => {
 
   it("passes content-free writes through", async () => {
     await expect(
-      provider.attachEventEncryptionShadow({ start: "s", end: "e" }),
+      provider.attachEventEncryptionShadow({ start: "s", end: "e" }, "event-1"),
     ).resolves.toEqual({ start: "s", end: "e" });
     await expect(
       provider.attachCalendarEncryptionShadow({ isVisible: false, name: "" }),

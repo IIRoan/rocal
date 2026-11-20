@@ -23,10 +23,11 @@ use webauthn_rs_core::proto::{
 use super::api::{
     ApiError, LOWER_ALPHANUMERIC, URL_SAFE, generate_id, json, random_string, validate,
 };
+use super::guard;
 use super::hooks::{self, Reply};
 use super::pipeline::AuthBody;
 use super::session::{self, ActiveSession};
-use super::sessions::{require_fresh_session, require_session};
+use super::sessions::{require_fresh_session, require_session, require_step_up};
 use super::{cookies, store};
 use crate::db::entities::{passkey, user};
 use crate::http::extract::form_object;
@@ -276,6 +277,8 @@ pub async fn registration_options(
         let query: Option<RegisterQuery> = validate(&REGISTER_QUERY, query.as_ref(), "query")?;
         let query = query.unwrap_or_default();
         let active = require_fresh_session(&state, &headers, &mut cookies).await?;
+        // Adding a passkey must not be how a password alone gets past a passkey; the first one passes, as step-up does without passkeys.
+        require_step_up(&state, &headers, &active).await?;
         let user = &active.user;
         let name = if user.email.is_empty() {
             user.id.clone()
@@ -359,6 +362,7 @@ pub async fn verify_registration(
     let outcome = async {
         let body: RegistrationBody = validate(&REGISTRATION, body.as_ref(), "body")?;
         let active = require_fresh_session(&state, &headers, &mut cookies).await?;
+        require_step_up(&state, &headers, &active).await?;
         let challenge = consume_challenge(&state, &headers, "registration").await?;
         if challenge.user_data.id != active.user.id {
             return Err(not_allowed());
@@ -677,6 +681,8 @@ pub async fn delete(
     let outcome = async {
         let body: IdBody = validate(&DELETE, body.as_ref(), "body")?;
         let active = require_session(&state, &headers, &mut cookies).await?;
+        // Lost passkeys are removed through the recovery kit, never with a password session alone.
+        require_step_up(&state, &headers, &active).await?;
         let Some(row) = owned(&state, &active, &body.id).await? else {
             return Ok(StatusCode::UNAUTHORIZED.into_response());
         };
@@ -713,8 +719,9 @@ pub async fn freshen_session(State(state): State<AppState>, headers: HeaderMap) 
     let mut cookies = Vec::new();
     let outcome = async {
         let active = require_session(&state, &headers, &mut cookies).await?;
+        let stepped_up = guard::step_up_verified(&state, &headers, &active);
         let mut set = Vec::new();
-        new_session(&state, &headers, active.user, &mut set)
+        let fresh = new_session(&state, &headers, active.user, &mut set)
             .await
             .map_err(|_| {
                 ApiError::message(
@@ -722,18 +729,22 @@ pub async fn freshen_session(State(state): State<AppState>, headers: HeaderMap) 
                     "Unable to prepare passkey setup.",
                 )
             })?;
+        // The app's passkey step-up carries over, so adding another passkey still passes.
+        if stepped_up {
+            set.push(step_up(&state, &fresh));
+        }
         Ok(Reply::new(json(&OkFlag { ok: true }), set))
     }
     .await;
     hooks::with_cookies(outcome, cookies)
 }
 
-/// Marks a session a passkey sign-in created; it outlives the 3-minute one-time token that hands the session to the app.
-fn bridge_step_up(session_id: &str) -> String {
+/// Marks a session a passkey sign-in created, or a stepped-up app session handed to the browser; it outlives the 3-minute one-time token.
+pub(super) fn bridge_step_up(session_id: &str) -> String {
     format!("passkey-bridge-step-up:{session_id}")
 }
 
-/// The app receives a passkey sign-in's session through a one-time token but not its step-up cookie, so it takes the cookie here, once.
+/// A session handed over by one-time token arrives without its step-up cookie, so the receiver takes the cookie here, once.
 pub async fn complete_step_up(State(state): State<AppState>, headers: HeaderMap) -> Response {
     let mut cookies = Vec::new();
     let outcome = async {

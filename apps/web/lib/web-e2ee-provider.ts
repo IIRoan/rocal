@@ -13,12 +13,7 @@ import type {
   CreateEventRequest,
   UpdateEventRequest,
 } from "@workspace/calendar-core";
-import {
-  hydrateEncryptedEventWithoutSession,
-  hydrateEncryptedName,
-  withDecryptedEventContent,
-  type DecryptedEventContent,
-} from "@workspace/e2ee";
+import { hydrateEncryptedName, openEncryptedEvent } from "@workspace/e2ee";
 import {
   createBlindIndexTokens,
   decryptJsonPayload,
@@ -26,6 +21,7 @@ import {
   parseEncryptedJsonPayload,
 } from "./e2ee-crypto";
 import { encryptReminderLead, encryptReminderTitle } from "./e2ee-notification-title";
+import { getStoredE2eeDevice, markStoredEventContentBound } from "./e2ee-storage";
 import {
   attachCalendarEncryptionShadow,
   attachCategoryEncryptionShadow,
@@ -36,10 +32,12 @@ import {
 const contentDecrypter = { decryptJsonPayload };
 
 export class WebE2eeProvider implements E2eeProvider {
+  private boundUsers = new Map<string, Promise<boolean>>();
+
   async attachEventEncryptionShadow<
     T extends CreateEventRequest | UpdateEventRequest,
-  >(request: T): Promise<EventWireRequest<T>> {
-    return attachEventEncryptionShadow(request);
+  >(request: T, eventId: string): Promise<EventWireRequest<T>> {
+    return attachEventEncryptionShadow(request, eventId);
   }
 
   async attachCalendarEncryptionShadow<
@@ -80,32 +78,38 @@ export class WebE2eeProvider implements E2eeProvider {
     return (await getE2eeSession()) !== null;
   }
 
-  async hydrateEncryptedEvent(event: CalendarEvent): Promise<CalendarEvent> {
-    if (
-      event.encryptionState !== "encrypted" ||
-      !event.encryptedContent ||
-      typeof event.encryptedContent !== "string"
-    ) {
-      return event;
-    }
-
-    const session = await getE2eeSession();
-    if (!session) {
-      return hydrateEncryptedEventWithoutSession(event);
-    }
-
-    try {
-      const payload = JSON.parse(event.encryptedContent);
-      const decrypted = await decryptJsonPayload<DecryptedEventContent>(
-        session.accountKey,
-        payload,
-        "event-content:v1",
+  private refusesUnboundContentFor(userId: string): Promise<boolean> {
+    let bound = this.boundUsers.get(userId);
+    if (!bound) {
+      bound = getStoredE2eeDevice(userId).then(
+        (record) => record?.eventContentBound === true,
+        () => false,
       );
-
-      return withDecryptedEventContent(event, decrypted);
-    } catch {
-      return hydrateEncryptedEventWithoutSession(event);
+      this.boundUsers.set(userId, bound);
     }
+    return bound;
+  }
+
+  async markEventContentBound(): Promise<void> {
+    const session = await getE2eeSession();
+    if (!session || (await this.refusesUnboundContentFor(session.userId))) return;
+    this.boundUsers.set(session.userId, Promise.resolve(true));
+    await markStoredEventContentBound(session.userId);
+  }
+
+  async refusesUnboundContent(): Promise<boolean> {
+    const session = await getE2eeSession();
+    return session ? this.refusesUnboundContentFor(session.userId) : false;
+  }
+
+  async hydrateEncryptedEvent(event: CalendarEvent): Promise<CalendarEvent> {
+    const session = event.encryptedContent ? await getE2eeSession() : null;
+    return openEncryptedEvent(
+      session ? contentDecrypter : null,
+      session,
+      event,
+      session ? await this.refusesUnboundContentFor(session.userId) : false,
+    );
   }
 
   async hydrateEncryptedEvents(

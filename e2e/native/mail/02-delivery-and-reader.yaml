@@ -26,7 +26,7 @@ appId: ${APP_ID}
     visible: ".*Maestro body survives encrypted draft storage.*"
     timeout: 60000
 - runFlow: ../common/close-compose.yaml
-- tapOn: Go back
+- runFlow: ../common/go-back.yaml
 - assertVisible: ".*Maestro round trip.*"
 - tapOn: ".*Switch mailbox"
 - tapOn: Sent Items

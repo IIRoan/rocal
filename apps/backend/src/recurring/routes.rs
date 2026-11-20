@@ -15,9 +15,9 @@ use crate::auth::guard::RouteUser;
 use crate::error::AppError;
 use crate::http::extract::{ValidJson, ValidQuery};
 use crate::http::schemas::{
-    calendar_color_schema, event_content_encryption_fields, event_invitation_content_schema,
-    event_participant_input_schema, recurrence_rule_schema, recurrence_scope_schema,
-    refine_invitation_content_body, timezone_schema,
+    calendar_color_schema, client_entity_id_schema, event_content_encryption_fields,
+    event_invitation_content_schema, event_participant_input_schema, recurrence_rule_schema,
+    recurrence_scope_schema, refine_invitation_content_body, timezone_schema,
 };
 use crate::http::zod;
 use crate::request_schema;
@@ -36,6 +36,7 @@ request_schema!(PreviewRecurrenceRequest => zod::object([
 request_schema!(EditRecurringRequest => zod::object([
     ("editScope", recurrence_scope_schema()),
     ("occurrenceDate", zod::string().optional()),
+    ("newEventId", client_entity_id_schema().optional()),
     ("updates", zod::object([
         ("start", zod::string().optional()),
         ("end", zod::string().optional()),

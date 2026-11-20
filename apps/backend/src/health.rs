@@ -1,4 +1,4 @@
-//! Health and root routes: liveness, mail server reachability, the connectivity test and the root redirect.
+//! Health and root routes: liveness, mail server reachability, the connectivity test, the root redirect and security.txt.
 
 use std::time::Instant;
 
@@ -144,4 +144,18 @@ pub async fn root_redirect(State(state): State<AppState>, RawQuery(query): RawQu
         response.headers_mut().insert(header::LOCATION, value);
     }
     response
+}
+
+const SECURITY_TXT: &str = include_str!("../security.txt");
+
+/// RFC 9116 contact file; the web and mail copies must stay identical (`scripts/tests/security-txt.test.ts`).
+pub async fn security_txt() -> Response {
+    (
+        [
+            (header::CONTENT_TYPE, "text/plain; charset=utf-8"),
+            (header::CACHE_CONTROL, "public, max-age=86400"),
+        ],
+        SECURITY_TXT,
+    )
+        .into_response()
 }

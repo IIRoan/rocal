@@ -88,7 +88,7 @@ async fn recent_past_imports_are_idempotent_owner_scoped_and_ciphertext_only() {
     .await
     .expect("yesterday's event times");
     let body = json!({"calendarId":calendar_id,"skipExisting":true,"encryptedEvents":[{
-        "externalId":"fixture-keyed-event","encryptedContent":envelope,
+        "id":hex(16),"externalId":"fixture-keyed-event","encryptedContent":envelope,"encryptionKeyVersion":2,
         "start":start,"end":end,"allDay":false,"timezone":"UTC"
     }]});
     assert!(calendar_id.bytes().all(|byte| byte.is_ascii_alphanumeric()));

@@ -17,6 +17,7 @@ import {
   listRecoverableE2eeDevices,
 } from "@/lib/e2ee-storage";
 import { clearLocalMailSettings } from "@/lib/mail/mail-settings-storage";
+import { clearMailLinkHandoff } from "@/lib/mail/mail-link-handoff";
 import { clearMailTrustAnchors } from "@/lib/mail/mail-trust-anchor-storage";
 import { cancelMailTrustReview } from "@/lib/mail/mail-trust-lifecycle";
 import { MAIL_VAULT_DATABASE_NAME } from "@/lib/mail/vault-storage";
@@ -46,6 +47,7 @@ export function clearSolaceClientAuthArtifacts(): void {
   clearAuthPasswords();
   resetE2eeBootstrap();
   clearLocalMailSettings();
+  clearMailLinkHandoff();
   // The device key, the mail vault key and the search index would otherwise stay on disk after sign-out.
   void Promise.all([
     deleteRecoverableE2eeDevices(),
@@ -64,6 +66,7 @@ export function clearOrphanedClientAuthArtifacts(): void {
   clearMailSendAttempts();
   clearLegacyRememberedPassword();
   clearLocalMailSettings();
+  clearMailLinkHandoff();
 }
 
 /** Best-effort server sign-out plus a full local auth artifact wipe. */

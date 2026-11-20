@@ -11,7 +11,6 @@ A calendar and mail monorepo: web frontend, native Calendar and Mail apps, API b
 - **apps/notifications** - Rust worker for scheduled reminder email and APNs notifications
 - **apps/stalwart** - Stalwart mail server image, JMAP config plan and production deployment runbook. See [apps/stalwart/README.md](apps/stalwart/README.md).
 - **.zeabur** - [Solace project configuration](.zeabur/README.md) for Zeabur OSS
-- **apps/gatus** - Status page (`status.solace.onl`). See [apps/gatus/README.md](apps/gatus/README.md).
 - **packages/ui** - Shared UI component library
 - **packages/native-core** - Code shared by both native apps (auth, E2EE, settings, push, sheets, theme)
 - **packages/logger** - Shared logging utilities
@@ -24,7 +23,6 @@ A calendar and mail monorepo: web frontend, native Calendar and Mail apps, API b
 - Backend: Rust (axum, SeaORM) and PostgreSQL on Zeabur OSS; web on Vercel
 - Notifications: Rust, Stalwart JMAP (noreply identity), APNs
 - Mail server: Stalwart on Zeabur OSS, Cloudflare HTTPS, and SMTP through the two Webdock MX hosts
-- Status page: Gatus on Railway
 - Authentication: Better Auth's protocol and tables, served by the Rust API, with passkey support
 - Database: PostgreSQL; SeaORM migrations in `apps/backend/src/db/migrations`, applied by the API and the worker at startup
 

@@ -4,20 +4,10 @@ appId: ${APP_ID}
     visible:
       id: workspace-ready
     timeout: 90000
-- retry:
-    maxRetries: 1
-    commands:
-      - runFlow:
-          when:
-            visible: Go back
-          commands:
-            - tapOn:
-                text: Go back
-                retryTapIfNoChange: false
-            - waitForAnimationToEnd
-      - extendedWaitUntil:
-          visible: ${HOME_LABEL}
-          timeout: 30000
+- runFlow: go-back.yaml
+- extendedWaitUntil:
+    visible: ${HOME_LABEL}
+    timeout: 30000
 - tapOn: Settings
 - runFlow:
     file: select-settings-page.yaml

@@ -4,7 +4,7 @@ import React, { act } from "react";
 import { afterEach, beforeEach, expect, it, jest } from "@jest/globals";
 import { createRoot, type Root } from "react-dom/client";
 import { EventConfirmDialog } from "../../components/event-editor/event-confirm-dialog";
-import { getEventDeleteConfirmCopy } from "../../lib/event-editor-view-model";
+import { getEventDeleteConfirmCopy } from "@workspace/calendar-core";
 
 jest.mock("lucide-react", () => ({
   XIcon: () => null,
@@ -35,7 +35,12 @@ it("insets the title, description and buttons from the dialog edges", async () =
   await act(async () =>
     root.render(
       <EventConfirmDialog
-        {...getEventDeleteConfirmCopy("Planning", false)}
+        {...getEventDeleteConfirmCopy({
+          id: "event-1",
+          title: "Planning",
+          start: new Date(),
+          userId: "user-1",
+        })}
         onConfirm={jest.fn()}
         onOpenChange={jest.fn()}
         open
@@ -50,7 +55,7 @@ it("insets the title, description and buttons from the dialog edges", async () =
   expect(header?.parentElement).toBe(content);
   expect(footer?.parentElement).toBe(content);
   expect(header?.textContent).toContain("Delete “Planning”?");
-  expect(header?.textContent).toContain("You can’t undo this.");
+  expect(header?.textContent).toContain("It moves to Trash for 30 days.");
   expect(footer?.textContent).toContain("Delete event");
   expect(classesOf("[data-slot='dialog-header']")).toEqual(
     expect.arrayContaining(["px-5", "pt-5", "pb-3"]),

@@ -90,6 +90,7 @@ fn router(state: AppState) -> Router {
     let (routes, _) = api().split_for_parts();
     routes
         .route("/api", get(health::root_redirect))
+        .route("/.well-known/security.txt", get(health::security_txt))
         .fallback(not_found)
         .method_not_allowed_fallback(not_found)
         .layer(DefaultBodyLimit::max(http::BODY_LIMIT_BYTES))

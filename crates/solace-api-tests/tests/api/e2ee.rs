@@ -26,10 +26,19 @@ fn device(device_id: &str) -> RegisterDeviceRequest {
         device_label: Some("Work laptop".into()),
         public_key: blob(550),
         public_key_algorithm: None,
-        wrapped_account_key: blob(512),
-        wrapped_search_key: blob(512),
+        wrapped_account_key: Some(blob(512)),
+        wrapped_search_key: Some(blob(512)),
         wrap_algorithm: None,
         key_version: None,
+    }
+}
+
+/// A registration as current clients send it: the wrapped keys stay on the device.
+fn keyless_device(device_id: &str) -> RegisterDeviceRequest {
+    RegisterDeviceRequest {
+        wrapped_account_key: None,
+        wrapped_search_key: None,
+        ..device(device_id)
     }
 }
 
@@ -38,6 +47,8 @@ fn envelope() -> PasswordEnvelopeRequest {
         kdf_algorithm: None,
         kdf_salt: blob(16),
         kdf_iterations: None,
+        kdf_memory_kib: None,
+        kdf_parallelism: None,
         wrapped_account_key: blob(60),
         wrapped_search_key: blob(60),
         wrap_algorithm: None,
@@ -215,8 +226,8 @@ async fn device_key_material_is_stored_byte_for_byte() {
         ),
         (
             &body.public_key,
-            &body.wrapped_account_key,
-            &body.wrapped_search_key
+            body.wrapped_account_key.as_ref().expect("account key"),
+            body.wrapped_search_key.as_ref().expect("search key")
         )
     );
     assert_eq!(stored.key_version, 7);
@@ -226,8 +237,8 @@ async fn device_key_material_is_stored_byte_for_byte() {
             None,
             body.public_key.clone(),
             "RSA-OAEP-256".into(),
-            body.wrapped_account_key.clone(),
-            body.wrapped_search_key.clone(),
+            body.wrapped_account_key.clone().expect("account key"),
+            body.wrapped_search_key.clone().expect("search key"),
             "RSA-OAEP-256".into(),
             7
         )
@@ -259,8 +270,8 @@ async fn device_registration_trims_values_and_applies_defaults() {
             device_label: Some("\u{2028}  ".into()),
             public_key: "\n public-key \r".into(),
             public_key_algorithm: Some("   ".into()),
-            wrapped_account_key: "\t wrapped-account ".into(),
-            wrapped_search_key: " wrapped-search\u{feff}".into(),
+            wrapped_account_key: Some("\t wrapped-account ".into()),
+            wrapped_search_key: Some(" wrapped-search\u{feff}".into()),
             wrap_algorithm: Some(" RSA-OAEP-512 ".into()),
             key_version: None,
         },
@@ -347,6 +358,49 @@ async fn re_registering_a_device_updates_it_in_place() {
         .await,
         1
     );
+}
+
+#[tokio::test]
+async fn a_device_registers_without_a_server_copy_of_its_keys() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let body = keyless_device("phone");
+    let request = json_body(&body);
+    assert!(
+        request.get("wrappedAccountKey").is_none() && request.get("wrappedSearchKey").is_none()
+    );
+
+    let stored = register(&mut user, &body).await;
+    assert_eq!(
+        (
+            stored.wrapped_account_key.as_str(),
+            stored.wrapped_search_key.as_str()
+        ),
+        ("", "")
+    );
+    let row = device_row(&app, &user, "phone").await;
+    assert_eq!((row.3.as_str(), row.4.as_str()), ("", ""));
+    assert_eq!(bootstrap(&mut user).await.devices, [stored]);
+}
+
+#[tokio::test]
+async fn re_registering_without_keys_keeps_no_copy() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let first = register(&mut user, &device("tablet")).await;
+    assert!(!first.wrapped_account_key.is_empty());
+
+    let second = register(&mut user, &keyless_device("tablet")).await;
+    assert_eq!(second.id, first.id);
+    assert_eq!(
+        (
+            second.wrapped_account_key.as_str(),
+            second.wrapped_search_key.as_str()
+        ),
+        ("", "")
+    );
+    let row = device_row(&app, &user, "tablet").await;
+    assert_eq!((row.3.as_str(), row.4.as_str()), ("", ""));
 }
 
 #[tokio::test]
@@ -468,15 +522,7 @@ async fn device_fields_are_validated() {
         .iter()
         .map(|issue| &issue["path"])
         .collect();
-    assert_eq!(
-        paths,
-        [
-            "deviceId",
-            "publicKey",
-            "wrappedAccountKey",
-            "wrappedSearchKey"
-        ]
-    );
+    assert_eq!(paths, ["deviceId", "publicKey"]);
     expect_unknown_field(
         &user
             .put("/api/e2ee/device", with("unexpected", json!(true)))
@@ -502,6 +548,22 @@ async fn device_fields_are_validated() {
             message,
             field,
         );
+    }
+    for (sent, missing, message) in [
+        (
+            "wrappedAccountKey",
+            "wrappedSearchKey",
+            "Wrapped search key is required",
+        ),
+        (
+            "wrappedSearchKey",
+            "wrappedAccountKey",
+            "Wrapped account key is required",
+        ),
+    ] {
+        let mut half = json_body(&keyless_device("half"));
+        half[sent] = json!(blob(512));
+        expect_field_error(&user.put("/api/e2ee/device", half).await, message, missing);
     }
     assert_eq!(
         count(
@@ -560,7 +622,7 @@ async fn the_password_envelope_is_created_then_rotated_in_place() {
     );
 
     let rotated_body = PasswordEnvelopeRequest {
-        kdf_algorithm: Some(" PBKDF2-SHA-512 ".into()),
+        kdf_algorithm: Some(" PBKDF2-SHA-256 ".into()),
         kdf_iterations: Some(600_000),
         wrap_algorithm: Some("AES-GCM-256".into()),
         key_version: Some(2),
@@ -579,7 +641,7 @@ async fn the_password_envelope_is_created_then_rotated_in_place() {
             rotated.kdf_iterations,
             rotated.key_version
         ),
-        ("PBKDF2-SHA-512", 600_000, 2)
+        ("PBKDF2-SHA-256", 600_000, 2)
     );
     assert_eq!(rotated.kdf_salt, rotated_body.kdf_salt);
 
@@ -594,7 +656,7 @@ async fn the_password_envelope_is_created_then_rotated_in_place() {
     assert_eq!(
         row,
         (
-            "PBKDF2-SHA-512".into(),
+            "PBKDF2-SHA-256".into(),
             rotated_body.kdf_salt.clone(),
             600_000,
             rotated_body.wrapped_account_key.clone(),
@@ -618,9 +680,24 @@ async fn password_envelope_fields_are_validated() {
     };
     let cases = [
         (
-            with("kdfIterations", json!(99_999)),
-            "Number must be greater than or equal to 100000",
+            with("kdfIterations", json!(0)),
+            "Number must be greater than or equal to 1",
             "kdfIterations",
+        ),
+        (
+            with("kdfMemoryKiB", json!(1024)),
+            "Number must be greater than or equal to 65536",
+            "kdfMemoryKiB",
+        ),
+        (
+            with("kdfMemoryKiB", json!(131_073)),
+            "Number must be less than or equal to 131072",
+            "kdfMemoryKiB",
+        ),
+        (
+            with("kdfParallelism", json!(5)),
+            "Number must be less than or equal to 4",
+            "kdfParallelism",
         ),
         (
             with("kdfIterations", json!(5_000_001)),
@@ -696,6 +773,64 @@ async fn password_envelope_fields_are_validated() {
             field,
         );
     }
+    let argon = |changes: Value| {
+        let mut body = with("kdfAlgorithm", json!("Argon2id"));
+        body["kdfIterations"] = json!(3);
+        body["kdfMemoryKiB"] = json!(65_536);
+        body["kdfParallelism"] = json!(4);
+        for (key, value) in changes.as_object().expect("changes") {
+            if value.is_null() {
+                body.as_object_mut().expect("body").remove(key);
+            } else {
+                body[key] = value.clone();
+            }
+        }
+        body
+    };
+    for (body, message, field) in [
+        (
+            with("kdfIterations", json!(99_999)),
+            "KDF iterations must be at least 100000",
+            "kdfIterations",
+        ),
+        (
+            with("kdfMemoryKiB", json!(65_536)),
+            "PBKDF2 takes no memory parameter",
+            "kdfMemoryKiB",
+        ),
+        (
+            with("kdfParallelism", json!(4)),
+            "PBKDF2 takes no parallelism parameter",
+            "kdfParallelism",
+        ),
+        (
+            with("kdfAlgorithm", json!("scrypt")),
+            "KDF algorithm must be PBKDF2-SHA-256 or Argon2id",
+            "kdfAlgorithm",
+        ),
+        (
+            argon(json!({"kdfMemoryKiB": null})),
+            "Argon2id memory is required",
+            "kdfMemoryKiB",
+        ),
+        (
+            argon(json!({"kdfParallelism": null})),
+            "Argon2id parallelism is required",
+            "kdfParallelism",
+        ),
+        (
+            argon(json!({"kdfIterations": null})),
+            "Argon2id passes must be 3 to 10",
+            "kdfIterations",
+        ),
+        (
+            argon(json!({"kdfIterations": 11})),
+            "Argon2id passes must be 3 to 10",
+            "kdfIterations",
+        ),
+    ] {
+        expect_field_error(&user.put("/api/e2ee/password", body).await, message, field);
+    }
     assert_eq!(
         count(
             &app.db,
@@ -704,6 +839,79 @@ async fn password_envelope_fields_are_validated() {
         )
         .await,
         0
+    );
+}
+
+#[tokio::test]
+async fn an_argon2id_envelope_keeps_its_parameters_and_a_pbkdf2_rotation_clears_them() {
+    let app = TestApp::spawn().await;
+    let mut user = app.user().await;
+    let argon_body = PasswordEnvelopeRequest {
+        kdf_algorithm: Some("Argon2id".into()),
+        kdf_iterations: Some(4),
+        kdf_memory_kib: Some(131_072),
+        kdf_parallelism: Some(2),
+        ..envelope()
+    };
+    let argon: PasswordEnvelope = ok(user
+        .put("/api/e2ee/password", json_body(&argon_body))
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    assert_eq!(
+        (
+            argon.kdf_algorithm.as_str(),
+            argon.kdf_iterations,
+            argon.kdf_memory_kib,
+            argon.kdf_parallelism
+        ),
+        ("Argon2id", 4, Some(131_072), Some(2))
+    );
+    assert_eq!(
+        bootstrap(&mut user).await.password_envelope,
+        Some(argon.clone())
+    );
+
+    let pbkdf2: PasswordEnvelope = ok(user
+        .put(
+            "/api/e2ee/password",
+            json_body(&PasswordEnvelopeRequest {
+                kdf_iterations: Some(600_000),
+                ..envelope()
+            }),
+        )
+        .await
+        .expect_status(200)
+        .and_then(|r| r.dto()));
+    assert_eq!(pbkdf2.id, argon.id);
+    assert_eq!(
+        (
+            pbkdf2.kdf_algorithm.as_str(),
+            pbkdf2.kdf_memory_kib,
+            pbkdf2.kdf_parallelism
+        ),
+        ("PBKDF2-SHA-256", None, None)
+    );
+    let row: (Option<i32>, Option<i32>) = sqlx::query_as(
+        "SELECT kdf_memory_kib, kdf_parallelism FROM user_encryption_password WHERE user_id = $1",
+    )
+    .bind(&user.id)
+    .fetch_one(&app.db)
+    .await
+    .expect("password envelope");
+    assert_eq!(row, (None, None));
+    let wire = ok(user
+        .get("/api/e2ee/bootstrap")
+        .await
+        .expect_status(200)
+        .and_then(|r| r.value()));
+    assert_eq!(
+        (
+            &wire["passwordEnvelope"]["kdfMemoryKiB"],
+            &wire["passwordEnvelope"]["kdfParallelism"]
+        ),
+        (&Value::Null, &Value::Null),
+        "always written, null for PBKDF2"
     );
 }
 

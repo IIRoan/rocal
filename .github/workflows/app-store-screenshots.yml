@@ -25,6 +25,8 @@ jobs:
         working-directory: apps/native-${{ matrix.app }}
     steps:
       - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
+        with:
+          persist-credentials: false
       # Flow-only changes reuse the last simulator build; the key covers everything that goes into the app.
       - id: app
         uses: chainguard-actions/actions-cache/restore@46c2783c2418d3de33490be27a0d86c6268bc4fd # v6.1.0

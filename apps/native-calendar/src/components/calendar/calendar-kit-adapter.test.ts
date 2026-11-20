@@ -7,6 +7,7 @@ import {
   KIT_NUMBER_OF_DAYS,
   fromKitPageDate,
   kitBackgroundToCreateSlot,
+  kitCreatedRangeToInstants,
   kitDropToEventMove,
   kitDropToVisibleDate,
   kitScrollByDay,
@@ -528,5 +529,41 @@ describe("toKitDayShadeRegions", () => {
     expect(regions["5"]).toBeUndefined();
     expect(regions["7"]?.[0]?.backgroundColor).toBe("workday-color");
     expect(regions["6"]?.[0]?.backgroundColor).toBe("weekend-color");
+  });
+});
+
+describe("kitCreatedRangeToInstants", () => {
+  it("keeps the swept wall-clock range across the Amsterdam DST switch", () => {
+    // 01:30 CET to 03:30 CEST on 2026-03-29 is one hour of real time.
+    expect(
+      kitCreatedRangeToInstants({
+        start: { dateTime: "2026-03-29T01:30:00.000+01:00", timeZone: TIMEZONE },
+        end: { dateTime: "2026-03-29T03:30:00.000+02:00", timeZone: TIMEZONE },
+      }),
+    ).toEqual({
+      start: "2026-03-29T00:30:00.000Z",
+      end: "2026-03-29T01:30:00.000Z",
+    });
+  });
+
+  it("ignores date-only, invalid and empty ranges", () => {
+    expect(
+      kitCreatedRangeToInstants({
+        start: { date: "2026-03-29" },
+        end: { date: "2026-03-30" },
+      }),
+    ).toBeNull();
+    expect(
+      kitCreatedRangeToInstants({
+        start: { dateTime: "not a date" },
+        end: { dateTime: "2026-03-29T03:30:00.000+02:00" },
+      }),
+    ).toBeNull();
+    expect(
+      kitCreatedRangeToInstants({
+        start: { dateTime: "2026-03-29T03:30:00.000+02:00" },
+        end: { dateTime: "2026-03-29T03:30:00.000+02:00" },
+      }),
+    ).toBeNull();
   });
 });

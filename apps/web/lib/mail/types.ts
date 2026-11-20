@@ -8,6 +8,7 @@ import {
   type MailOAuthConfig,
   type MailSignup as SharedMailSignup,
   type MailSimpleLoginFields,
+  type MailUnsubscribeFields,
   type MailVaultBackup as SharedMailVaultBackup,
   type MailVaultKdfParams,
 } from "@workspace/calendar-core";
@@ -100,7 +101,7 @@ export type MailAttachment = {
 
 export type JmapAttachment = Omit<MailAttachment, "content">;
 
-export type JmapEmailMessage = MailSimpleLoginFields & MailAuthResultsFields & {
+export type JmapEmailMessage = MailSimpleLoginFields & MailUnsubscribeFields & MailAuthResultsFields & {
   id: string;
   threadId?: string;
   messageId?: string[];
@@ -257,6 +258,7 @@ const jmapEmailMessageSchema = z.object({
   ),
   "header:X-SimpleLogin-Unsub-Behaviour:asText": jmapOptional(z.string().optional()),
   "header:List-Unsubscribe:asURLs": jmapOptional(z.array(z.string()).optional()),
+  "header:List-Unsubscribe-Post:asText": jmapOptional(z.string().optional()),
   "header:Authentication-Results:asText:all": jmapHeaderValuesSchema.optional(),
   "header:Received": jmapHeaderValuesSchema.optional(),
   "header:DKIM-Signature": jmapHeaderValuesSchema.optional(),

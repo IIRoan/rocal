@@ -248,6 +248,44 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
     });
   }
 
+  it("cancels a held submission, then moves its sealed copy to Drafts, and lists scheduled sends", async () => {
+    const fetcher = jest
+      .fn(async (_url: string, _init?: RequestInit) => jsonOk({ methodResponses: [] }))
+      .mockResolvedValueOnce(jsonOk({ methodResponses: [["EmailSubmission/set", { updated: { sub1: null } }, "c1"]] }))
+      .mockResolvedValueOnce(jsonOk({ methodResponses: [["Email/set", { updated: { copy1: null } }, "c1"]] }))
+      .mockResolvedValueOnce(jsonOk({ methodResponses: [["EmailSubmission/query", { ids: [] }, "q"], ["EmailSubmission/get", { list: [] }, "g"]] }));
+    const client = createClient(fetcher);
+    await expect(client.cancelHeldSubmission(session, { submissionId: "sub1", copyEmailId: "copy1", draftsMailboxId: "drafts" })).resolves.toBe("canceled");
+    await expect(client.listScheduledSends(session)).resolves.toEqual([]);
+    const cancel = parseJmapRequest(fetcher.mock.calls[0][1]);
+    expect(cancel.using).toContain("urn:ietf:params:jmap:submission");
+    expect(cancel.methodCalls[0]).toEqual(["EmailSubmission/set", { accountId: "acc1", update: { sub1: { undoStatus: "canceled" } } }, "c1"]);
+    expect(parseJmapRequest(fetcher.mock.calls[1][1]).methodCalls[0][1]).toEqual({
+      accountId: "acc1",
+      update: { copy1: { mailboxIds: { drafts: true }, keywords: { $draft: true, $seen: true } } },
+    });
+    expect(parseJmapRequest(fetcher.mock.calls[2][1]).methodCalls[0][1]).toEqual({ accountId: "acc1", filter: { undoStatus: "pending" }, limit: 100 });
+  });
+
+  it("reads and saves the auto-reply with the vacation capability", async () => {
+    const fetcher = jest
+      .fn(async (_url: string, _init?: RequestInit) => jsonOk({ methodResponses: [] }))
+      .mockResolvedValueOnce(
+        jsonOk({ methodResponses: [["VacationResponse/get", { list: [{ id: "singleton", isEnabled: true, textBody: "Away" }] }, "v1"]] }),
+      )
+      .mockResolvedValueOnce(
+        jsonOk({ methodResponses: [["VacationResponse/set", { notUpdated: { singleton: { description: "Field could not be set." } } }, "v1"]] }),
+      );
+    const client = createClient(fetcher);
+    await expect(client.getVacationResponse(session)).resolves.toMatchObject({ isEnabled: true, textBody: "Away" });
+    const update = { isEnabled: false, fromDate: null, toDate: null, subject: null, textBody: null, htmlBody: null };
+    await expect(client.setVacationResponse(session, update)).rejects.toThrow("Field could not be set.");
+    const read = parseJmapRequest(fetcher.mock.calls[0][1]);
+    expect(read.using).toEqual(["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:vacationresponse"]);
+    expect(read.methodCalls[0]).toEqual(["VacationResponse/get", { accountId: "acc1", ids: ["singleton"] }, "v1"]);
+    expect(parseJmapRequest(fetcher.mock.calls[1][1]).methodCalls[0][1]).toEqual({ accountId: "acc1", update: { singleton: update } });
+  });
+
   it("creates a mailbox with Mailbox/set and returns the created folder", async () => {
     const fetcher = jest.fn(async (_url: string, _init?: RequestInit) =>
       jsonOk({

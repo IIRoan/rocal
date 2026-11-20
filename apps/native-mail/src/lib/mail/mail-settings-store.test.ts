@@ -35,11 +35,16 @@ describe("mail settings store", () => {
       ...DEFAULT_MAIL_DISPLAY_SETTINGS,
       externalContentPolicy: "block" as const,
       trustedSenders: ["news@example.com"],
+      confirmExternalLinks: false,
     };
     await saveMailDisplaySettings(display);
     expect(await loadMailDisplaySettings()).toEqual(display);
 
-    const compose = { ...(await loadMailComposeSettings()), plainTextMode: true };
+    const compose = {
+      ...(await loadMailComposeSettings()),
+      plainTextMode: true,
+      stripImageMetadata: false,
+    };
     await saveMailComposeSettings(compose);
     expect(await loadMailComposeSettings()).toEqual(compose);
   });

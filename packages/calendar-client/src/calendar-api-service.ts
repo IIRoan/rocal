@@ -22,6 +22,12 @@ import {
   splitUserSettingsUpdate,
   type UserSettingsPreferences,
   storedEventId,
+  newClientEntityId,
+  EVENT_CONTENT_UNAVAILABLE_MESSAGE,
+  subscriptionUrlAad,
+  UNBOUND_SUBSCRIPTION_URL_AAD,
+  feedSyncUrl,
+  isFeedSyncDue,
 } from "@workspace/calendar-core";
 import type {
   CalendarEvent,
@@ -36,6 +42,7 @@ import type {
   CreateCategoryRequest,
   UpdateCategoryRequest,
   DeleteResponse,
+  TrashedCalendarEvent,
   ApiError,
   UserSettings,
   UpdateSettingsRequest,
@@ -91,10 +98,18 @@ function needsStoredContent(request: UpdateEventRequest): boolean {
   return set > 0 && set < EVENT_CONTENT_FIELDS.length;
 }
 
+/** A stored event that did not open here would seal its placeholder over the real content. */
+function hasAllContent(request: UpdateEventRequest): boolean {
+  return EVENT_CONTENT_FIELDS.every((field) => request[field] !== undefined);
+}
+
 function withStoredContent(
   request: UpdateEventRequest,
   stored: CalendarEvent,
 ): UpdateEventRequest {
+  if (stored.contentUnavailable) {
+    throw new Error(EVENT_CONTENT_UNAVAILABLE_MESSAGE);
+  }
   return {
     ...request,
     title: request.title ?? stored.title,
@@ -103,6 +118,15 @@ function withStoredContent(
     color: request.color ?? stored.color ?? undefined,
     categoryId: request.categoryId ?? stored.categoryId ?? undefined,
   };
+}
+
+function openedFeedUrl(opened: unknown): string | null {
+  return typeof opened === "object" &&
+    opened !== null &&
+    "url" in opened &&
+    typeof opened.url === "string"
+    ? opened.url
+    : null;
 }
 
 // `as` casts from API types only narrow free-text fields (kind, encryptionState, role, status) to calendar-core's literal unions.
@@ -227,6 +251,7 @@ export class CalendarApiService {
       description: null,
       location: null,
       encryptionState: "encrypted",
+      contentUnavailable: true,
     });
   }
 
@@ -435,11 +460,19 @@ export class CalendarApiService {
       return undefined;
     }
 
-    const shadow = await this.e2ee.attachEventEncryptionShadow({
-      title: parsed.title,
-      description: parsed.description,
-      location: parsed.location,
-    } as UpdateEventRequest);
+    // An existing copy is sealed only with content bound to its id; a new one takes the id proposed here.
+    const existing = await this.getInvitationByExternalId(parsed.uid, {
+      syncRemote: false,
+    }).catch(() => null);
+    const eventId = existing?.id ?? newClientEntityId();
+    const shadow = await this.e2ee.attachEventEncryptionShadow(
+      {
+        title: parsed.title,
+        description: parsed.description,
+        location: parsed.location,
+      } as UpdateEventRequest,
+      eventId,
+    );
 
     if (!shadow.encryptedContent) {
       return undefined;
@@ -448,6 +481,7 @@ export class CalendarApiService {
     return [
       {
         externalId: parsed.uid,
+        eventId,
         encryptedContent: shadow.encryptedContent,
         ...(shadow.encryptionKeyVersion
           ? { encryptionKeyVersion: shadow.encryptionKeyVersion }
@@ -490,11 +524,14 @@ export class CalendarApiService {
       return null;
     }
 
-    const shadow = await this.e2ee.attachEventEncryptionShadow({
-      title: event.title,
-      description: event.description ?? undefined,
-      location: event.location ?? undefined,
-    } as UpdateEventRequest);
+    const shadow = await this.e2ee.attachEventEncryptionShadow(
+      {
+        title: event.title,
+        description: event.description ?? undefined,
+        location: event.location ?? undefined,
+      } as UpdateEventRequest,
+      event.id,
+    );
 
     if (!shadow.encryptedContent) {
       return null;
@@ -538,24 +575,39 @@ export class CalendarApiService {
     }
   }
 
-  /** Seals an event's readable colour and category into new ciphertext; false when it cannot be opened here. */
+  /** The stored content opened, or null when it does not open on this device. */
+  private async openStoredEvent(stored: CalendarEvent): Promise<CalendarEvent | null> {
+    const opened = await this.e2ee.hydrateEncryptedEvent(stored).catch(() => null);
+    return opened && !opened.contentUnavailable ? opened : null;
+  }
+
+  /** Records that every event is bound to its id, so this and the account's other devices refuse unbound content. */
+  async markEventContentBound(): Promise<void> {
+    await this.e2ee.markEventContentBound();
+    if (!(await this.getUserSettings()).eventContentBound) {
+      await this.updateUserSettings({ eventContentBound: true });
+    }
+  }
+
+  /** Re-seals an event bound to its id, moving a readable colour and category inside; false when it cannot be opened here. */
   async resealEventAttributes(id: string): Promise<boolean> {
     if (!(await this.e2ee.hasActiveSession())) return false;
     const path = `/api/events/${encodeURIComponent(id)}`;
     const stored = (await this.client.get<Schema<"Event">>(path)) as CalendarEvent;
     if (typeof stored.encryptedContent !== "string") return false;
     // An event this device cannot open is left as it is, so its title is never overwritten.
-    const opened = await this.e2ee
-      .hydrateEncryptedEvent(stored)
-      .catch(() => null);
+    const opened = await this.openStoredEvent(stored);
     if (!opened?.title.trim()) return false;
-    const shadow = await this.e2ee.attachEventEncryptionShadow({
-      title: opened.title,
-      description: opened.description ?? "",
-      location: opened.location ?? "",
-      color: opened.color ?? "",
-      categoryId: opened.categoryId ?? "",
-    } as UpdateEventRequest);
+    const shadow = await this.e2ee.attachEventEncryptionShadow(
+      {
+        title: opened.title,
+        description: opened.description ?? "",
+        location: opened.location ?? "",
+        color: opened.color ?? "",
+        categoryId: opened.categoryId ?? "",
+      } as UpdateEventRequest,
+      id,
+    );
     if (!shadow.encryptedContent) return false;
     // The server stores it only over the ciphertext read here, so an edit made meanwhile wins.
     await this.client.post<Schema<"Event">>(`${path}/seal-encryption`, {
@@ -601,6 +653,9 @@ export class CalendarApiService {
     }
     if (params.readableInvitations) {
       searchParams.set("readableInvitations", "true");
+    }
+    if (params.includeExceptions) {
+      searchParams.set("includeExceptions", "true");
     }
 
     const query = searchParams.toString();
@@ -652,12 +707,13 @@ export class CalendarApiService {
     event: CreateEventRequest,
   ): Promise<WithOperationWarnings<CalendarEvent>> {
     try {
+      const id = newClientEntityId();
       const { encryptedContent, ...payload } =
-        await this.e2ee.attachEventEncryptionShadow(event);
+        await this.e2ee.attachEventEncryptionShadow(event, id);
       if (!encryptedContent) throw new Error("Event title is required");
       const response = await this.client.post<Schema<"Event">>(
         "/api/events",
-        { ...payload, encryptedContent } satisfies Schema<"CreateEventRequest">,
+        { ...payload, id, encryptedContent } satisfies Schema<"CreateEventRequest">,
       );
       return await this.hydrateEncryptedEvent(response as CalendarEvent);
     } catch (error) {
@@ -674,6 +730,7 @@ export class CalendarApiService {
         needsStoredContent(event)
           ? withStoredContent(event, await this.getEvent(id))
           : event,
+        storedEventId(id),
       );
       const response = await this.client.put<Schema<"Event">>(
         `/api/events/${encodeURIComponent(id)}`,
@@ -685,6 +742,7 @@ export class CalendarApiService {
     }
   }
 
+  /** An event the caller owns goes to the trash (`trashId`); an invitation copy is declined or removed for good. */
   async deleteEvent(id: string): Promise<DeleteResponse> {
     try {
       return await this.client.delete<Schema<"EventDeleted">>(
@@ -692,6 +750,83 @@ export class CalendarApiService {
       );
     } catch (error) {
       throw this.transformError(error, "Failed to delete event");
+    }
+  }
+
+  // ─── Trash ───────────────────────────────────────────────────────────────────
+
+  /** Deleted events of the last 30 days, newest first, with titles opened on this device. */
+  async listTrashedEvents(): Promise<TrashedCalendarEvent[]> {
+    try {
+      const { events } = await this.client.get<Schema<"TrashedEventList">>(
+        "/api/events/trash",
+      );
+      return await Promise.all(events.map((entry) => this.hydrateTrashedEvent(entry)));
+    } catch (error) {
+      throw this.transformError(error, "Failed to load deleted events");
+    }
+  }
+
+  private async hydrateTrashedEvent(
+    entry: ApiResponse<"TrashedEvent">,
+  ): Promise<TrashedCalendarEvent> {
+    const start = new Date(entry.start);
+    const end = new Date(entry.end);
+    const trashedAt = new Date(entry.trashedAt);
+    const { title } = await this.hydrateEncryptedEventContent({
+      ...entry,
+      id: entry.eventId,
+      encryptionState: entry.encryptionState as CalendarEvent["encryptionState"],
+      start,
+      end,
+      userId: "",
+      createdAt: trashedAt,
+      updatedAt: trashedAt,
+    });
+    return {
+      id: entry.id,
+      eventId: entry.eventId,
+      calendarId: entry.calendarId,
+      calendarMissing: entry.calendarMissing,
+      title,
+      start,
+      end,
+      allDay: entry.allDay,
+      timezone: entry.timezone,
+      recurrence: entry.recurrence,
+      trashedAt,
+      purgeAt: new Date(entry.purgeAt),
+    };
+  }
+
+  /** Restores under the same id and ciphertext; a `calendarId` other than the entry's means its calendar was gone. */
+  async restoreTrashedEvent(id: string): Promise<CalendarEvent> {
+    try {
+      const response = await this.client.post<Schema<"Event">>(
+        `/api/events/trash/${encodeURIComponent(id)}/restore`,
+        {},
+      );
+      return await this.hydrateEncryptedEvent(response as CalendarEvent);
+    } catch (error) {
+      throw this.transformError(error, "Failed to restore event");
+    }
+  }
+
+  async deleteTrashedEvent(id: string): Promise<Schema<"SuccessMessage">> {
+    try {
+      return await this.client.delete<Schema<"SuccessMessage">>(
+        `/api/events/trash/${encodeURIComponent(id)}`,
+      );
+    } catch (error) {
+      throw this.transformError(error, "Failed to delete event permanently");
+    }
+  }
+
+  async emptyEventTrash(): Promise<Schema<"SuccessMessage">> {
+    try {
+      return await this.client.delete<Schema<"SuccessMessage">>("/api/events/trash");
+    } catch (error) {
+      throw this.transformError(error, "Failed to empty the trash");
     }
   }
 
@@ -822,9 +957,7 @@ export class CalendarApiService {
       for (const event of page.events as CalendarEvent[]) {
         if (event.encryptionState !== "encrypted") continue;
         // Without the column the category read back is the sealed one, and an event that does not open is left as it is.
-        const opened = await this.e2ee
-          .hydrateEncryptedEvent({ ...event, categoryId: null })
-          .catch(() => null);
+        const opened = await this.openStoredEvent({ ...event, categoryId: null });
         if (opened?.categoryId === id) assigned.push(opened);
       }
       offset = page.nextOffset ?? -1;
@@ -947,7 +1080,12 @@ export class CalendarApiService {
     const opened = encryptedPreferences
       ? await this.e2ee.decryptJson(encryptedPreferences, USER_SETTINGS_PREFERENCES_AAD)
       : null;
-    return { ...(settings as UserSettings), ...readUserSettingsPreferences(opened) };
+    const preferences = readUserSettingsPreferences(opened);
+    // Another device finished binding every event, so this one refuses unbound content too.
+    if (preferences.eventContentBound) {
+      await this.e2ee.markEventContentBound();
+    }
+    return { ...(settings as UserSettings), ...preferences };
   }
 
   /** The whole blob is replaced, so changes merge onto the current preferences; one that cannot be opened is never overwritten. */
@@ -966,6 +1104,8 @@ export class CalendarApiService {
     }
     return this.e2ee.encryptJson(
       {
+        // Keys this build does not know stay, so a newer client's preferences survive this write.
+        ...(typeof opened === "object" && !Array.isArray(opened) ? opened : {}),
         ...pickUserSettingsPreferences(current as UserSettings),
         ...readUserSettingsPreferences(opened),
         ...changes,
@@ -1140,15 +1280,23 @@ export class CalendarApiService {
     request: EditRecurringEventRequest,
   ): Promise<CalendarEvent> {
     try {
+      // A detached occurrence gets its own id and ciphertext bound to it, since series content opens only under the series id.
+      const newEventId =
+        request.editScope === "all" ? undefined : newClientEntityId();
+      const fillContent = newEventId
+        ? !hasAllContent(request.updates)
+        : needsStoredContent(request.updates);
       const updates = await this.e2ee.attachEventEncryptionShadow(
-        needsStoredContent(request.updates)
+        fillContent
           ? withStoredContent(request.updates, await this.getEvent(id))
           : request.updates,
+        newEventId ?? storedEventId(id),
       );
       const response = await this.client.put<Schema<"Event">>(
         `/api/recurring/event/${encodeURIComponent(id)}`,
         {
           ...request,
+          ...(newEventId ? { newEventId } : {}),
           updates,
         } satisfies Schema<"EditRecurringRequest">,
       );
@@ -1192,11 +1340,12 @@ export class CalendarApiService {
       for (const event of parsed.events) {
         checkCurrent();
         const { sourceUid, occurrenceDate, excludedDates, ...content } = event;
-        const payload = await this.e2ee.attachEventEncryptionShadow({ ...content, calendarId: request.calendarId });
+        const id = newClientEntityId();
+        const payload = await this.e2ee.attachEventEncryptionShadow({ ...content, calendarId: request.calendarId }, id);
         const externalId = await this.icsImportId(JSON.stringify([sourceUid, occurrenceDate ?? null]));
         // Zod checked it; apps/web's non-strict build infers its keys as optional.
         encryptedEvents.push(encryptedIcsImportEventSchema.parse({
-          externalId,
+          id, externalId,
           seriesExternalId: occurrenceDate ? await this.icsImportId(JSON.stringify([sourceUid, null])) : undefined,
           occurrenceDate, excludedDates,
           start: content.start, end: content.end, allDay: Boolean(content.allDay), timezone: content.timezone,
@@ -1275,16 +1424,58 @@ export class CalendarApiService {
 
   // ─── Subscriptions ───────────────────────────────────────────────────────────
 
-  /** A feed's name is sealed as its mirrored calendar's name, so both are opened from there. */
+  /** A feed's name is sealed as its mirrored calendar's name, so both are opened from there; a sealed URL that does not open keeps its placeholder and is never synced. */
   private async hydrateSubscription<
     T extends Omit<CalendarSubscription, "_count">,
   >(subscription: T): Promise<T> {
-    const calendar = await this.hydrateCalendar(subscription.calendar as Calendar);
+    const [calendar, sealed] = await Promise.all([
+      this.hydrateCalendar(subscription.calendar as Calendar),
+      this.openSealedUrl(subscription),
+    ]);
+    const url = sealed?.url ?? subscription.url;
     return {
       ...subscription,
       name: calendar.name,
+      url,
       calendar: { ...subscription.calendar, ...calendar },
     };
+  }
+
+  /** The sealed URL and whether it is bound to its feed; one sealed before binding opens only until this device refuses unbound content. */
+  private async openSealedUrl(
+    subscription: Pick<CalendarSubscription, "id" | "encryptedUrl">,
+  ): Promise<{ url: string; bound: boolean } | null> {
+    const { encryptedUrl } = subscription;
+    if (!encryptedUrl) return null;
+    const open = async (aad: string) =>
+      openedFeedUrl(await this.e2ee.decryptJson(encryptedUrl, aad).catch(() => null));
+    const bound = await open(subscriptionUrlAad(subscription.id));
+    if (bound) return { url: bound, bound: true };
+    if (await this.e2ee.refusesUnboundContent()) return null;
+    const unbound = await open(UNBOUND_SUBSCRIPTION_URL_AAD);
+    return unbound ? { url: unbound, bound: false } : null;
+  }
+
+  /** Throws instead of sending a feed URL readable when no session is active. */
+  private sealSubscriptionUrl(url: string, subscriptionId: string): Promise<string> {
+    return this.e2ee.encryptJson({ url }, subscriptionUrlAad(subscriptionId));
+  }
+
+  /** Feeds whose URL was sealed before it was bound to the feed, with the URL opened here; none once this device refuses unbound content. */
+  async getUnboundSubscriptionUrls(): Promise<Array<{ id: string; url: string }>> {
+    if (await this.e2ee.refusesUnboundContent()) return [];
+    const subscriptions = await this.client.get<Schema<"CalendarSubscription">[]>(
+      "/api/subscriptions",
+    );
+    const opened = await Promise.all(
+      subscriptions.map(async (subscription) => ({
+        id: subscription.id,
+        sealed: await this.openSealedUrl(subscription),
+      })),
+    );
+    return opened.flatMap(({ id, sealed }) =>
+      sealed && !sealed.bound ? [{ id, url: sealed.url }] : [],
+    );
   }
 
   /** Seals a feed name as a calendar name; throws instead of sending it readable when no session is active. */
@@ -1310,14 +1501,24 @@ export class CalendarApiService {
     }
   }
 
+  /** The server cannot compare sealed URLs, so duplicates are found in the decrypted list. */
   async createSubscription(
     request: CreateSubscriptionRequest,
   ): Promise<Omit<CalendarSubscription, "_count">> {
     try {
       const { name, ...rest } = request;
+      const id = newClientEntityId();
+      const sealed = {
+        ...(await this.sealSubscriptionName(name)),
+        encryptedUrl: await this.sealSubscriptionUrl(request.url, id),
+      };
+      const url = request.url.trim();
+      if ((await this.getSubscriptions()).some((subscription) => subscription.url.trim() === url)) {
+        throw new Error("You are already subscribed to this calendar URL");
+      }
       const created = (await this.client.post<Schema<"CalendarSubscription">>(
         "/api/subscriptions",
-        { ...rest, ...(await this.sealSubscriptionName(name)) } satisfies Schema<"CreateSubscriptionRequest">,
+        { ...rest, id, ...sealed } satisfies Schema<"CreateSubscriptionRequest">,
       )) as Omit<CalendarSubscription, "_count">;
       return await this.hydrateSubscription(created);
     } catch (error) {
@@ -1330,12 +1531,13 @@ export class CalendarApiService {
     request: UpdateSubscriptionRequest,
   ): Promise<Omit<CalendarSubscription, "_count">> {
     try {
-      const { name, ...rest } = request;
+      const { name, url, ...rest } = request;
       const updated = (await this.client.put<Schema<"CalendarSubscription">>(
         `/api/subscriptions/${encodeURIComponent(id)}`,
         {
           ...rest,
           ...(name === undefined ? {} : await this.sealSubscriptionName(name)),
+          ...(url === undefined ? {} : { encryptedUrl: await this.sealSubscriptionUrl(url, id) }),
         } satisfies Schema<"UpdateSubscriptionRequest">,
       )) as Omit<CalendarSubscription, "_count">;
       return await this.hydrateSubscription(updated);
@@ -1355,15 +1557,37 @@ export class CalendarApiService {
     }
   }
 
-  async syncSubscription(id: string): Promise<SyncSubscriptionResponse> {
+  /** A sealed feed syncs only from `url`, its URL opened on this device (`feedSyncUrl`); the server never stores it. */
+  async syncSubscription(id: string, url?: string): Promise<SyncSubscriptionResponse> {
     try {
       return (await this.client.post<Schema<"SubscriptionSyncResult">>(
         `/api/subscriptions/${encodeURIComponent(id)}/sync`,
-        {},
+        (url === undefined ? {} : { url }) satisfies Schema<"SyncSubscriptionRequest">,
       )) as SyncSubscriptionResponse;
     } catch (error) {
       throw this.transformError(error, "Failed to sync subscription");
     }
+  }
+
+  /** Syncs the sealed feeds whose interval has passed, one at a time; resolves to how many it tried and how many events changed. */
+  async syncDueSubscriptions(
+    now: number = Date.now(),
+  ): Promise<{ attempted: number; changed: number }> {
+    if (!(await this.e2ee.hasActiveSession())) return { attempted: 0, changed: 0 };
+    const due = (await this.getSubscriptions()).filter((subscription) =>
+      isFeedSyncDue(subscription, now),
+    );
+    let changed = 0;
+    for (const subscription of due) {
+      // A failed fetch is recorded on the feed, so one bad feed never stops the rest.
+      const result = await this.syncSubscription(
+        subscription.id,
+        feedSyncUrl(subscription),
+      ).catch(() => undefined);
+      changed +=
+        (result?.eventsAdded ?? 0) + (result?.eventsUpdated ?? 0) + (result?.eventsDeleted ?? 0);
+    }
+    return { attempted: due.length, changed };
   }
 
   // ─── Bulk Operations ─────────────────────────────────────────────────────────
@@ -1439,9 +1663,7 @@ export class CalendarApiService {
         `/api/events/${encodeURIComponent(eventId)}`,
       ),
     ]);
-    const opened = await this.e2ee
-      .hydrateEncryptedEvent(stored as CalendarEvent)
-      .catch(() => null);
+    const opened = await this.openStoredEvent(stored as CalendarEvent);
     const pending = [
       ...new Set(
         data.notifications

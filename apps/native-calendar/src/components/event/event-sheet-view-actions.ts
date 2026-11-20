@@ -37,7 +37,8 @@ export function resolveEventSheetViewActions(
 
   return {
     showDelete: canCurrentUserDeleteEvent(event),
-    showEdit: canCurrentUserModifyEvent(event),
+    // Content that did not open here would be saved back as its placeholder.
+    showEdit: canCurrentUserModifyEvent(event) && !event.contentUnavailable,
     deleteLabel: !canEdit && cancelled ? "Remove" : "Delete",
     showInvitationActions: shouldShowInvitationActions(event),
     invitationStatus: getInvitationResponseStatus(event, canEdit),

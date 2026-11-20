@@ -9,6 +9,7 @@ import {
   useUpdateCalendar,
   type DeleteCalendarAction,
 } from "../../hooks/use-calendar-management";
+import { useCalendarIcsExport } from "../../hooks/use-calendar-ics-export";
 import {
   CALENDAR_NAME_MAX_LENGTH,
   validateCalendarName,
@@ -90,6 +91,7 @@ function CalendarEditForm({ calendar, calendars }: { calendar: Calendar; calenda
   const { back } = useSheetPageNavigator();
   const updateCalendar = useUpdateCalendar(calendar.id);
   const deleteCalendar = useDeleteCalendar(calendar.id);
+  const icsExport = useCalendarIcsExport();
   const [{ name, color, isDefault, nameError, moveTargetId }, dispatch] = useReducer(
     calendarDraftReducer,
     calendar,
@@ -206,6 +208,18 @@ function CalendarEditForm({ calendar, calendars }: { calendar: Calendar; calenda
           </SheetGroup>
         </SheetSection>
       ) : null}
+
+      <SheetSection>
+        <SheetGroup>
+          <SheetItem
+            label="Export .ics"
+            icon="share"
+            pending={icsExport.isPending}
+            disabled={icsExport.isPending}
+            onPress={() => icsExport.mutate([calendar])}
+          />
+        </SheetGroup>
+      </SheetSection>
 
       <SheetSection
         title="Delete calendar"

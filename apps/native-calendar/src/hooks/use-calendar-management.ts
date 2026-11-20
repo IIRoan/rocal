@@ -1,6 +1,9 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useFeedSync } from "@workspace/calendar-client/use-feed-sync";
 import {
+  feedSyncUrl,
   getErrorMessage,
+  type CalendarSubscription,
   type CreateCalendarRequest,
   type CreateSubscriptionRequest,
   type UpdateCalendarRequest,
@@ -8,6 +11,8 @@ import {
 } from "@workspace/calendar-core";
 import { calendarApiService } from "@workspace/native-core/lib/api";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
+import { useAuth } from "@workspace/native-core/providers/AuthProvider";
+import { useE2ee } from "@workspace/native-core/providers/E2eeProvider";
 import { useToast } from "@workspace/native-core/providers/ToastProvider";
 
 export type DeleteCalendarAction = "delete_events" | "move_events";
@@ -92,7 +97,8 @@ export function useSyncSubscription() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   return useMutation({
-    mutationFn: (subscriptionId: string) => calendarApiService.syncSubscription(subscriptionId),
+    mutationFn: (subscription: CalendarSubscription) =>
+      calendarApiService.syncSubscription(subscription.id, feedSyncUrl(subscription)),
     onSuccess: (result) => {
       invalidateCalendarData(queryClient, { subscriptions: true });
       if (result.status === "error") {
@@ -106,6 +112,13 @@ export function useSyncSubscription() {
     },
     onError: (error) => toast(getErrorMessage(error, "Failed to sync calendar"), "error"),
   });
+}
+
+/** Sealed feeds sync only while a Calendar client is open, because the server keeps no URL to fetch. */
+export function useFeedSyncWhileOpen() {
+  const { isAuthenticated } = useAuth();
+  const { isReady } = useE2ee();
+  useFeedSync({ api: calendarApiService, enabled: isAuthenticated && isReady });
 }
 
 export function useCreateSubscription() {

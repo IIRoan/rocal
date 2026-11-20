@@ -26,6 +26,7 @@ use crate::db::entities::{
 };
 use crate::entity_metadata::{EncryptedName, NameInput, resolve_name_persistence};
 use crate::error::AppError;
+use crate::events::encryption::{BOUND_EVENT_CONTENT_VERSION, require_bound_content};
 use crate::events::participants;
 use crate::events::queries as events_queries;
 use crate::http::zod::{js_length, js_trim};
@@ -192,6 +193,7 @@ fn dto(
         id: feed.id.into(),
         name: feed.name,
         url: feed.url,
+        encrypted_url: feed.encrypted_url,
         is_active: feed.is_active,
         sync_interval_minutes: feed.sync_interval_minutes,
         last_sync_at: feed.last_sync_at.map(instant::iso),
@@ -280,16 +282,17 @@ pub async fn create(
     };
     let feed = queries::insert_feed(
         &state.db,
-        &user.id,
-        &calendar.name,
+        &request.id.0,
+        &calendar,
         &request.url,
-        &calendar.id,
+        request.encrypted_url.as_deref(),
         interval,
     )
     .await?;
-    let (background, initial) = (state.clone(), feed.clone());
+    // The first sync reads the URL from the request, since a sealed row no longer holds it.
+    let (background, initial, url) = (state.clone(), feed.clone(), request.url);
     tokio::spawn(async move {
-        if let Err(error) = sync_feed(&background, &initial).await {
+        if let Err(error) = sync_feed(&background, &initial, &url).await {
             tracing::error!(
                 subscription_id = %initial.id,
                 message = redact_pii(&error.to_string()),
@@ -387,6 +390,7 @@ pub async fn update(
         color: request.color.as_deref(),
         is_active: request.is_active,
         sync_interval_minutes: request.sync_interval_minutes,
+        sealed_url: request.encrypted_url.as_deref(),
     };
     let (feed, calendar) = queries::update_feed(&transaction, feed, calendar, changes).await?;
     transaction.commit().await?;
@@ -415,16 +419,27 @@ pub async fn delete(
     Ok(DeleteSubscriptionResponse { success: true })
 }
 
-/// Syncs one of the caller's feeds now, paused or not.
+/// Syncs one of the caller's feeds now, paused or not; a sealed feed syncs from the URL its client sent, which is never stored.
 pub async fn sync(
     state: &AppState,
     user: &RouteUser,
     id: &str,
+    url: Option<String>,
 ) -> Result<SubscriptionSyncResult, AppError> {
     let Some(feed) = queries::owned(&state.db, id, &user.id).await? else {
         return Err(AppError::NotFound(NOT_FOUND.into()));
     };
-    sync_feed(state, &feed).await
+    let url = match (feed.encrypted_url.is_some(), url) {
+        (false, _) => feed.url.clone(),
+        (true, Some(url)) => url,
+        (true, None) => {
+            return Err(AppError::field(
+                "Update the app to sync this calendar.",
+                "url",
+            ));
+        }
+    };
+    sync_feed(state, &feed, &url).await
 }
 
 fn elapsed_ms(started: Instant) -> i32 {
@@ -435,10 +450,11 @@ fn elapsed_ms(started: Instant) -> i32 {
 pub async fn sync_feed(
     state: &AppState,
     feed: &calendar_subscription::Model,
+    url: &str,
 ) -> Result<SubscriptionSyncResult, AppError> {
     let log = queries::start_sync_log(&state.db, &feed.id).await?;
     let started = Instant::now();
-    match mirror(state, feed, log.clone(), started).await {
+    match mirror(state, feed, url, log.clone(), started).await {
         Ok(result) => Ok(result),
         Err(error) => {
             let message = error.client_message();
@@ -460,11 +476,12 @@ pub async fn sync_feed(
 async fn mirror(
     state: &AppState,
     feed: &calendar_subscription::Model,
+    url: &str,
     log: calendar_sync_log::Model,
     started: Instant,
 ) -> Result<SubscriptionSyncResult, AppError> {
     let request = feed_request(feed.etag.as_deref(), feed.last_modified.as_deref());
-    let response = fetch(state, &feed.url, &request).await?;
+    let response = fetch(state, url, &request).await?;
     let status = response.status;
     if status == StatusCode::NOT_MODIFIED {
         let outcome = SyncOutcome {
@@ -736,6 +753,9 @@ pub async fn import_ics(
     user: &RouteUser,
     request: EncryptedIcsImportRequest,
 ) -> Result<ImportIcsResponse, AppError> {
+    for entry in &request.encrypted_events {
+        require_bound_content(Some(&entry.encrypted_content), entry.encryption_key_version)?;
+    }
     let calendar_id = request.calendar_id.0.as_str();
     let mut entries: Vec<_> = request.encrypted_events.iter().collect();
     entries.sort_by_key(|entry| entry.series_external_id.is_some());
@@ -772,7 +792,7 @@ pub async fn import_ics(
             }
             None => None,
         };
-        let row = calendar_event::ActiveModel {
+        let mut row = calendar_event::ActiveModel {
             user_id: Set(user.id.clone()),
             calendar_id: Set(calendar_id.to_owned()),
             external_id: Set(Some(entry.external_id.clone())),
@@ -781,7 +801,9 @@ pub async fn import_ics(
             location: Set(None),
             encrypted_content: Set(Some(entry.encrypted_content.clone())),
             encryption_state: Set("encrypted".into()),
-            encryption_key_version: Set(entry.encryption_key_version.unwrap_or(1)),
+            encryption_key_version: Set(entry
+                .encryption_key_version
+                .unwrap_or(BOUND_EVENT_CONTENT_VERSION)),
             start: Set(stored_instant(&entry.start)?),
             end: Set(stored_instant(&entry.end)?),
             all_day: Set(entry.all_day),
@@ -794,6 +816,7 @@ pub async fn import_ics(
             parent_event_id: Set(parent.as_ref().map(|parent| parent.id.clone())),
             ..Default::default()
         };
+        row.id = Set(entry.id.0.clone());
         let event = events_queries::insert(&transaction, row).await?;
         let people = entry.participants.as_deref().unwrap_or_default();
         participants::sync(&transaction, &event.id, people, None).await?;
@@ -945,10 +968,10 @@ pub(crate) mod tests {
             let url = format!("{}{path}?feed={}", self.origin, crate::db::cuid());
             let feed = queries::insert_feed(
                 db,
-                &self.user.id,
-                "Feed",
+                &crate::db::cuid(),
+                &calendar,
                 &url,
-                &calendar.id,
+                None,
                 interval_minutes,
             )
             .await
@@ -1026,10 +1049,12 @@ pub(crate) mod tests {
 
         let fixture = fixture().await;
         let request = CreateSubscriptionRequest {
+            id: "0123456789abcdef0123456789abcdef".to_owned().into(),
             name: Some("Work".into()),
             encrypted_name: None,
             encryption_key_version: None,
             url: format!("{}/private-redirect", fixture.origin),
+            encrypted_url: None,
             color: None,
         };
         let refused = create(&fixture.state, &fixture.user, request)
@@ -1051,15 +1076,18 @@ pub(crate) mod tests {
     async fn a_sealed_name_is_stored_only_as_ciphertext_on_the_mirrored_calendar() {
         let fixture = fixture().await;
         let request = CreateSubscriptionRequest {
+            id: "0123456789abcdef0123456789abcdef".to_owned().into(),
             name: None,
             encrypted_name: Some("sealed-name".into()),
             encryption_key_version: Some(2),
             url: format!("{}/feed.ics", fixture.origin),
+            encrypted_url: None,
             color: None,
         };
         let created = create(&fixture.state, &fixture.user, request)
             .await
             .unwrap();
+        assert_eq!(created.id.0, "0123456789abcdef0123456789abcdef");
         assert_eq!(created.name, "");
         assert_eq!(
             (
@@ -1086,7 +1114,9 @@ pub(crate) mod tests {
         let fixture = fixture().await;
         let feed = fixture.feed("/slow.ics", None, 15).await;
         let message = "Calendar request timed out after 10 seconds";
-        let error = sync_feed(&fixture.state, &feed).await.unwrap_err();
+        let error = sync_feed(&fixture.state, &feed, &feed.url)
+            .await
+            .unwrap_err();
         assert_eq!(error.client_message(), message);
         assert_eq!(
             fixture.logs(&feed.id).await,
@@ -1128,7 +1158,7 @@ pub(crate) mod tests {
             .map(|row| row.try_get::<String>("", "id").unwrap())
             .collect::<Vec<_>>()
         };
-        sync_feed(&fixture.state, &feed).await.unwrap();
+        sync_feed(&fixture.state, &feed, &feed.url).await.unwrap();
         let expected = [
             ("Daily", "2099-11-02T00:00:00.000Z"),
             ("Weekly", "2099-11-02T09:00:00.000Z"),
@@ -1140,7 +1170,7 @@ pub(crate) mod tests {
         assert_eq!(starts().await, expected);
         let first = exceptions().await;
         assert_eq!(first.len(), 3, "two EXDATEs and one override");
-        sync_feed(&fixture.state, &feed).await.unwrap();
+        sync_feed(&fixture.state, &feed, &feed.url).await.unwrap();
         assert_eq!(starts().await, expected);
         assert_eq!(
             exceptions().await,
@@ -1153,7 +1183,7 @@ pub(crate) mod tests {
     async fn a_sync_mirrors_the_feed_and_keeps_its_validators() {
         let fixture = fixture().await;
         let feed = fixture.feed("/feed.ics", None, 15).await;
-        let first = sync_feed(&fixture.state, &feed).await.unwrap();
+        let first = sync_feed(&fixture.state, &feed, &feed.url).await.unwrap();
         assert_eq!(
             (
                 first.events_added,
@@ -1166,7 +1196,7 @@ pub(crate) mod tests {
             fixture.feed_state(&feed.id).await,
             ("success".to_owned(), None, Some("\"v1\"".to_owned()))
         );
-        let again = sync_feed(&fixture.state, &feed).await.unwrap();
+        let again = sync_feed(&fixture.state, &feed, &feed.url).await.unwrap();
         assert_eq!(
             (
                 again.events_added,
@@ -1175,5 +1205,68 @@ pub(crate) mod tests {
             ),
             (Some(0), Some(0), Some(0))
         );
+    }
+
+    #[tokio::test]
+    async fn a_sealed_create_stores_only_the_ciphertext_and_syncs_through_the_request_url() {
+        let fixture = fixture().await;
+        let request = CreateSubscriptionRequest {
+            id: "0123456789abcdef0123456789abcdef".to_owned().into(),
+            name: None,
+            encrypted_name: Some("sealed-name".into()),
+            encryption_key_version: Some(1),
+            url: format!("{}/feed.ics?private=token", fixture.origin),
+            encrypted_url: Some("sealed-url".into()),
+            color: None,
+        };
+        let created = create(&fixture.state, &fixture.user, request)
+            .await
+            .unwrap();
+        let placeholder = format!("sealed:{}", created.id.0);
+        assert_eq!(
+            (created.url.as_str(), created.encrypted_url.as_deref()),
+            (placeholder.as_str(), Some("sealed-url"))
+        );
+        let db = &fixture.state.db;
+        let stored = queries::owned(db, &created.id.0, &fixture.user.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (stored.url.as_str(), stored.encrypted_url.as_deref()),
+            (placeholder.as_str(), Some("sealed-url"))
+        );
+        for _ in 0..400 {
+            if fixture.feed_state(&created.id.0).await.0 != "pending" {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        assert_eq!(fixture.feed_state(&created.id.0).await.0, "success");
+        assert_eq!(
+            queries::feed_events(db, &created.id.0).await.unwrap().len(),
+            1,
+            "the initial sync mirrored the feed through the transient URL"
+        );
+    }
+
+    #[tokio::test]
+    async fn sealed_feeds_are_never_due_for_the_background_sync() {
+        let fixture = fixture().await;
+        let readable = fixture.feed("/feed.ics", None, 15).await;
+        let sealed = fixture.feed("/feed.ics", None, 15).await;
+        fixture
+            .sql(&format!(
+                "UPDATE calendar_subscription SET encrypted_url = 'sealed-url', url = 'sealed:{0}' WHERE id = '{0}'",
+                sealed.id
+            ))
+            .await;
+        let due: Vec<String> = queries::due(&fixture.state.db, instant::now())
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|feed| feed.id)
+            .collect();
+        assert_eq!(due, [readable.id]);
     }
 }

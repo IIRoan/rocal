@@ -108,6 +108,18 @@ describe("mail compose formatting", () => {
     );
   });
 
+  it("keeps a reply's leading blank line as a caret line above the quote", () => {
+    const reply = "\n\nOn Nov 16, Maestro wrote:\n> Hello";
+    expect(composeTextToHtml(reply)).toBe(
+      "<p><br></p><p>On Nov 16, Maestro wrote:<br>&gt; Hello</p>",
+    );
+    expect(htmlToComposeText(composeTextToHtml(reply))).toBe(reply);
+    expect(
+      htmlToComposeText('<p>Thanks</p><p class="quote">On Nov 16, Maestro wrote:<br>&gt; Hello</p>'),
+    ).toBe("Thanks\n\nOn Nov 16, Maestro wrote:\n> Hello");
+    expect(htmlToComposeText("<p><br></p>")).toBe("");
+  });
+
   it("prefers markdown-lite text when reopening a draft", () => {
     expect(
       messageBodiesToComposeText({

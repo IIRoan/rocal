@@ -29,7 +29,7 @@ export function withDecryptedEventContent(
   };
 }
 
-/** Placeholder for an encrypted event without an E2EE session: "Encrypted event" title with null description/location; unencrypted events pass through unchanged. */
+/** Read-only placeholder for encrypted content that did not open here: "Encrypted event" title with null description/location; unencrypted events pass through unchanged. */
 export function hydrateEncryptedEventWithoutSession(
   event: CalendarEvent,
 ): CalendarEvent {
@@ -47,5 +47,6 @@ export function hydrateEncryptedEventWithoutSession(
     description: null,
     location: null,
     encryptionState: "encrypted",
+    contentUnavailable: true,
   };
 }

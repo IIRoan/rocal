@@ -1,8 +1,16 @@
-import { privateSearchCoverageText } from "@workspace/calendar-core";
+import {
+  conditionToChip,
+  formatMailSearchQuery,
+  hasMailSearchConditions,
+  parseMailSearchQuery,
+  isBodyOnlyMatch,
+  privateSearchCoverageText,
+  type MailSearchContext,
+  type TimeFormat,
+} from "@workspace/calendar-core";
 import { useEffect, useRef, useState } from "react";
 import { type TextInputInstance } from "react-native";
 import { useRouter } from "expo-router";
-import { isBodyOnlyMatch, type TimeFormat } from "@workspace/calendar-core";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { useCommandPalette } from "@workspace/native-core/providers/CommandPaletteProvider";
 import { useDeferredSheetAction } from "@workspace/native-core/hooks/use-deferred-sheet-action";
@@ -21,6 +29,7 @@ import {
 } from "@workspace/native-core/components/sheet/SheetSections";
 import { useMailSelection } from "../providers/MailSelectionProvider";
 import { useMailAccount, useMailRuntime } from "../lib/mail/use-mail";
+import { useLabels } from "../lib/mail/use-labels";
 import { formatMessageDate } from "../lib/mail/mail-helpers";
 import { mailMessageRoute } from "../lib/mail-routes";
 import { useNativeTitleIndex } from "../hooks/use-native-title-index";
@@ -33,7 +42,7 @@ import { usePaletteMailSearch } from "./command-palette/use-palette-mail-search"
 const SEARCH_MIN_LENGTH = 2;
 const SEARCH_DEBOUNCE_MS = 250;
 const SEARCH_LIMIT = 12;
-const SEARCH_HINT = "Search by subject, sender or message text.";
+const SEARCH_HINT = "Search by subject, sender or message text, or type from:, in:, is:unread and more.";
 
 /** Search-only drawer over the on-device subject index and live mailbox results. */
 export function CommandPalette() {
@@ -52,6 +61,9 @@ export function CommandPalette() {
   const mailProvisioned = accountQuery.data?.provisioned ?? false;
   const runtime = useMailRuntime(isOpen && mailProvisioned).data;
   const { selectedMailboxId } = useMailSelection();
+  const { labels } = useLabels({ runtime, enabled: isOpen && mailProvisioned });
+  // Folder and label names resolve here on the device; only ids reach the search.
+  const searchContext: MailSearchContext = { mailboxes: runtime?.mailboxes ?? [], labels };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -68,24 +80,41 @@ export function CommandPalette() {
   }, [query]);
 
   const trimmedQuery = debouncedQuery.trim();
-  const searchEnabled = isOpen && trimmedQuery.length >= SEARCH_MIN_LENGTH;
+  const parsed = parseMailSearchQuery(trimmedQuery, searchContext);
+  const operatorSearch = hasMailSearchConditions(parsed);
+  // Unusable operators are dropped rather than searched as words.
+  const searchText = parsed.unresolved ? parsed.text : trimmedQuery;
+  const searchEnabled =
+    isOpen && (operatorSearch || searchText.length >= SEARCH_MIN_LENGTH);
 
   // With the on-device index on, results come only from it, even while it builds, so the words never reach the mail server.
   const searchesLocally = titleIndex.enabled;
   const { data: mailSearchData, isFetching: mailSearchFetching } =
-    usePaletteMailSearch(runtime, selectedMailboxId, trimmedQuery, {
-      enabled: searchEnabled && !searchesLocally,
+    usePaletteMailSearch(runtime, selectedMailboxId, searchText, {
+      enabled: searchEnabled && (operatorSearch || !searchesLocally),
       limit: SEARCH_LIMIT,
+      parsed,
+      searchesLocally,
+      timezone,
     });
 
   const results = searchEnabled
     ? mergePaletteSearchResults({
-        titleDocuments: titleIndex.documents,
-        query: trimmedQuery,
+        // Index hits ignore typed conditions, so an operator search shows only the filtered messages.
+        titleDocuments: operatorSearch ? [] : titleIndex.documents,
+        query: searchText,
         messages: mailSearchData?.messages ?? [],
         limit: SEARCH_LIMIT,
       })
     : [];
+  const typed = parseMailSearchQuery(query.trim(), searchContext);
+  const removeFilter = (index: number) =>
+    setQuery(
+      formatMailSearchQuery(
+        [typed.text, typed.unresolved].filter(Boolean).join(" "),
+        typed.filters.conditions.filter((_, position) => position !== index),
+      ),
+    );
 
   const { runAfterClose, onCloseComplete } = useDeferredSheetAction(close);
 
@@ -99,7 +128,7 @@ export function CommandPalette() {
     runAfterClose(() => push(mailMessageRoute(result.messageId) as never));
 
   const searching =
-    query.trim().length >= SEARCH_MIN_LENGTH &&
+    (query.trim().length >= SEARCH_MIN_LENGTH || hasMailSearchConditions(typed)) &&
     (query.trim() !== trimmedQuery ||
       mailSearchFetching ||
       titleIndex.isIndexing);
@@ -118,6 +147,27 @@ export function CommandPalette() {
           placeholder="Search mail"
           accessibilityLabel="Search mail"
         />
+
+        {hasMailSearchConditions(typed) || typed.issues.length > 0 ? (
+          <SheetSection title="Filters" footer={typed.issues.join(" ") || undefined}>
+            <SheetGroup>
+              {typed.filters.conditions.map((condition, index) => {
+                const label = conditionToChip(condition)
+                  .map((chip) => chip.label)
+                  .join(" ");
+                return (
+                  <SheetItem
+                    key={label}
+                    label={label}
+                    accessory="x"
+                    onPress={() => removeFilter(index)}
+                    accessibilityLabel={`Remove filter ${label}`}
+                  />
+                );
+              })}
+            </SheetGroup>
+          </SheetSection>
+        ) : null}
 
         {results.length > 0 ? (
           <SheetSection

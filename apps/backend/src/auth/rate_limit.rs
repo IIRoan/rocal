@@ -26,7 +26,7 @@ const fn rule(window: i64, max: i64) -> Option<Rule> {
 }
 
 /// Per-path rules relative to `/api/auth`; `None` disables limiting (session checks write nothing).
-const RULES: [(&str, Option<Rule>); 19] = [
+const RULES: [(&str, Option<Rule>); 21] = [
     ("/get-session", None),
     ("/sign-in/*", rule(60, 5)),
     ("/sign-up/*", rule(3600, 5)),
@@ -46,6 +46,8 @@ const RULES: [(&str, Option<Rule>); 19] = [
     ("/verify-password", rule(900, 5)),
     ("/delete-user", rule(900, 3)),
     ("/delete-user/callback", rule(900, 5)),
+    ("/recovery/start", rule(900, 10)),
+    ("/recovery/complete", rule(900, 5)),
 ];
 
 /// Better Auth's built-in stricter defaults, which Solace's rules override where both match.
@@ -210,9 +212,13 @@ mod tests {
             "/reset-password",
             "/send-verification-email",
             "/verify-email",
+            "/recovery/start",
+            "/recovery/complete",
         ] {
             assert!(rule_for(path).is_some_and(|rule| rule.max <= 10), "{path}");
         }
+        assert_eq!(rule_for("/recovery/start"), rule(900, 10));
+        assert_eq!(rule_for("/recovery/complete"), rule(900, 5));
         assert_eq!(rule_for("/get-session"), None);
         assert_eq!(rule_for("/list-sessions"), Some(DEFAULT));
         assert_eq!(

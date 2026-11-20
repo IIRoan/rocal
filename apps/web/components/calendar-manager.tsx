@@ -13,6 +13,7 @@ import {
 } from "./calendar-manager/calendar-form-state";
 import { CalendarEditorView } from "./calendar-manager/calendar-editor-view";
 import { CalendarListView } from "./calendar-manager/calendar-list-view";
+import { EventTrashView } from "./calendar-manager/event-trash-view";
 
 interface CalendarManagerProps {
   onBack: () => void;
@@ -55,8 +56,13 @@ export function CalendarManager({
         }}
         onGoToSubscriptions={onGoToSubscriptions}
         onGoToCategories={() => onNavigateTo("categories")}
+        onGoToTrash={() => onNavigateTo("trash")}
       />
     );
+  }
+
+  if (currentView === "trash") {
+    return <EventTrashView onBack={onBack} />;
   }
 
   if (currentView === "calendar-create" || currentView === "calendar-edit") {

@@ -6,7 +6,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/ui/select";
-import { Calendar, BookOpen } from "lucide-react";
+import { Calendar, BookOpen, Keyboard } from "lucide-react";
 import { partitionCalendarsByKind } from "@workspace/calendar-core";
 import type { UserSettings } from "@/lib/types/calendar";
 import type { CalendarView } from "@workspace/ui/components/calendar";
@@ -20,6 +20,7 @@ import {
   PaletteView,
 } from "./palette-ui";
 import { PALETTE_COMPACT_SELECT_CLASS } from "./palette-styles";
+import { SettingToggleRow } from "./setting-toggle-row";
 
 interface CalendarDefaultsSettingsProps {
   localSettings: UserSettings;
@@ -72,6 +73,8 @@ export function CalendarDefaultsSettings({
     }
     updateSetting("workingDays", JSON.stringify(currentWorkingDays.sort()));
   };
+
+  const keyboardShortcuts = localSettings.keyboardShortcuts !== false;
 
   return (
     <PaletteView title="Calendar Defaults" onBack={goBack}>
@@ -154,6 +157,16 @@ export function CalendarDefaultsSettings({
             checked={workingDaysList.includes(day.value)}
           />
         ))}
+      </PaletteSection>
+
+      <PaletteSection label="Keyboard">
+        <SettingToggleRow
+          checked={keyboardShortcuts}
+          description="Single keys switch views and dates; press ? for the list."
+          icon={Keyboard}
+          label="Keyboard shortcuts"
+          onToggle={() => updateSetting("keyboardShortcuts", !keyboardShortcuts)}
+        />
       </PaletteSection>
     </PaletteView>
   );

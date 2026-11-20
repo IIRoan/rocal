@@ -47,6 +47,7 @@ describe("buildContentSecurityPolicy", () => {
     expect(csp.get("base-uri")).toEqual(["'self'"]);
     expect(csp.get("default-src")).toEqual(["'self'"]);
     expect(csp.get("script-src")).toEqual(["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'"]);
+    expect(csp.get("script-src-attr")).toEqual(["'none'"]);
     expect(csp.get("worker-src")).toEqual(["'self'", "blob:"]);
     expect(csp.get("img-src")).toEqual(["'self'", "data:", "blob:", "https:", "https://api.solace.onl"]);
     expect(csp.has("upgrade-insecure-requests")).toBe(true);
@@ -58,11 +59,27 @@ describe("buildContentSecurityPolicy", () => {
     );
 
     expect(csp.get("script-src")).toContain("'unsafe-eval'");
+    expect(csp.get("script-src-attr")).toEqual(["'none'"]);
     expect(csp.get("connect-src")).toEqual(
       expect.arrayContaining(["http://localhost:4001", "ws:", "wss:"]),
     );
     expect(csp.get("img-src")).toEqual(["'self'", "data:", "blob:", "https:", "http://localhost:4001"]);
     expect(csp.has("upgrade-insecure-requests")).toBe(false);
+  });
+
+  it("skips upgrade-insecure-requests only for an http loopback API", () => {
+    const upgrades = (apiUrl: string) =>
+      directives(buildContentSecurityPolicy({ NODE_ENV: "production", NEXT_PUBLIC_API_URL: apiUrl })).has(
+        "upgrade-insecure-requests",
+      );
+
+    expect(upgrades("http://localhost:4001")).toBe(false);
+    expect(upgrades("http://127.0.0.1:4001")).toBe(false);
+    expect(upgrades("http://[::1]:4001")).toBe(false);
+    expect(upgrades("https://api.solace.onl")).toBe(true);
+    expect(upgrades("https://localhost:4001")).toBe(true);
+    expect(upgrades("http://api.solace.test")).toBe(true);
+    expect(upgrades("http://localhost.evil.test:4001")).toBe(true);
   });
 
   it("ignores missing or non-http env values", () => {
@@ -102,10 +119,37 @@ describe("buildSecurityHeaderRoutes", () => {
 
   it("never allows the app to be framed", () => {
     const routes = buildSecurityHeaderRoutes(PRODUCTION_ENV);
-    const headers = headerMap(routes.at(-1)?.headers ?? []);
 
-    expect(routes).toHaveLength(1);
-    expect(headers["X-Frame-Options"]).toBe("DENY");
-    expect(headers["Content-Security-Policy"]).toContain("frame-ancestors 'none'");
+    expect(headerMap(routes[0]?.headers ?? [])["X-Frame-Options"]).toBe("DENY");
+    for (const route of routes) {
+      expect(headerMap(route.headers)["Content-Security-Policy"]).toContain("frame-ancestors 'none'");
+    }
+  });
+
+  it("allows https form actions and drops the referrer only on the mail link page", () => {
+    const routes = buildSecurityHeaderRoutes(PRODUCTION_ENV);
+    // Mirrors next.config headers(): every matching entry applies and later keys win.
+    const headersFor = (path: string) =>
+      Object.assign(
+        {},
+        ...routes
+          .filter((route) => route.source === "/:path*" || route.source === path)
+          .map((route) => headerMap(route.headers)),
+      ) as Record<string, string>;
+    const formAction = (path: string) =>
+      directives(headersFor(path)["Content-Security-Policy"] ?? "").get("form-action");
+
+    expect(routes.map((route) => route.source)).toEqual(["/:path*", "/mail/link"]);
+    expect(formAction("/mail/link")).toEqual(["'self'", "https://api.solace.onl", "https:"]);
+    expect(headersFor("/mail/link")["Referrer-Policy"]).toBe("no-referrer");
+    for (const path of ["/mail", "/calendar", "/login", "/mail/link/other"]) {
+      expect(formAction(path)).toEqual(["'self'", "https://api.solace.onl"]);
+      expect(headersFor(path)["Referrer-Policy"]).toBe("strict-origin-when-cross-origin");
+    }
+    const link = directives(headersFor("/mail/link")["Content-Security-Policy"] ?? "");
+    const mail = directives(headersFor("/mail")["Content-Security-Policy"] ?? "");
+    link.delete("form-action");
+    mail.delete("form-action");
+    expect(link).toEqual(mail);
   });
 });

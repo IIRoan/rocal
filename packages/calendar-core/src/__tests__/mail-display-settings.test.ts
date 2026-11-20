@@ -10,7 +10,7 @@ import {
   withoutTrustedSender,
   type MailDisplaySettings,
 } from "../mail-display-settings";
-import { emailHtmlHasRemoteContent } from "../mail-html";
+import { analyzeEmailHtml } from "../mail-html";
 
 const REMOTE_HTML = '<p>Hi</p><img src="https://tracker.example/pixel.png">';
 
@@ -26,11 +26,11 @@ function resolveFor(input: {
 }) {
   return resolveReaderRemoteContent({
     settings: input.settings,
-    hasRemoteContent: emailHtmlHasRemoteContent({
+    hasRemoteContent: analyzeEmailHtml({
       html: input.html,
       isDark: false,
       blockTrackingPixels: input.settings.blockTrackingPixels,
-    }),
+    }).hasRemoteContent,
     senderEmail: input.senderEmail,
     loadedForMessage: input.loadedForMessage,
   });
@@ -187,6 +187,14 @@ describe("mail display settings", () => {
       blockTrackingPixels: false,
     });
     expect(parseMailDisplaySettings(serializeMailDisplaySettings(stored))).toEqual(stored);
+  });
+
+  it("confirms external links by default and keeps an explicit choice and unknown keys", () => {
+    expect(DEFAULT_MAIL_DISPLAY_SETTINGS.confirmExternalLinks).toBe(true);
+    expect(parseMailDisplaySettings(JSON.stringify({ confirmExternalLinks: 0 })).confirmExternalLinks).toBe(true);
+    expect(
+      parseMailDisplaySettings(JSON.stringify({ confirmExternalLinks: false, futureKey: "x" })),
+    ).toMatchObject({ confirmExternalLinks: false, futureKey: "x" });
   });
 
   it("drops invalid and duplicate trusted senders", () => {

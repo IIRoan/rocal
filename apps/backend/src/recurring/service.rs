@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use sea_orm::Set;
+use sea_orm::{ConnectionTrait, DatabaseTransaction, Set, TransactionTrait};
 use solace_api_types::events::{Event, ParticipantInput};
 use solace_api_types::recurring::{
     DeleteRecurringQuery, EditRecurringRequest, PreviewInstance, PreviewRecurrenceRequest,
@@ -17,13 +17,16 @@ use crate::auth::guard::RouteUser;
 use crate::calendars::queries as calendars;
 use crate::db::entities::{calendar, calendar_event, event_participant, user};
 use crate::error::AppError;
-use crate::events::encryption::resolve_invitation_content;
+use crate::events::encryption::{
+    BOUND_EVENT_CONTENT_VERSION, require_bound_content, resolve_invitation_content,
+};
 use crate::events::recurrence::{generate_instances, validate_rule};
 use crate::events::service::{
-    assert_editable, invitation_event, is_writable, refuse_plaintext, refuse_synced,
+    assert_editable, invitation_event, is_attendee_invitation, is_writable, refuse_plaintext,
+    refuse_synced,
 };
 use crate::events::view::{Relations, event_dto};
-use crate::events::{participants, queries as events};
+use crate::events::{participants, queries as events, trash};
 use crate::http::zod::non_blank;
 use crate::instant;
 use crate::invitations::request;
@@ -252,30 +255,15 @@ fn clear_sealed_attributes(row: &mut calendar_event::ActiveModel, updates: &Recu
     }
 }
 
-/// New ciphertext replaces the content; otherwise the series' own content (and ciphertext) is carried over.
-fn apply_content(
-    row: &mut calendar_event::ActiveModel,
-    existing: &calendar_event::Model,
-    updates: &RecurringUpdates,
-) -> Result<(), AppError> {
-    if let Some(ciphertext) = new_ciphertext(updates) {
-        row.title = Set(String::new());
-        row.description = Set(None);
-        row.location = Set(None);
-        row.encrypted_content = Set(Some(ciphertext.to_owned()));
-        row.blind_index_tokens = Set(None);
-        row.encryption_state = Set("encrypted".into());
-        row.encryption_key_version = Set(updates.encryption_key_version.unwrap_or(1));
-        return Ok(());
-    }
-    row.title = Set(existing.title.clone());
-    row.description = Set(existing.description.clone());
-    row.location = Set(existing.location.clone());
-    row.encrypted_content = Set(existing.encrypted_content.clone());
+/// New ciphertext, bound to the row it is written to, replaces the readable content.
+fn apply_content(row: &mut calendar_event::ActiveModel, ciphertext: &str, version: Option<i32>) {
+    row.title = Set(String::new());
+    row.description = Set(None);
+    row.location = Set(None);
+    row.encrypted_content = Set(Some(ciphertext.to_owned()));
     row.blind_index_tokens = Set(None);
-    row.encryption_state = Set(existing.encryption_state.clone());
-    row.encryption_key_version = Set(existing.encryption_key_version);
-    Ok(())
+    row.encryption_state = Set("encrypted".into());
+    row.encryption_key_version = Set(version.unwrap_or(BOUND_EVENT_CONTENT_VERSION));
 }
 
 /// `buildRecurringEventCreateData`: a child of the series at `occurrence`, keeping the series' duration unless the edit sets an end.
@@ -283,11 +271,21 @@ fn child_row(
     existing: &calendar_event::Model,
     updates: &RecurringUpdates,
     parent_event_id: &str,
+    child_id: Option<&str>,
     recurrence: Option<String>,
     occurrence: Option<i64>,
 ) -> Result<calendar_event::ActiveModel, AppError> {
-    let mut row = calendar_event::ActiveModel::default();
-    apply_content(&mut row, existing, updates)?;
+    // Series content opens only under the series id, so a child row needs its own id and ciphertext bound to it.
+    let (Some(child_id), Some(ciphertext)) = (child_id, new_ciphertext(updates)) else {
+        return Err(AppError::Conflict(
+            "Update the app to edit one occurrence of this event.".into(),
+        ));
+    };
+    let mut row = calendar_event::ActiveModel {
+        id: Set(child_id.to_owned()),
+        ..Default::default()
+    };
+    apply_content(&mut row, ciphertext, updates.encryption_key_version);
     let duration =
         (instant::unix_millis(existing.end) - instant::unix_millis(existing.start)).max(0);
     let start = js_date(updates.start.as_deref()).unwrap_or(occurrence);
@@ -346,8 +344,8 @@ fn series_update(
     if let Some(category_id) = &updates.category_id {
         row.category_id = Set(clearable_category(category_id));
     }
-    if new_ciphertext(updates).is_some() {
-        apply_content(&mut row, existing, updates)?;
+    if let Some(ciphertext) = new_ciphertext(updates) {
+        apply_content(&mut row, ciphertext, updates.encryption_key_version);
     }
     clear_sealed_attributes(&mut row, updates);
     if let Some(start) = js_date(updates.start.as_deref()) {
@@ -369,36 +367,42 @@ pub async fn edit(
     let existing = series(state, &user.id, id).await?;
     assert_editable(&user.id, &existing.row, &existing.participants)?;
     let updates = &request.updates;
+    require_bound_content(new_ciphertext(updates), updates.encryption_key_version)?;
     let calendar = assert_targets_owned(state, &user.id, &existing.row, updates).await?;
     refuse_plaintext(
         &calendar,
         [new_ciphertext(updates).or(existing.row.encrypted_content.as_deref())],
     )?;
     let occurrence = request.occurrence_date.as_deref();
+    let child_id = request.new_event_id.as_ref().map(|id| id.0.as_str());
     match request.edit_scope.as_str() {
         "this_only" => {
             let date = occurrence_date(occurrence, "this_only", "edit")?;
-            let row = child_row(&existing.row, updates, id, None, date)?;
-            let detached = events::insert(&state.db, row).await?;
+            let row = child_row(&existing.row, updates, id, child_id, None, date)?;
+            let transaction = lock_parent(state, &user.id, id).await?;
+            let detached = events::insert(&transaction, row).await?;
             queries::insert_exception(
-                &state.db,
+                &transaction,
                 id,
                 column(date)?,
                 "modified",
                 Some(detached.id.clone()),
             )
             .await?;
+            transaction.commit().await?;
             respond(state, user, detached, updates, Some(&existing)).await
         }
         "this_and_future" => {
             let date = occurrence_date(occurrence, "this_and_future", "edit")?;
-            split(state, &existing.row, date).await?;
             let recurrence = updates
                 .recurrence
                 .clone()
                 .or_else(|| existing.row.recurrence.clone());
-            let row = child_row(&existing.row, updates, id, recurrence, date)?;
-            let future = events::insert(&state.db, row).await?;
+            let row = child_row(&existing.row, updates, id, child_id, recurrence, date)?;
+            let transaction = lock_parent(state, &user.id, id).await?;
+            split(&transaction, &existing.row, date).await?;
+            let future = events::insert(&transaction, row).await?;
+            transaction.commit().await?;
             respond(state, user, future, updates, Some(&existing)).await
         }
         _ => {
@@ -409,16 +413,29 @@ pub async fn edit(
     }
 }
 
-/// Ends the stored rule the day before the split, when it is readable.
-async fn split(
+/// A transaction holding the series row, so trashing the series cannot miss or drop the child created in it.
+async fn lock_parent(
     state: &AppState,
+    user_id: &str,
+    id: &str,
+) -> Result<DatabaseTransaction, AppError> {
+    let transaction = state.db.begin().await?;
+    if !queries::lock_series(&transaction, user_id, id).await? {
+        return Err(AppError::validation(NOT_FOUND));
+    }
+    Ok(transaction)
+}
+
+/// Ends the stored rule the day before the split, when it is readable.
+async fn split<C: ConnectionTrait>(
+    db: &C,
     series: &calendar_event::Model,
     date: Option<i64>,
 ) -> Result<(), AppError> {
     if let Some(rule) = rules::split_rule(series.recurrence.as_deref(), date) {
         let mut row: calendar_event::ActiveModel = series.clone().into();
         row.recurrence = Set(Some(rule));
-        events::update(&state.db, row).await?;
+        events::update(db, row).await?;
     }
     Ok(())
 }
@@ -477,6 +494,7 @@ pub async fn delete(
     let existing = series(state, &user.id, id).await?;
     refuse_synced(&existing.row, "delete")?;
     let occurrence = query.occurrence_date.as_deref();
+    let mut trash_id = None;
     let (message, action) = match query.delete_scope.as_str() {
         "this_only" => {
             let date = column(occurrence_date(occurrence, "this_only", "delete")?)?;
@@ -494,11 +512,20 @@ pub async fn delete(
         }
         "this_and_future" => {
             let date = occurrence_date(occurrence, "this_and_future", "delete")?;
-            split(state, &existing.row, date).await?;
+            split(&state.db, &existing.row, date).await?;
             ("Future occurrences deleted successfully", "delete_future")
         }
         _ => {
-            queries::delete_series(&state.db, &user.id, id).await?;
+            let transaction = state.db.begin().await?;
+            if is_attendee_invitation(&user.id, &existing.row, &existing.participants) {
+                queries::delete_series(&transaction, &user.id, id).await?;
+            } else {
+                trash_id = trash::trash_events(&transaction, &user.id, &[id.to_owned()])
+                    .await?
+                    .into_iter()
+                    .next();
+            }
+            transaction.commit().await?;
             ("Entire recurring series deleted successfully", "delete_all")
         }
     };
@@ -507,6 +534,7 @@ pub async fn delete(
         message: message.into(),
         deleted_event_id: id.to_owned().into(),
         action: action.into(),
+        trash_id: trash_id.map(Into::into),
     })
 }
 

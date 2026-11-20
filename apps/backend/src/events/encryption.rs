@@ -3,7 +3,8 @@
 use sea_orm::Set;
 
 use crate::db::entities::calendar_event;
-use crate::http::zod::js_trim;
+use crate::error::AppError;
+use crate::http::zod::{js_trim, non_blank};
 use crate::integrations::ics::trimmed_text;
 
 /// Ciphertext replaces the content, so no plaintext copy stays beside it.
@@ -12,6 +13,23 @@ pub fn clear_plaintext(row: &mut calendar_event::ActiveModel) {
     row.description = Set(None);
     row.location = Set(None);
     row.encryption_state = Set("encrypted".into());
+}
+
+/// `encryptionKeyVersion` of content bound to its row id (`event-content:v2:<id>`); 1 is the unbound format.
+pub const BOUND_EVENT_CONTENT_VERSION: i32 = 2;
+
+/// New event content must be bound to its row id; unbound content stays only where it was, until its re-seal.
+pub fn require_bound_content(
+    new_ciphertext: Option<&str>,
+    new_version: Option<i32>,
+) -> Result<(), AppError> {
+    if non_blank(new_ciphertext).is_some() && new_version.unwrap_or(1) < BOUND_EVENT_CONTENT_VERSION
+    {
+        return Err(AppError::Conflict(
+            "Update the app to save this event.".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// What an invitation mail shows: the transient `invitationContent`.
@@ -36,6 +54,16 @@ pub fn resolve_invitation_content(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_bound_content_is_written() {
+        let refuse = |content, version| require_bound_content(content, version).is_err();
+        assert!(refuse(Some("c"), None));
+        assert!(refuse(Some("c"), Some(1)));
+        assert!(!refuse(Some("c"), Some(2)));
+        assert!(!refuse(None, Some(1)));
+        assert!(!refuse(Some(" "), Some(1)));
+    }
 
     #[test]
     fn invitations_use_only_the_transient_copy() {

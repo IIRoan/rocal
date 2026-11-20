@@ -33,6 +33,7 @@ import {
   type RecurrenceDeleteScope,
   type RecurrenceEditScope,
 } from "@workspace/calendar-core";
+import { invalidateEventTrash } from "@workspace/calendar-client/event-trash-query-options";
 import {
   persistRecurringEventDelete as deleteRecurringWith,
   persistRecurringEventEdit as editRecurringWith,
@@ -85,7 +86,7 @@ async function snapshotEventCache(
   });
 }
 
-function restoreEventCache(
+export function restoreEventCache(
   queryClient: QueryClient,
   snapshot: EventCacheSnapshot | undefined,
 ) {
@@ -128,6 +129,25 @@ function toOccurrencePatch(
   return patch;
 }
 
+/** Moves the cached event to its new times before the server answers, so a drag or resize lands at once. */
+export async function patchCachedEventTiming(
+  queryClient: QueryClient,
+  id: string,
+  { start, end, allDay }: UpdateEventRequest,
+) {
+  const previous = findEventInCache(queryClient, id);
+  // A content-only edit leaves the cache alone, so no range fetch is cancelled for it.
+  if (!start && !end && allDay === undefined) return { previous, snapshot: undefined };
+  const snapshot = await snapshotEventCache(queryClient);
+  const patch = toOccurrencePatch({ start, end, allDay });
+  mapCachedEvents(queryClient, (events) =>
+    events.map((candidate) =>
+      candidate.id === id ? { ...candidate, ...patch } : candidate,
+    ),
+  );
+  return { previous, snapshot };
+}
+
 function isAtOrAfter(event: CalendarEvent, instant: Date | string) {
   return new Date(event.start).getTime() >= new Date(instant).getTime();
 }
@@ -154,7 +174,7 @@ export function persistRecurringEventEdit(
 
 export function persistRecurringEventDelete(
   input: DeleteRecurringEventInput,
-): Promise<void> {
+): Promise<string | null> {
   return deleteRecurringWith(calendarApiService, input);
 }
 
@@ -215,9 +235,10 @@ export interface UseCalendarDataReturn {
     id: string,
     event: UpdateEventRequest,
   ) => Promise<CalendarEvent>;
-  deleteEvent: (id: string) => Promise<void>;
+  /** Resolves to the trash entry an Undo can restore, or null when the delete was permanent. */
+  deleteEvent: (id: string) => Promise<string | null>;
   editRecurringEvent: (input: EditRecurringEventInput) => Promise<CalendarEvent>;
-  deleteRecurringEvent: (input: DeleteRecurringEventInput) => Promise<void>;
+  deleteRecurringEvent: (input: DeleteRecurringEventInput) => Promise<string | null>;
   createCalendar: (calendar: CreateCalendarRequest) => Promise<Calendar>;
   updateCalendar: (
     id: string,
@@ -320,12 +341,17 @@ export function useCalendarData(
   const updateEventMutation = useMutation({
     mutationFn: ({ id, event }: { id: string; event: UpdateEventRequest }) =>
       calendarApiService.updateEvent(id, event),
-    onSuccess: (_data, { id, event }) => {
+    onMutate: ({ id, event }) => patchCachedEventTiming(queryClient, id, event),
+    onError: (_error, _input, context) => {
+      restoreEventCache(queryClient, context?.snapshot);
+    },
+    onSuccess: (_data, { id, event }, context) => {
       if (hasRecurrence(event)) {
         queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
         return;
       }
-      const cached = findEventInCache(queryClient, id);
+      // The pre-update copy, so the range the event left is refreshed too.
+      const cached = context?.previous ?? findEventInCache(queryClient, id);
       if (hasRecurrence(cached)) {
         queryClient.invalidateQueries({ queryKey: EVENTS_QUERY_KEY });
         return;
@@ -364,6 +390,7 @@ export function useCalendarData(
       }
       invalidateEventRanges(queryClient, cached.start, cached.end, timezone);
     },
+    onSettled: () => invalidateEventTrash(queryClient),
   });
 
   const editRecurringEventMutation = useMutation({
@@ -419,6 +446,7 @@ export function useCalendarData(
       restoreEventCache(queryClient, context?.snapshot);
     },
     onSettled: (_data, _error, { event, scope }) => {
+      invalidateEventTrash(queryClient);
       if (scope === "this_only") {
         invalidateEventRanges(queryClient, event.start, event.end, timezone);
         return;
@@ -577,16 +605,14 @@ export function useCalendarData(
   const updateEvent = (id: string, event: UpdateEventRequest) =>
     updateEventMutation.mutateAsync({ id, event });
 
-  const deleteEvent = async (id: string) => {
-    await deleteEventMutation.mutateAsync(id);
-  };
+  const deleteEvent = async (id: string) =>
+    (await deleteEventMutation.mutateAsync(id)).trashId ?? null;
 
   const editRecurringEvent = (input: EditRecurringEventInput) =>
     editRecurringEventMutation.mutateAsync(input);
 
-  const deleteRecurringEvent = async (input: DeleteRecurringEventInput) => {
-    await deleteRecurringEventMutation.mutateAsync(input);
-  };
+  const deleteRecurringEvent = (input: DeleteRecurringEventInput) =>
+    deleteRecurringEventMutation.mutateAsync(input);
 
   const createCalendar = (calendar: CreateCalendarRequest) =>
     createCalendarMutation.mutateAsync(calendar);

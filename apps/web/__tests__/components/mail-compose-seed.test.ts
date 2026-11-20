@@ -1,7 +1,7 @@
 /** @jest-environment jsdom */
 
 import { expect, it } from "@jest/globals";
-import { buildDraftSeed, buildForwardSeed, buildReplySeed } from "@/components/mail/mail-compose-seed";
+import { buildDraftSeed, buildForwardSeed, buildMailtoSeed, buildReplySeed } from "@/components/mail/mail-compose-seed";
 import type { JmapEmailMessage, JmapIdentity } from "@/lib/mail/types";
 import { MAX_MAIL_DISPLAY_CHARACTERS } from "@workspace/calendar-core/mail-mime-limits";
 
@@ -107,4 +107,28 @@ it("escapes the sender and subject in the forward header", () => {
   expect(html).not.toContain("<img");
   expect(html).toContain("Subject: &lt;div data-quoted-html&gt;");
   expect(html).toContain("From: Eve &lt;div data-quoted-html&gt;");
+});
+
+it("seeds a new message from a mailto link with its body above the signature", () => {
+  const signed: JmapIdentity[] = [{ id: "primary", email: "me@solace.test", name: "Me", textSignature: "Me\nSolace" }];
+  const draft = { to: ["a@example.org", "b@example.org"], cc: ["c@example.org"], bcc: ["d@example.org"], subject: "Hi", body: "<Hello>\nthere" };
+  const rich = buildMailtoSeed(draft, signed, "primary");
+  expect(rich.patch).toMatchObject({
+    composeTo: "a@example.org, b@example.org",
+    composeCc: "c@example.org",
+    composeBcc: "d@example.org",
+    composeSubject: "Hi",
+    composeMode: "new",
+    isComposeOpen: true,
+  });
+  expect(rich.patch.composeHtmlBody).toMatch(/^<p>&lt;Hello&gt;<br>there<\/p><p><\/p>.*Solace/s);
+
+  localStorage.setItem("mail:composeSettings", JSON.stringify({ plainTextMode: true }));
+  try {
+    const plain = buildMailtoSeed(draft, signed, "primary");
+    expect(plain.patch.composeHtmlBody).toBe("");
+    expect(plain.patch.composeBody).toMatch(/^<Hello>\nthere\n\n-- \nMe\nSolace$/);
+  } finally {
+    localStorage.removeItem("mail:composeSettings");
+  }
 });

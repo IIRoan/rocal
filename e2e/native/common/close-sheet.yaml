@@ -1,7 +1,22 @@
 appId: ${APP_ID}
 ---
-- tapOn:
-    point: 50%,8%
-- waitForAnimationToEnd:
-    timeout: 5000
+# An iOS system banner can cover the backdrop and swallow the tap, so swipe it away and tap again.
+- repeat:
+    while:
+      visible: Close sheet
+    times: 4
+    commands:
+      - tapOn:
+          point: 50%,8%
+      - waitForAnimationToEnd:
+          timeout: 5000
+      - runFlow:
+          when:
+            visible: Close sheet
+          commands:
+            - swipe:
+                start: 50%,9%
+                end: 50%,1%
+                duration: 300
+            - waitForAnimationToEnd
 - assertVisible: ${HOME_LABEL}

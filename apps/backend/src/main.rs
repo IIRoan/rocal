@@ -28,7 +28,7 @@ async fn run(config: Config) -> anyhow::Result<()> {
     db::migrate(&db).await.context("apply the migrations")?;
     let port = config.port;
     let state = AppState::new(config, db)?;
-    // Dual-stack: the production Railway environment's private DNS resolves to IPv6 only.
+    // Dual-stack, so a private network whose DNS resolves to IPv6 only still reaches it.
     let listener = tokio::net::TcpListener::bind(("::", port)).await?;
     tracing::info!(port, "Server is running");
     let calendar_sync = state

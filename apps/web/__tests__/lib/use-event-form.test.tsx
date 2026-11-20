@@ -22,6 +22,10 @@ jest.mock("../../lib/calendar-api-service", () => ({
   },
 }));
 
+jest.mock("../../hooks/use-settings", () => ({
+  useSettings: () => ({ settings: null }),
+}));
+
 jest.mock("../../lib/e2ee-notification-title", () => ({
   encryptReminderTitle: jest.fn(
     async (eventId: string, title: string) => `enc:${eventId}:${title}`,
@@ -909,7 +913,7 @@ describe("useEventForm reminder hydration", () => {
       "deletes with the %s scope",
       async (scope) => {
         const calendarData = {
-          deleteRecurringEvent: jest.fn<UseCalendarDataReturn["deleteRecurringEvent"]>(async () => undefined),
+          deleteRecurringEvent: jest.fn<UseCalendarDataReturn["deleteRecurringEvent"]>(async () => null),
         };
 
         await act(async () => {

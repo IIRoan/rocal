@@ -44,12 +44,14 @@ export function createDefaultMailSyncedSettings(): MailSyncedSettings {
   };
 }
 
+/** Keeps top-level and group keys this build does not know, so a newer client's settings survive this write. */
 export function sanitizeMailSyncedSettings(input: unknown): MailSyncedSettings {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     return createDefaultMailSyncedSettings();
   }
   const parsed = input as Record<string, unknown>;
   return {
+    ...parsed,
     display: normalizeMailDisplaySettings(parsed.display),
     compose: normalizeMailComposeSettings(parsed.compose),
     list: normalizeMailListSettings(parsed.list),

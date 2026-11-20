@@ -182,6 +182,7 @@ function MailThreadList({ controller }: { controller: MailListController }) {
     decryptedPreviews,
     timeFormat,
     timezone,
+    scheduledSendAtById,
     listSettings,
     threadRows,
     listExtraData,
@@ -213,9 +214,12 @@ function MailThreadList({ controller }: { controller: MailListController }) {
         identities={identities}
         timeFormat={timeFormat}
         timezone={timezone}
+        scheduledSendAt={scheduledSendAtById.get(item.latestMessage.id)}
         density={listSettings.density}
         showLabelChips={listSettings.showLabelChipsInList}
         threadExpandable={listSettings.threadExpandInList}
+        swipeRight={listSettings.swipeRight}
+        swipeLeft={listSettings.swipeLeft}
         handlers={rowHandlers}
       />
     );
@@ -318,7 +322,7 @@ function MailBulkActionSheet({
     >
       <BottomSheetHeader>
         <BottomSheetTitle>
-          {controller.activeSheetView === "bulkMove"
+          {controller.moveSheetOpen
             ? "Move to"
             : controller.activeSheetView === "bulkLabel"
               ? "Labels"
@@ -339,12 +343,12 @@ function MailBulkActionSheet({
             onMove={() => controller.setActiveSheetView("bulkMove")}
           />
         </MailSheetPanel>
-      ) : controller.activeSheetView === "bulkMove" ? (
+      ) : controller.moveSheetOpen ? (
         <MailBulkMoveSheet
           mailboxes={controller.bulkMoveTargets}
           bottomInset={controller.sheetPadCompact}
-          disabled={controller.isActionBusy || controller.bulkIds.length === 0}
-          onSelectMailbox={controller.handleBulkMove}
+          disabled={controller.moveSheetDisabled}
+          onSelectMailbox={controller.handleMoveSheetSelect}
         />
       ) : controller.activeSheetView === "bulkLabel" ? (
         <MailSheetPanel bottomInset={controller.insetsBottom}>

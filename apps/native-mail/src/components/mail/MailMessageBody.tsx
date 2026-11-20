@@ -18,7 +18,7 @@ import {
   resolveMailContentIsDark,
   resolveReaderRemoteContent,
 } from "@workspace/calendar-core";
-import { emailHtmlHasRemoteContent } from "@workspace/calendar-core/mail-html";
+import { analyzeEmailHtml } from "@workspace/calendar-core/mail-html";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { useToast } from "@workspace/native-core/providers/ToastProvider";
@@ -26,6 +26,7 @@ import type { MailDecryptResult } from "../../lib/mail/mail-crypto";
 import type { useMailMessageContent } from "../../hooks/use-mail-message-content";
 import type { useMailMessageCalendar } from "../../hooks/use-mail-message-calendar";
 import { HtmlEmailView } from "./HtmlEmailView";
+import { MailTrackerRow } from "./MailTrackerRow";
 import { EventReminderBanner } from "./EventReminderBanner";
 import { CalendarInviteBanner } from "./CalendarInviteBanner";
 import { EventReminderMessageBody } from "./EventReminderMessageBody";
@@ -37,6 +38,7 @@ import {
   type MailSkin,
 } from "@workspace/native-core/components/mail/mail-ui";
 import { useMailDisplaySettings } from "../../hooks/use-mail-settings";
+import { useMailLinkPress } from "../../hooks/use-mail-link-press";
 
 type MailMessageBodyProps = {
   messageId: string;
@@ -70,10 +72,11 @@ export function MailMessageBody({
   } = calendar;
   const { decryptError, decryptResult, htmlContent, plainContent } = content;
   const { settings: displaySettings, addTrustedSender } = useMailDisplaySettings();
+  const onLinkPress = useMailLinkPress();
   const [loadedMessageId, setLoadedMessageId] = useState<string | null>(null);
   const senderEmail = content.message?.from?.[0]?.email ?? null;
   const emailIsDark = isDark && resolveMailContentIsDark(displaySettings) && !showOriginalLook;
-  const hasRemoteContent = emailHtmlHasRemoteContent({
+  const { hasRemoteContent, trackers } = analyzeEmailHtml({
     html: htmlContent ?? "",
     isDark: emailIsDark,
     blockTrackingPixels: displaySettings.blockTrackingPixels,
@@ -171,6 +174,7 @@ export function MailMessageBody({
       ) : htmlContent ? (
         <>
           {signatureBadge}
+          <MailTrackerRow trackers={trackers} />
           {remoteContent.prompt ? (
             <RemoteContentBanner
               theme={theme}
@@ -192,6 +196,7 @@ export function MailMessageBody({
             theme={theme}
             blockRemoteImages={remoteContent.blockRemoteImages}
             blockTrackingPixels={displaySettings.blockTrackingPixels}
+            onLinkPress={onLinkPress}
           />
         </>
       ) : plainContent ? (

@@ -123,9 +123,15 @@ export function MailDisplaySettingsContent() {
           <SheetGroup>
             <SheetSwitchItem
               label="Block tracking pixels"
-              detail="Remove tiny invisible tracker images from HTML email"
+              detail="Blocks known trackers and tiny tracking images."
               value={settings.blockTrackingPixels}
               onValueChange={(value) => updateSettings({ blockTrackingPixels: value })}
+            />
+            <SheetSwitchItem
+              label="Confirm links before opening"
+              detail="Shows where a link goes. Suspicious links always ask."
+              value={settings.confirmExternalLinks}
+              onValueChange={(value) => updateSettings({ confirmExternalLinks: value })}
             />
           </SheetGroup>
         </SheetSection>

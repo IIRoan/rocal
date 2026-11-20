@@ -1,4 +1,9 @@
-import { createNativeCryptoProvider } from "./native-crypto-provider";
+import { loadQuickCrypto } from "./load-quick-crypto";
+import { createNativeCryptoProvider, nativeArgon2id } from "./native-crypto-provider";
+
+jest.mock("./load-quick-crypto", () => ({ loadQuickCrypto: jest.fn() }));
+
+const mockLoadQuickCrypto = jest.mocked(loadQuickCrypto);
 
 jest.mock("react-native", () => ({
   Platform: { OS: "ios" },
@@ -61,5 +66,32 @@ describe("createNativeCryptoProvider", () => {
       ]),
     ).resolves.toBe("native-key");
     expect(subtle.generateKey).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("nativeArgon2id", () => {
+  const params = { memoryKiB: 65536, passes: 3, parallelism: 4 };
+
+  it("derives 32 bytes with quick-crypto's argon2Sync and the envelope's parameters", async () => {
+    const argon2Sync = jest.fn(() => new Uint8Array(32).fill(7));
+    mockLoadQuickCrypto.mockReturnValue({ argon2Sync });
+    const password = new Uint8Array([1]);
+    const salt = new Uint8Array(16);
+
+    await expect(nativeArgon2id(password, salt, params)).resolves.toEqual(new Uint8Array(32).fill(7));
+    expect(argon2Sync).toHaveBeenCalledWith("argon2id", {
+      message: password,
+      nonce: salt,
+      memory: 65536,
+      passes: 3,
+      parallelism: 4,
+      tagLength: 32,
+    });
+  });
+
+  it("throws without argon2Sync instead of falling back to JavaScript", async () => {
+    mockLoadQuickCrypto.mockReturnValue({});
+
+    await expect(nativeArgon2id(new Uint8Array([1]), new Uint8Array(16), params)).rejects.toThrow("Argon2id");
   });
 });

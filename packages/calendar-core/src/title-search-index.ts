@@ -4,6 +4,11 @@ import {
   tokenizeSearchQuery,
 } from "./mail-search-relevance";
 import { isBodyOnlyMatch, mailBodySnippet } from "./mail-body-index";
+import {
+  filterEventsBySearchOperators,
+  type CalendarSearchContext,
+} from "./calendar-search-filter";
+import type { ParsedSearchQuery } from "./search-query";
 import type { CalendarEvent } from "./types";
 import type {
   UnifiedCalendarSearchResult,
@@ -227,16 +232,7 @@ export function scoreTitleIndexDocument(
   };
 }
 
-export function searchTitleIndex(
-  documents: TitleIndexDocument[],
-  query: string,
-  limit: number,
-): TitleIndexHit[] {
-  const hits = documents.flatMap((document) => {
-    const scored = scoreTitleIndexDocument(document, query);
-    return scored ? [scored] : [];
-  });
-
+function rankTitleIndexHits(hits: TitleIndexHit[], limit: number): TitleIndexHit[] {
   return hits
     .sort((left, right) => {
       if (right.score !== left.score) return right.score - left.score;
@@ -247,20 +243,60 @@ export function searchTitleIndex(
     .slice(0, Math.max(limit, 0));
 }
 
-/** Scores decrypted events in memory like index documents, descriptions included, so search words never leave the device. */
-export function searchCalendarEvents(
-  events: CalendarEvent[],
+function scoreTitleIndexDocuments(
+  documents: TitleIndexDocument[],
+  query: string,
+): TitleIndexHit[] {
+  return documents.flatMap((document) => {
+    const scored = scoreTitleIndexDocument(document, query);
+    return scored ? [scored] : [];
+  });
+}
+
+export function searchTitleIndex(
+  documents: TitleIndexDocument[],
   query: string,
   limit: number,
+): TitleIndexHit[] {
+  return rankTitleIndexHits(scoreTitleIndexDocuments(documents, query), limit);
+}
+
+function containsPhrases(event: CalendarEvent, phrases: string[]): boolean {
+  const fields = [event.title, event.location, event.description].map((value) =>
+    normalizeSearchText(value ?? ""),
+  );
+  return phrases.every((phrase) => fields.some((field) => field.includes(phrase)));
+}
+
+/** Filters and scores decrypted events in memory like index documents, descriptions included, so search words never leave the device. */
+export function searchCalendarEvents(
+  events: CalendarEvent[],
+  query: ParsedSearchQuery,
+  limit: number,
+  context?: CalendarSearchContext,
 ): UnifiedCalendarSearchResult[] {
-  const eventsById = new Map(events.map((event) => [event.id, event]));
-  const documents = events.flatMap((event) => {
+  const text = query.terms.join(" ");
+  if (!text && query.operators.length === 0) return [];
+  const filtered = filterEventsBySearchOperators(events, query.operators, context);
+  const phrases = query.terms
+    .filter((term) => /\s/.test(term))
+    .map(normalizeSearchText);
+  const eventsById = new Map(filtered.map((event) => [event.id, event]));
+  const documents = filtered.flatMap((event) => {
     const document = eventToTitleIndexDocument(event);
     const description = event.description?.trim();
-    if (!document) return [];
+    if (!document || !containsPhrases(event, phrases)) return [];
     return [description ? { ...document, body: description } : document];
   });
-  return searchTitleIndex(documents, query, limit).flatMap((hit) => {
+  const hits = text
+    ? scoreTitleIndexDocuments(documents, text)
+    : documents.map((document): TitleIndexHit => ({
+        document,
+        score: 1,
+        matchedFields: [],
+        snippet: document.subtitle,
+      }));
+  return rankTitleIndexHits(hits, limit).flatMap((hit) => {
     const result = titleHitToUnifiedResult(hit);
     const event = eventsById.get(hit.document.eventId ?? "");
     return result.source === "calendar" && event ? [{ ...result, event }] : [];

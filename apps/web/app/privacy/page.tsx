@@ -170,10 +170,11 @@ export default function PrivacyPage() {
             Connections to Solace use TLS.
           </p>
           <p className="mt-3">
-            Keep your password safe. Solace does not reset passwords from the
-            sign-in screen; if you forget yours, email support from a different
-            address. Without your password, no one, including Solace, can open
-            your encrypted content.
+            Keep your password safe. If you forget it, your recovery kit resets
+            it: the kit&apos;s key opens your existing keys on your device, so
+            your content stays readable, and Solace stores only a hash of a key
+            derived from it. Without your password or your recovery kit, no
+            one, including Solace, can open your encrypted content.
           </p>
         </div>
 
@@ -333,7 +334,7 @@ function PrivacyOverview() {
       >
         Overview
       </h2>
-      <p className="mt-2">Last updated 3 November 2026.</p>
+      <p className="mt-2">Last updated 19 November 2026.</p>
       <p className="mt-3">
         This policy covers the Solace website and the Solace Calendar and
         Solace Mail apps. Solace is run by Roan van Westerop, the controller
@@ -473,14 +474,14 @@ function PrivacyRights({ contact }: { contact: string | null }) {
 
 const SUBPROCESSORS: ReadonlyArray<readonly [string, string, string]> = [
   [
-    "Railway Corporation",
-    "United States; your data is stored in the Netherlands",
-    "Hosts the API, databases, mail storage, notification worker and profile pictures",
+    "Webdock.io ApS",
+    "Denmark, where your data is stored",
+    "Hosts the API, databases, mail storage, notification worker and profile pictures, and runs the relay servers that send and receive internet mail; their connection and delivery logs include IP and email addresses",
   ],
   [
-    "Webdock.io ApS",
-    "Denmark",
-    "Runs the relay server that sends and receives internet mail; its connection and delivery logs include IP and email addresses",
+    "Cloudflare, Inc.",
+    "United States",
+    "Routes connections to the API and mail server and decrypts them in transit, so it sees IP addresses and request details; end-to-end encrypted content stays encrypted",
   ],
   ["Vercel Inc.", "United States", "Serves the website"],
   [

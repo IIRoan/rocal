@@ -42,6 +42,8 @@ export const SECURE_STORE_KEYS = {
   E2EE_DEVICE_KEYS: "E2EE_DEVICE_KEYS",
   /** Salt of the password envelope known to hold this device's account key; without it sign-out keeps the key. */
   E2EE_ENVELOPE_SALT: "E2EE_ENVELOPE_SALT",
+  /** User id whose events are all bound to their row ids, so unbound event content is refused; cleared on sign-out. */
+  E2EE_EVENT_CONTENT_BOUND: "E2EE_EVENT_CONTENT_BOUND",
   PUSH_TOKEN: "PUSH_TOKEN",
   THEME_PREFERENCE: "THEME_PREFERENCE",
   /** Login password persisted for mail vault decryption. Cleared on sign-out. */

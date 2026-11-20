@@ -11,4 +11,3 @@ curl -fsSL --retry 3 --max-time 180 \
 printf '28807a1b3caf08d1d6805d61dcc05fe5638747aa85782ccb9e57912b9fc91910  %s\n' "$stalwart_download" | sha256sum -c -
 install -m755 "$stalwart_download" /usr/local/bin/stalwart
 test "$(/usr/local/bin/stalwart --version)" = "$upstream_version"
-setcap 'cap_net_bind_service=+ep' /usr/local/bin/stalwart

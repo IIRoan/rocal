@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::common::{CalendarId, EventId, Timestamp};
-use crate::events::{InvitationContent, ParticipantInput};
+use crate::events::{InvitationContent, ParticipantInput, TrashedEventId};
 
 /// The JSON object stored (as text) in `calendar_event.recurrence`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -112,6 +112,10 @@ pub struct EditRecurringRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(nullable = false)]
     pub occurrence_date: Option<String>,
+    /// The row id a `this_only` or `this_and_future` child takes, which its new content is bound to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub new_event_id: Option<EventId>,
     pub updates: RecurringUpdates,
 }
 
@@ -187,4 +191,8 @@ pub struct RecurringDeleted {
     pub deleted_event_id: EventId,
     /// `delete_occurrence`, `delete_future` or `delete_all`.
     pub action: String,
+    /// Set when `delete_all` moved the series to the trash.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(nullable = false)]
+    pub trash_id: Option<TrashedEventId>,
 }

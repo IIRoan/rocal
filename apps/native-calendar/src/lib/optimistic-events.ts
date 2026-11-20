@@ -1,4 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
+import { invalidateEventRangesTouching } from "@workspace/calendar-client/use-event-trash";
 import type {
   CalendarEvent,
   EventsResponse,
@@ -89,7 +90,7 @@ function cancelLoadedEventQueries(queryClient: QueryClient): Promise<void> {
   });
 }
 
-function parseEventsQueryRange(
+export function parseEventsQueryRange(
   queryKey: readonly unknown[],
 ): { start: Date; end: Date } | null {
   const [, startISO, endISO] = queryKey as [string, string, string];
@@ -267,17 +268,7 @@ export function invalidateEventRanges(
   queryClient: QueryClient,
   event: Pick<CalendarEvent, "start" | "end" | "recurrence">,
 ): Promise<void> {
-  const eventStart = new Date(event.start);
-  return queryClient.invalidateQueries({
-    queryKey: QUERY_KEYS.eventsRoot(),
-    predicate: (query) => {
-      const range = parseEventsQueryRange(query.queryKey);
-      if (!range) return true;
-      return event.recurrence
-        ? range.end > eventStart
-        : eventOverlapsRange(event, range.start, range.end);
-    },
-  });
+  return invalidateEventRangesTouching(queryClient, event, parseEventsQueryRange);
 }
 
 /** Builds a range from loaded ranges that fully cover it, so a new timeline page renders without a fetch. */

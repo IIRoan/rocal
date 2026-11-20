@@ -9,6 +9,7 @@ module.exports = {
       { configFile: require.resolve("../../babel.config.cts") },
     ],
   },
+  transformIgnorePatterns: ["/node_modules/(?!@noble/hashes/)"],
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
   moduleNameMapper: {
     "^(\\.{1,2}/.*)\\.js$": "$1",

@@ -137,9 +137,6 @@ jobs:
           - image: stalwart
             context: apps/stalwart
             dockerfile: apps/stalwart/Dockerfile
-          - image: gatus
-            context: apps/gatus
-            dockerfile: apps/gatus/Dockerfile
 
     steps:
       - name: Checkout

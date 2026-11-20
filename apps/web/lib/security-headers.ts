@@ -17,11 +17,22 @@ function toOrigin(value: string | undefined): string | null {
   }
 }
 
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+function isLoopbackHttp(origin: string | null): boolean {
+  if (!origin) return false;
+  const url = new URL(origin);
+  return url.protocol === "http:" && LOOPBACK_HOSTS.has(url.hostname);
+}
+
 function unique(values: Array<string | null>): string[] {
   return Array.from(new Set(values.filter((value): value is string => Boolean(value))));
 }
 
-export function buildContentSecurityPolicy(env: SecurityHeaderEnv): string {
+export function buildContentSecurityPolicy(
+  env: SecurityHeaderEnv,
+  { allowHttpsFormActions = false }: { allowHttpsFormActions?: boolean } = {},
+): string {
   const isDev = env.NODE_ENV === "development";
   const apiOrigin = toOrigin(env.NEXT_PUBLIC_API_URL);
 
@@ -32,6 +43,8 @@ export function buildContentSecurityPolicy(env: SecurityHeaderEnv): string {
       // wasm-unsafe-eval: hash-wasm (argon2id vault KDF). unsafe-eval only for React dev tooling.
       ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", ...(isDev ? ["'unsafe-eval'"] : [])],
     ],
+    // Inline event handlers stay blocked even though Next's inline RSC scripts need 'unsafe-inline'.
+    ["script-src-attr", ["'none'"]],
     // Inline styles come from React, next/font, and mail HTML in the srcdoc reader frame.
     ["style-src", ["'self'", "'unsafe-inline'"]],
     // https: covers avatar URLs and opted-in mail images; the reader frame's CSP still blocks them.
@@ -55,12 +68,14 @@ export function buildContentSecurityPolicy(env: SecurityHeaderEnv): string {
     ["frame-src", ["'self'"]],
     ["object-src", ["'none'"]],
     ["base-uri", ["'self'"]],
-    ["form-action", unique(["'self'", apiOrigin])],
+    // Only /mail/link posts out: the RFC 8058 one-click unsubscribe form to the list sender.
+    ["form-action", unique(["'self'", apiOrigin, allowHttpsFormActions ? "https:" : null])],
     ["frame-ancestors", ["'none'"]],
   ];
 
   const policy = directives.map(([name, sources]) => `${name} ${sources.join(" ")}`);
-  if (!isDev) policy.push("upgrade-insecure-requests");
+  // An http loopback API (the web E2E stack) cannot be upgraded; deployed APIs are https.
+  if (!isDev && !isLoopbackHttp(apiOrigin)) policy.push("upgrade-insecure-requests");
   return policy.join("; ");
 }
 
@@ -100,5 +115,17 @@ function buildBaseHeaders(env: SecurityHeaderEnv): Header[] {
 
 /** Entries for `headers()` in next.config.ts. Later entries override earlier keys. */
 export function buildSecurityHeaderRoutes(env: SecurityHeaderEnv) {
-  return [{ source: "/:path*", headers: buildBaseHeaders(env) }];
+  return [
+    { source: "/:path*", headers: buildBaseHeaders(env) },
+    {
+      source: "/mail/link",
+      headers: [
+        { key: "Referrer-Policy", value: "no-referrer" },
+        {
+          key: "Content-Security-Policy",
+          value: buildContentSecurityPolicy(env, { allowHttpsFormActions: true }),
+        },
+      ],
+    },
+  ];
 }

@@ -116,7 +116,7 @@ async fn change_password_replaces_the_hash_and_mails_a_confirmation() {
     let text = text_body(&message);
     assert!(text.contains(&format!("Hi {},", user.name)), "{text}");
     assert!(
-        text.contains("This is a confirmation that your Solace password was changed."),
+        text.contains("The password for your Solace account was changed."),
         "{text}"
     );
     assert!(
@@ -375,6 +375,50 @@ async fn change_password_stores_the_envelope_for_the_new_password_with_it() {
         Some(new_salt.as_str())
     );
     assert_eq!(sign_in_status(&app, &user.email, &changed).await, 200);
+
+    let argon_salt = fake_token();
+    let mut argon = envelope(&argon_salt);
+    argon["kdfAlgorithm"] = json!("Argon2id");
+    argon["kdfIterations"] = json!(3);
+    argon["kdfMemoryKiB"] = json!(65_536);
+    argon["kdfParallelism"] = json!(4);
+    let again = format!("solace-test-{}", hex(8));
+    let response = ok(user
+        .post(
+            "/api/auth/change-password",
+            json!({
+                "currentPassword": changed,
+                "newPassword": again,
+                "passwordEnvelope": argon,
+                "revokeOtherSessions": true,
+            }),
+        )
+        .await
+        .expect_status(200)
+        .and_then(|r| r.value()));
+    assert_eq!(response["envelopeStored"], json!(true));
+    let bootstrap = ok(user
+        .get("/api/e2ee/bootstrap")
+        .await
+        .expect_status(200)
+        .and_then(|r| r.value()));
+    let stored = &bootstrap["passwordEnvelope"];
+    assert_eq!(
+        (
+            &stored["kdfAlgorithm"],
+            &stored["kdfSalt"],
+            &stored["kdfIterations"],
+            &stored["kdfMemoryKiB"],
+            &stored["kdfParallelism"]
+        ),
+        (
+            &json!("Argon2id"),
+            &json!(argon_salt),
+            &json!(3),
+            &json!(65_536),
+            &json!(4)
+        )
+    );
 }
 
 #[tokio::test]

@@ -1,4 +1,10 @@
-import { decodeHtmlEntities } from "./html-text";
+import { decodeHtmlEntities, stripHtmlTags } from "./html-text";
+import { getLinkHost, stripTrackingParams } from "./mail-links";
+import {
+  matchKnownTracker,
+  normalizeMailImageUrl,
+  type EmailTrackerSummary,
+} from "./mail-trackers";
 import {
   decodeCssEscapes,
   sanitizeUntrustedEmailHtml,
@@ -11,6 +17,8 @@ export interface ProcessEmailHtmlOptions {
   blockRemoteImages?: boolean;
   /** Dark canvas that email whites are translated onto; defaults to the reader canvas. */
   canvasColor?: string;
+  /** Returns a replacement href for a link (shown originals go in `title`), or null to keep it. */
+  rewriteLink?: (link: { href: string; text: string }) => string | null;
 }
 
 export interface BuildEmailHtmlDocumentOptions {
@@ -255,23 +263,46 @@ function darkenEmailColors(html: string, canvasLightness: number): string {
     );
 }
 
-export function processEmailHtml({
-  html,
-  isDark,
-  blockTrackingPixels,
-  blockRemoteImages = false,
-  canvasColor,
-}: ProcessEmailHtmlOptions): string {
+export function processEmailHtml(options: ProcessEmailHtmlOptions): string {
+  return processEmailHtmlInternal(options);
+}
+
+/** `onBlockedTracker` gets the host of each remote tracker removed: a known endpoint of any size, or a tiny remote image. */
+function processEmailHtmlInternal(
+  {
+    html,
+    isDark,
+    blockTrackingPixels,
+    blockRemoteImages = false,
+    canvasColor,
+    rewriteLink,
+  }: ProcessEmailHtmlOptions,
+  onBlockedTracker?: (host: string) => void,
+): string {
   // The transforms below run on sanitized markup, where every `<` starts a closed tag, so hostile input cannot make their regexes quadratic.
   let processed = sanitizeUntrustedEmailHtml(extractBodyHtml(html), { profile: "reader" });
 
   if (blockTrackingPixels || blockRemoteImages) {
-    processed = processed.replace(/<img\b[^>]*>/gi, (tag) => {
-      if (blockRemoteImages && isRemoteImageTag(tag)) return "";
-      if (blockTrackingPixels && isTrackingPixelTag(tag)) return "";
+    processed = processed.replace(IMG_TAG_PATTERN, (tag, attributes: string) => {
+      const src = attributeValueOf(attributes, "src");
+      if (blockTrackingPixels) {
+        const knownHost = matchKnownTracker(src);
+        if (knownHost || isTrackingPixelTag(tag)) {
+          const host = knownHost ?? (isRemoteUrl(src) ? getLinkHost(normalizeMailImageUrl(src)) : null);
+          if (host) onBlockedTracker?.(host);
+          return "";
+        }
+      }
+      if (blockRemoteImages && isRemoteUrl(src)) return "";
       return tag;
     });
   }
+
+  if (blockTrackingPixels) {
+    processed = stripMarkupCssTrackers(processed, onBlockedTracker);
+  }
+
+  processed = rewriteEmailAnchors(processed, rewriteLink);
 
   if (isDark && !DARK_SCHEME_PATTERN.test(html)) {
     processed = darkenEmailColors(processed, canvasLightnessOf(canvasColor));
@@ -281,6 +312,71 @@ export function processEmailHtml({
 
   // Always last: nothing after this point may reintroduce untrusted markup.
   return sanitizeUntrustedEmailHtml(processed, { profile: "reader" });
+}
+
+const ANCHOR_TAG_PATTERN =
+  /<(\/?)a((?:\s+[^\s"'>/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+))?)*)\s*\/?>/gi;
+const LINK_TEXT_MAX_LENGTH = 512;
+const LINK_TITLE_MAX_LENGTH = 200;
+
+function escapeAttributeValue(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/** Browsers keep `&name=` literal inside attributes, so a query key such as `&tab=` must not decode to a tab. */
+function decodeAttributeUrl(raw: string): string {
+  return decodeHtmlEntities(raw.replace(/&(?=[a-z]+[=0-9])/gi, "&amp;"));
+}
+
+function linkText(html: string): string {
+  return decodeHtmlEntities(stripHtmlTags(html)).replace(/\s+/g, " ").trim().slice(0, LINK_TEXT_MAX_LENGTH);
+}
+
+type EmailLinkRewrite = ProcessEmailHtmlOptions["rewriteLink"];
+
+/** Tracking parameters always go; a rewrite also moves the original href into `title`, since hover would show only the replacement. */
+function rewriteAnchorAttributes(
+  attributes: string,
+  readText: () => string,
+  rewriteLink: EmailLinkRewrite,
+): string | null {
+  const parsed = [...attributes.matchAll(ATTRIBUTE_PATTERN)].map((attribute) => ({
+    name: (attribute[1] ?? "").toLowerCase(),
+    value: decodeAttributeUrl(attribute[2] ?? attribute[3] ?? attribute[4] ?? ""),
+  }));
+  const href = parsed.find((attribute) => attribute.name === "href")?.value;
+  if (href === undefined) return null;
+  const stripped = stripTrackingParams(href);
+  const replacement = rewriteLink ? rewriteLink({ href: stripped, text: readText() }) : null;
+  if (replacement === null && stripped === href) return null;
+  const rewritten = replacement === null
+    ? parsed.map((attribute) => (attribute.name === "href" ? { name: "href", value: stripped } : attribute))
+    : [
+        ...parsed.filter((attribute) => attribute.name !== "href" && attribute.name !== "title"),
+        { name: "href", value: replacement },
+        { name: "title", value: stripped.slice(0, LINK_TITLE_MAX_LENGTH) },
+      ];
+  return rewritten
+    .map((attribute) => ` ${attribute.name}="${escapeAttributeValue(attribute.value)}"`)
+    .join("");
+}
+
+/** One scan records every anchor tag and link text runs to the next one, so an unclosed `<a>` cannot make this quadratic. */
+function rewriteEmailAnchors(html: string, rewriteLink: EmailLinkRewrite): string {
+  const tags = [...html.matchAll(ANCHOR_TAG_PATTERN)];
+  let out = "";
+  let last = 0;
+  tags.forEach((match, index) => {
+    out += html.slice(last, match.index);
+    last = match.index + match[0].length;
+    const textEnd = tags[index + 1]?.index ?? html.length;
+    const textStart = last;
+    const attributes = match[1]
+      ? null
+      : rewriteAnchorAttributes(match[2] ?? "", () => linkText(html.slice(textStart, textEnd)), rewriteLink);
+    out += attributes === null ? match[0] : `<a${attributes}>`;
+  });
+  return out + html.slice(last);
 }
 
 /** Remote images are allowed only once the user opted in for this message or sender. */
@@ -347,18 +443,18 @@ function extractBodyHtml(html: string): string {
   return headStyles.join("") + body;
 }
 
-function isRemoteImageTag(tag: string): boolean {
-  return isRemoteUrl(decodeHtmlEntities(getAttribute(tag, "src") ?? ""));
+/** The first attribute named exactly `name`, decoded; `data-src` and friends never count as `src`. */
+function attributeValueOf(attributes: string, name: string): string {
+  for (const attribute of attributes.matchAll(ATTRIBUTE_PATTERN)) {
+    if ((attribute[1] ?? "").toLowerCase() === name) {
+      return decodeHtmlEntities(attribute[2] ?? attribute[3] ?? attribute[4] ?? "");
+    }
+  }
+  return "";
 }
 
-/** Browsers ignore whitespace/control chars in URLs and read `\` as `/`, so normalize the same way. */
 function isRemoteUrl(value: string): boolean {
-  const normalized = value
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\x00-\x20\x7f-\x9f]+/g, "")
-    .replace(/\\/g, "/")
-    .toLowerCase();
-  return /^(?:https?:|\/\/)/.test(normalized);
+  return /^https?:/i.test(normalizeMailImageUrl(value));
 }
 
 /** `@import` and `@font-face` stay blocked by the style-src/font-src policy, so only image URLs count. */
@@ -366,11 +462,11 @@ function cssHasRemoteUrl(css: string): boolean {
   const normalized = decodeCssEscapes(css)
     .replace(/@import[^;]*;?/gi, "")
     .replace(/@font-face\s*\{[^}]*(?:\}|$)/gi, "");
-  for (const match of normalized.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)]*))\s*(?:\)|$)/gi)) {
+  for (const match of normalized.matchAll(CSS_URL_PATTERN)) {
     if (isRemoteUrl(match[1] ?? match[2] ?? match[3] ?? "")) return true;
   }
-  for (const imageSet of normalized.matchAll(/image-set\(([^)]*)(?:\)|$)/gi)) {
-    for (const match of (imageSet[1] ?? "").matchAll(/"([^"]*)"|'([^']*)'/g)) {
+  for (const imageSet of normalized.matchAll(CSS_IMAGE_SET_PATTERN)) {
+    for (const match of (imageSet[1] ?? "").matchAll(CSS_STRING_PATTERN)) {
       if (isRemoteUrl(match[1] ?? match[2] ?? "")) return true;
     }
   }
@@ -378,12 +474,78 @@ function cssHasRemoteUrl(css: string): boolean {
 }
 
 const STYLE_BLOCK_PATTERN = /<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi;
+const CSS_URL_PATTERN = /url\(\s*(?:"([^"]*)"|'([^']*)'|([^)]*))\s*(?:\)|$)/gi;
+const CSS_IMAGE_SET_PATTERN = /image-set\(([^)]*)(?:\)|$)/gi;
+const CSS_STRING_PATTERN = /"([^"]*)"|'([^']*)'/g;
+
+/** Known trackers in `url()`/`image-set()` become `none`, read with escapes decoded as the browser fetches them; untouched CSS is returned as is. */
+function stripCssTrackers(css: string, onBlockedTracker?: (host: string) => void): string {
+  let found = false;
+  const strip = (token: string, url: string): string => {
+    const host = matchKnownTracker(url);
+    if (!host) return token;
+    found = true;
+    onBlockedTracker?.(host);
+    return "none";
+  };
+  const stripped = decodeCssEscapes(css)
+    .replace(CSS_URL_PATTERN, (token, double?: string, single?: string, bare?: string) => strip(token, double ?? single ?? bare ?? ""))
+    .replace(CSS_IMAGE_SET_PATTERN, (imageSet) =>
+      imageSet.replace(CSS_STRING_PATTERN, (token, double?: string, single?: string) => strip(token, double ?? single ?? "")),
+    );
+  // Decoding can turn `\3c ` back into `<`, which must not reach markup as a tag.
+  return found ? stripped.replace(/</g, "\\3c ") : css;
+}
+const IMG_TAG_PATTERN =
+  /<img\b((?:\s+[^\s"'>/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+))?)*)\s*\/?>/gi;
 const TAG_PATTERN =
   /<([a-z][a-z0-9-]*)((?:\s+[^\s"'>/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+))?)*)\s*\/?>/gi;
 const ATTRIBUTE_PATTERN = /([^\s"'>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g;
 const BACKGROUND_ATTRIBUTE_TAGS = new Set([
   "table", "thead", "tbody", "tfoot", "tr", "td", "th",
 ]);
+
+/** Repeats until stable, so no rewrite can leave a tracker that another pass would still find. */
+function stripMarkupCssTrackers(html: string, onBlockedTracker?: (host: string) => void): string {
+  let previous: string;
+  let current = html;
+  do {
+    previous = current;
+    current = stripMarkupCssTrackersOnce(previous, onBlockedTracker);
+  } while (current !== previous);
+  return current;
+}
+
+function stripMarkupCssTrackersOnce(html: string, onBlockedTracker?: (host: string) => void): string {
+  let previous: string;
+  let current = html;
+  do {
+    previous = current;
+    current = previous.replace(STYLE_BLOCK_PATTERN, (block, css: string) =>
+      block.replace(css, () => stripCssTrackers(css, onBlockedTracker)),
+    );
+  } while (current !== previous);
+  return current
+    .replace(TAG_PATTERN, (tag, name: string, attributes: string) => {
+      let changed = false;
+      const kept = [...attributes.matchAll(ATTRIBUTE_PATTERN)].flatMap((attribute) => {
+        const attributeName = (attribute[1] ?? "").toLowerCase();
+        const value = decodeHtmlEntities(attribute[2] ?? attribute[3] ?? attribute[4] ?? "");
+        const knownHost =
+          attributeName === "background" && BACKGROUND_ATTRIBUTE_TAGS.has(name.toLowerCase()) ? matchKnownTracker(value) : null;
+        if (knownHost) {
+          onBlockedTracker?.(knownHost);
+          changed = true;
+          return [];
+        }
+        const css = attributeName === "style" ? stripCssTrackers(value, onBlockedTracker) : value;
+        if (css === value) return [` ${attribute[0]}`];
+        changed = true;
+        return [` style="${escapeAttributeValue(css)}"`];
+      });
+      return changed ? `<${name}${kept.join("")}>` : tag;
+    });
+}
 
 function sanitizedHtmlHasRemoteContent(html: string): boolean {
   for (const block of html.matchAll(STYLE_BLOCK_PATTERN)) {
@@ -405,14 +567,17 @@ function sanitizedHtmlHasRemoteContent(html: string): boolean {
   return false;
 }
 
-/** True when the rendered message would fetch http(s) content once the user allows remote content. */
-export function emailHtmlHasRemoteContent(
-  options: Omit<ProcessEmailHtmlOptions, "blockRemoteImages">,
-): boolean {
-  if (!options.html.trim()) return false;
-  return sanitizedHtmlHasRemoteContent(
-    processEmailHtml({ ...options, blockRemoteImages: false }),
-  );
+/** One sanitize pass: whether the message would fetch http(s) content once allowed, and the trackers that stay blocked regardless. */
+export function analyzeEmailHtml(
+  options: Omit<ProcessEmailHtmlOptions, "blockRemoteImages" | "rewriteLink">,
+): { hasRemoteContent: boolean; trackers: EmailTrackerSummary } {
+  if (!options.html.trim()) return { hasRemoteContent: false, trackers: { count: 0, hosts: [] } };
+  const hosts: string[] = [];
+  const processed = processEmailHtmlInternal({ ...options, blockRemoteImages: false }, (host) => hosts.push(host));
+  return {
+    hasRemoteContent: sanitizedHtmlHasRemoteContent(processed),
+    trackers: { count: hosts.length, hosts: [...new Set(hosts)].sort() },
+  };
 }
 
 function isTrackingPixelTag(tag: string): boolean {

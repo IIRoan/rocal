@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   canCurrentUserDeleteEvent,
   canCurrentUserEditEvent,
-  isCancelledCalendarEvent,
+  getEventDeleteConfirmCopy,
 } from "@workspace/calendar-core";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
 import { useIsMobile } from "@workspace/ui/hooks/use-mobile";
@@ -17,7 +17,6 @@ import { useCategories } from "@/hooks/use-categories";
 import { useEventForm } from "@/hooks/use-event-form";
 import {
   buildEventEditorEncryptionPreview,
-  getEventDeleteConfirmCopy,
   isRecurringEventDeleteCandidate,
 } from "@/lib/event-editor-view-model";
 import { getActiveE2eeSession } from "@/lib/e2ee-session";
@@ -139,6 +138,7 @@ export function EventEditor({
       eventToEdit.id &&
       initialEventViewMode === "edit" &&
       !eventToEdit.isSynced &&
+      !eventToEdit.contentUnavailable &&
       canEditEvent
     ) {
       setEventViewMode("edit");
@@ -310,10 +310,7 @@ export function EventEditor({
             <EventConfirmDialog
               open={showDeleteConfirm}
               onOpenChange={setShowDeleteConfirm}
-              {...getEventDeleteConfirmCopy(
-                selectedEvent.title,
-                !canEditSelectedEvent && isCancelledCalendarEvent(selectedEvent),
-              )}
+              {...getEventDeleteConfirmCopy(selectedEvent)}
               onConfirm={confirmEventDelete}
             />
             <RecurringScopeModal

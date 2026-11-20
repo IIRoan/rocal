@@ -61,22 +61,22 @@ export async function persistRecurringEventEdit(
   });
 }
 
+/** Resolves to the trash entry that can undo the delete, or null when it was permanent (one occurrence or the rest of a series). */
 export async function persistRecurringEventDelete(
   api: RecurringEventApi,
   { event, scope }: DeleteRecurringEventInput,
-): Promise<void> {
+): Promise<string | null> {
   const target = resolveRecurringEventTarget(event);
   if (!target) {
-    await api.deleteEvent(event.id);
-    return;
+    return (await api.deleteEvent(event.id)).trashId ?? null;
   }
   if (scope === "this_only" && target.detachedEventId) {
-    await api.deleteEvent(target.detachedEventId);
-    return;
+    return (await api.deleteEvent(target.detachedEventId)).trashId ?? null;
   }
-  await api.deleteRecurringEvent(
+  const deleted = await api.deleteRecurringEvent(
     target.parentEventId,
     scope,
     scope === "all" ? undefined : target.occurrenceDate,
   );
+  return deleted.trashId ?? null;
 }

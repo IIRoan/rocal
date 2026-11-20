@@ -2,6 +2,7 @@ import { useId, type ComponentType } from "react";
 import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
 import { ChevronRight, Search } from "lucide-react";
+import { CALENDAR_SEARCH_OPERATOR_HINT } from "@workspace/calendar-core";
 
 import type { UseCommandPaletteSearchResult } from "@/hooks/use-command-palette-search";
 import { getCommandPaletteListLength } from "@/lib/command-palette-interactions";
@@ -21,6 +22,9 @@ function SearchOnlyEmptyState({ debouncedQuery }: { debouncedQuery: string }) {
           ? `No mail or calendar results found for "${debouncedQuery}"`
           : "Type to search mail and calendar"}
       </p>
+      <p className="px-4 text-center text-xs text-muted-foreground">
+        {CALENDAR_SEARCH_OPERATOR_HINT}
+      </p>
     </div>
   );
 }
@@ -31,6 +35,9 @@ function SearchOnlyIntroState() {
       <Search className="size-8 text-muted-foreground/20" />
       <p className="text-sm text-muted-foreground">
         Search across your mail and calendar from one place
+      </p>
+      <p className="px-4 text-center text-xs text-muted-foreground">
+        {CALENDAR_SEARCH_OPERATOR_HINT}
       </p>
     </div>
   );
@@ -295,7 +302,10 @@ export function CommandPaletteMainSearchView({
               searchResults.length === 0 &&
               !searchLoading ? (
               <div className="px-3 py-4 text-center text-sm text-muted-foreground">
-                No mail or calendar results found for &quot;{debouncedQuery}&quot;
+                <p>
+                  No mail or calendar results found for &quot;{debouncedQuery}&quot;
+                </p>
+                <p className="mt-1 text-xs">{CALENDAR_SEARCH_OPERATOR_HINT}</p>
               </div>
             ) : !debouncedQuery.trim() ? (
               <p className="px-4 pt-1 pb-2 text-[11px] text-muted-foreground">

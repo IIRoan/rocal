@@ -22,4 +22,5 @@ export const SETTINGS_MAIL_ICONS: Record<SettingsMailId, FeatherIcon> = {
   composing: "edit-3",
   "mail-display": "eye",
   "mail-list": "list",
+  "auto-reply": "corner-up-left",
 };

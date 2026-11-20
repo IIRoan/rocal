@@ -110,10 +110,11 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.meta.outputs.matrix) }}
     env:
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       PROFILE: ${{ needs.meta.outputs.profile }}
     steps:
       - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: chainguard-actions/actions-setup-node@0fc7fd914070e07cca22606e4cab3cfeaf43711d # v6
@@ -145,36 +146,32 @@ jobs:
             --non-interactive \
             --output "$RUNNER_TEMP/solace.ipa" 2>&1 | sed -E -f "$GITHUB_WORKSPACE/scripts/eas-build-log.sed"
 
-      - name: Publish iOS artifact to R2
-        env:
-          S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
-          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
-          S3_BUCKET: ${{ secrets.S3_BUCKET }}
-          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
-          S3_REGION: ${{ secrets.S3_REGION }}
-          S3_PUBLIC_BASE_URL: ${{ secrets.S3_PUBLIC_BASE_URL }}
-          TITLE: ${{ matrix.name }} ${{ needs.meta.outputs.title_suffix }}
+      # PlistBuddy is macOS-only, so the bundle metadata travels with the .ipa to the publish job.
+      - name: Read iOS bundle metadata
         run: |
           set -euo pipefail
-          IPA_PATH="$RUNNER_TEMP/solace.ipa"
+          ARTIFACT_DIR="$RUNNER_TEMP/ios-artifact"
+          mkdir -p "$ARTIFACT_DIR"
+          mv "$RUNNER_TEMP/solace.ipa" "$ARTIFACT_DIR/solace.ipa"
 
           EXTRACT_DIR="$RUNNER_TEMP/ipa-extract"
           rm -rf "$EXTRACT_DIR"
           mkdir -p "$EXTRACT_DIR"
-          unzip -q -o "$IPA_PATH" -d "$EXTRACT_DIR" 'Payload/*.app/Info.plist'
+          unzip -q -o "$ARTIFACT_DIR/solace.ipa" -d "$EXTRACT_DIR" 'Payload/*.app/Info.plist'
           INFO_PLIST=$(echo "$EXTRACT_DIR"/Payload/*.app/Info.plist)
           BUNDLE_VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO_PLIST")
           test -n "$BUNDLE_VERSION"
           IOS_BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$INFO_PLIST")
           test -n "$IOS_BUNDLE_ID"
+          jq -n --arg bundleId "$IOS_BUNDLE_ID" --arg bundleVersion "$BUNDLE_VERSION" '{ bundleId: $bundleId, bundleVersion: $bundleVersion }' > "$ARTIFACT_DIR/ios-meta.json"
 
-          bun "${{ matrix.dir }}/scripts/internal-release/publish-ios.ts" \
-            --profile "$PROFILE" \
-            --ipa "$IPA_PATH" \
-            --bundle-id "$IOS_BUNDLE_ID" \
-            --bundle-version "$BUNDLE_VERSION" \
-            --title "$TITLE" \
-            --out-dir "$RUNNER_TEMP/r2-publish"
+      - uses: chainguard-actions/actions-upload-artifact@c91615377dcc230c6b156542d25044f9b8d80dd8 # v7.0.2
+        with:
+          name: ${{ matrix.app }}-ios
+          path: ${{ runner.temp }}/ios-artifact
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 1
 
   android:
     needs: [meta, checks]
@@ -186,12 +183,13 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.meta.outputs.matrix) }}
     env:
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       PROFILE: ${{ needs.meta.outputs.profile }}
       # Hosted runners OOM with Gradle's default heap on RN 0.86 builds.
       GRADLE_OPTS: -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8" -Dorg.gradle.parallel=true -Dorg.gradle.daemon=false
     steps:
       - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
+        with:
+          persist-credentials: false
 
       # The runner starts with about 19 GB free, which RN 0.86's native Android build now outgrows; these toolchains are unused here.
       - name: Free Android build storage
@@ -237,25 +235,18 @@ jobs:
             --non-interactive \
             --output "$RUNNER_TEMP/solace.apk"
 
-      - name: Publish Android artifact to R2
-        env:
-          S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
-          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
-          S3_BUCKET: ${{ secrets.S3_BUCKET }}
-          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
-          S3_REGION: ${{ secrets.S3_REGION }}
-          S3_PUBLIC_BASE_URL: ${{ secrets.S3_PUBLIC_BASE_URL }}
-        run: |
-          set -euo pipefail
-          bun "${{ matrix.dir }}/scripts/internal-release/publish-android.ts" \
-            --profile "$PROFILE" \
-            --apk "$RUNNER_TEMP/solace.apk" \
-            --out-dir "$RUNNER_TEMP/r2-publish"
+      - uses: chainguard-actions/actions-upload-artifact@c91615377dcc230c6b156542d25044f9b8d80dd8 # v7.0.2
+        with:
+          name: ${{ matrix.app }}-android
+          path: ${{ runner.temp }}/solace.apk
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 1
 
   publish:
     needs: [meta, ios, android]
-    # Publish whichever platform built; the page script skips missing artifacts.
-    if: always() && needs.meta.result == 'success' && (needs.ios.result == 'success' || needs.android.result == 'success')
+    # Publish every leg that built, even when a leg of either platform failed; a failed leg leaves no artifact.
+    if: ${{ !cancelled() && needs.meta.result == 'success' && (needs.ios.result != 'skipped' || needs.android.result != 'skipped') }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -265,6 +256,8 @@ jobs:
       TITLE: ${{ matrix.name }} ${{ needs.meta.outputs.title_suffix }}
     steps:
       - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: chainguard-actions/actions-setup-node@0fc7fd914070e07cca22606e4cab3cfeaf43711d # v6
@@ -278,7 +271,63 @@ jobs:
       - name: Install qrencode
         run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends qrencode
 
+      # A failed matrix leg leaves no artifact for its app; a fully successful platform must have one.
+      - name: Download iOS build
+        id: ios-build
+        if: needs.ios.result != 'skipped'
+        continue-on-error: ${{ needs.ios.result != 'success' }}
+        uses: chainguard-actions/actions-download-artifact@d0056a87e7a5e15c79b2dc00f9a66d1aaf86907d # v8.0.2
+        with:
+          name: ${{ matrix.app }}-ios
+          path: ${{ runner.temp }}/ios-artifact
+
+      - name: Publish iOS artifact to R2
+        if: steps.ios-build.outcome == 'success'
+        env:
+          S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_REGION: ${{ secrets.S3_REGION }}
+          S3_PUBLIC_BASE_URL: ${{ secrets.S3_PUBLIC_BASE_URL }}
+        run: |
+          set -euo pipefail
+          ARTIFACT_DIR="$RUNNER_TEMP/ios-artifact"
+          bun "${{ matrix.dir }}/scripts/internal-release/publish-ios.ts" \
+            --profile "$PROFILE" \
+            --ipa "$ARTIFACT_DIR/solace.ipa" \
+            --bundle-id "$(jq -r .bundleId "$ARTIFACT_DIR/ios-meta.json")" \
+            --bundle-version "$(jq -r .bundleVersion "$ARTIFACT_DIR/ios-meta.json")" \
+            --title "$TITLE" \
+            --out-dir "$RUNNER_TEMP/r2-publish"
+
+      - name: Download Android build
+        id: android-build
+        if: needs.android.result != 'skipped'
+        continue-on-error: ${{ needs.android.result != 'success' }}
+        uses: chainguard-actions/actions-download-artifact@d0056a87e7a5e15c79b2dc00f9a66d1aaf86907d # v8.0.2
+        with:
+          name: ${{ matrix.app }}-android
+          path: ${{ runner.temp }}/android-artifact
+
+      - name: Publish Android artifact to R2
+        if: steps.android-build.outcome == 'success'
+        env:
+          S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_REGION: ${{ secrets.S3_REGION }}
+          S3_PUBLIC_BASE_URL: ${{ secrets.S3_PUBLIC_BASE_URL }}
+        run: |
+          set -euo pipefail
+          bun "${{ matrix.dir }}/scripts/internal-release/publish-android.ts" \
+            --profile "$PROFILE" \
+            --apk "$RUNNER_TEMP/android-artifact/solace.apk" \
+            --out-dir "$RUNNER_TEMP/r2-publish"
+
       - name: Build combined install page + QR
+        if: steps.ios-build.outcome == 'success' || steps.android-build.outcome == 'success'
         env:
           S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
           S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
@@ -301,6 +350,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Send install QR to Discord
+        if: steps.ios-build.outcome == 'success' || steps.android-build.outcome == 'success'
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           EVENT_NAME: ${{ github.event_name }}

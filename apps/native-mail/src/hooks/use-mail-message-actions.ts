@@ -2,19 +2,26 @@ import { captureSessionDataScope } from "@workspace/native-core/lib/session-data
 import { useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import {
   getErrorMessage,
+  getMailUnsubscribePage,
   resolveAttachmentPreviewKind,
+  resolveMailAutoAdvanceTarget,
   resolveMarkAsReadDelayMs,
+  MAIL_UNSUBSCRIBE_LABELS,
   type MailAttachmentPreviewKind,
   type SimpleLoginActionMode,
 } from "@workspace/calendar-core";
 import { useToast } from "@workspace/native-core/providers/ToastProvider";
 import { useMailCompose } from "../providers/MailComposeProvider";
+import { useMailSelection } from "../providers/MailSelectionProvider";
+import { mailMessageRoute } from "../lib/mail-routes";
 import {
   releaseMarkAsReadSuppression,
   suppressMarkAsRead,
   useMailMutations,
+  useMailUnsubscribeAction,
   useSimpleLoginAliasAction,
 } from "../lib/mail/use-mail";
 import { isSpamMailboxRole } from "../lib/mail/mail-helpers";
@@ -45,7 +52,8 @@ export function useMailMessageActions({
   message: JmapEmailMessage | null;
   runtime: MailRuntime | undefined;
 }) {
-  const { back } = useRouter();
+  const { back, replace } = useRouter();
+  const { readerOrder, setReaderOrder } = useMailSelection();
   const { openCompose: presentCompose } = useMailCompose();
   const { toast } = useToast();
   const {
@@ -58,6 +66,7 @@ export function useMailMessageActions({
     setMessageLabel,
   } = useMailMutations(runtime, null);
   const simpleLoginAction = useSimpleLoginAliasAction(runtime);
+  const unsubscribeAction = useMailUnsubscribeAction(runtime);
   const { settings: listSettings, isLoaded: listSettingsLoaded } =
     useMailListSettings();
   const showMoveToast = useMailUndoToast(runtime);
@@ -145,6 +154,22 @@ export function useMailMessageActions({
     moveToMailbox.isPending;
 
   const scope = captureSessionDataScope();
+
+  /** Opens the next message in list order after the open one leaves, or returns to the list. */
+  const leaveAfterRemoval = (removedId: string) => {
+    const next = resolveMailAutoAdvanceTarget(
+      readerOrder,
+      [removedId],
+      removedId,
+      listSettings.autoAdvance,
+    );
+    setReaderOrder(readerOrder.filter((id) => id !== removedId));
+    if (next) {
+      replace(mailMessageRoute(next) as never);
+      return;
+    }
+    back();
+  };
 
   const cacheAttachment = (attachment: JmapAttachment, cacheKey: string) =>
     writeAttachmentToCache({
@@ -254,7 +279,7 @@ export function useMailMessageActions({
         } else {
           showMoveToast("Message moved to trash", snapshot);
         }
-        back();
+        leaveAfterRemoval(targetMessageId);
       },
       onError: (error) =>
         toast(
@@ -281,7 +306,7 @@ export function useMailMessageActions({
         onSuccess: (_data, _input, snapshot) => {
           setActiveSheetView(null);
           showMoveToast(successMessage, snapshot);
-          back();
+          leaveAfterRemoval(message.id);
         },
         onError: (error) =>
           toast(getErrorMessage(error, failureMessage), "error"),
@@ -345,6 +370,25 @@ export function useMailMessageActions({
     );
   };
 
+  const handleUnsubscribe = (target: JmapEmailMessage) => {
+    unsubscribeAction.mutate(target, {
+      onSuccess: (outcome) => {
+        if (outcome === "unsubscribed") toast(MAIL_UNSUBSCRIBE_LABELS.done, "success");
+      },
+      onError: (error) => {
+        const page = getMailUnsubscribePage(target);
+        const openPage = (url: string) => () => {
+          WebBrowser.openBrowserAsync(url).catch(() => undefined);
+        };
+        toast(
+          getErrorMessage(error, MAIL_UNSUBSCRIBE_LABELS.failed),
+          "error",
+          page ? { action: { label: MAIL_UNSUBSCRIBE_LABELS.openPage, onPress: openPage(page) } } : undefined,
+        );
+      },
+    });
+  };
+
   return {
     activeSheetView,
     setActiveSheetView,
@@ -376,6 +420,8 @@ export function useMailMessageActions({
     handleSetLabel,
     handleSimpleLoginAction,
     isSimpleLoginPending: simpleLoginAction.isPending,
+    handleUnsubscribe,
+    isUnsubscribePending: unsubscribeAction.isPending,
   };
 }
 

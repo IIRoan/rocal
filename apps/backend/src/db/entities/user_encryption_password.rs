@@ -23,6 +23,8 @@ pub struct Model {
     pub key_version: i32,
     pub created_at: TimeDateTime,
     pub updated_at: TimeDateTime,
+    pub kdf_memory_kib: Option<i32>,
+    pub kdf_parallelism: Option<i32>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

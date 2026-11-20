@@ -1,5 +1,6 @@
 import type { CryptoProvider } from "./crypto-provider";
 import { base64UrlToArrayBuffer, bytesToBase64Url } from "./e2ee-module";
+import { hkdfSha256 } from "./hkdf";
 
 /** Wire format "v1.<iv>.<ct+tag>" (unpadded base64url) and HKDF derivation are mirrored in the Swift NSE. */
 
@@ -9,7 +10,6 @@ export const MAX_NOTIFICATION_TITLE_LENGTH = 200;
 
 const GCM_IV_BYTES = 12;
 const GCM_TAG_BYTES = 16;
-const HASH_BYTES = 32;
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -34,33 +34,13 @@ export function normalizeNotificationTitle(value: string): string | null {
   return codePoints.slice(0, MAX_NOTIFICATION_TITLE_LENGTH).join("").trimEnd();
 }
 
-async function hmacSha256(
-  crypto: CryptoProvider,
-  key: Uint8Array<ArrayBuffer>,
-  data: Uint8Array<ArrayBuffer>,
-): Promise<Uint8Array<ArrayBuffer>> {
-  const hmacKey = await crypto.subtle.importKey(
-    "raw",
-    key,
-    { name: "HMAC", hash: "SHA-256", length: key.length * 8 },
-    false,
-    ["sign"],
-  );
-  return new Uint8Array(await crypto.subtle.sign("HMAC", hmacKey, data));
-}
-
 /** Raw 32-byte notification key, derived from the raw account key. */
 export async function deriveNotificationKeyBytes(
   crypto: CryptoProvider,
   accountKey: CryptoKey,
 ): Promise<Uint8Array<ArrayBuffer>> {
   const ikm = new Uint8Array(await crypto.subtle.exportKey("raw", accountKey));
-  const prk = await hmacSha256(crypto, new Uint8Array(HASH_BYTES), ikm);
-  const info = textEncoder.encode(NOTIFICATION_KEY_INFO);
-  const block = new Uint8Array(info.length + 1);
-  block.set(info, 0);
-  block[info.length] = 0x01;
-  return hmacSha256(crypto, prk, block);
+  return hkdfSha256(crypto, ikm, NOTIFICATION_KEY_INFO);
 }
 
 export async function importNotificationKey(

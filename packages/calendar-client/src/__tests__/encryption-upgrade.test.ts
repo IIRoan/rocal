@@ -98,21 +98,29 @@ describe("sealPendingReminders", () => {
 
 describe("upgradeStoredEncryption", () => {
   function fakeApi(report: {
+    unboundSubscriptionUrls?: Array<{ id: string; url: string }>;
     eventsWithReadableAttributes?: string[];
     eventsWithUnsealedReminders?: string[];
+    eventsWithUnboundContent?: string[];
+    trashWithUnboundContent?: number;
     readableInvitations?: number;
     unsealedSettings?: boolean;
     subscriptionsWithReadableNames?: string[];
+    subscriptionsWithReadableUrls?: string[];
   }) {
     return {
       getEncryptionUpgrades: jest.fn(async () => ({
         eventsWithReadableAttributes: [],
         eventsWithUnsealedReminders: [],
+        eventsWithUnboundContent: [],
+        trashWithUnboundContent: 0,
         readableInvitations: 0,
         unsealedSettings: false,
         subscriptionsWithReadableNames: [],
+        subscriptionsWithReadableUrls: [],
         ...report,
       })),
+      getUnboundSubscriptionUrls: jest.fn(async () => report.unboundSubscriptionUrls ?? []),
       ensureSealedUserSettings: jest.fn(async () => true),
       getEventSearchCorpus: jest.fn(async () => ({ events: [], total: 0, nextOffset: null })),
       sealImportedInvitationIfNeeded: jest.fn(async (e: CalendarEvent) => e),
@@ -121,9 +129,10 @@ describe("upgradeStoredEncryption", () => {
         return true;
       }),
       sealPendingReminders: jest.fn(async () => true),
+      markEventContentBound: jest.fn(async () => undefined),
       getSubscriptions: jest.fn(async () => [
-        { id: "s1", name: " Therapy practice ", nameRevision: "original-revision" },
-        { id: "s2", name: "" },
+        { id: "s1", name: " Therapy practice ", nameRevision: "original-revision", url: " https://example.com/private.ics " },
+        { id: "s2", name: "", url: "sealed:s2", encryptedUrl: "sealed-url" },
       ] as never),
       updateSubscription: jest.fn(async (_id: string, _request: UpdateSubscriptionRequest) => ({}) as never),
     };
@@ -139,6 +148,48 @@ describe("upgradeStoredEncryption", () => {
     expect(api.resealEventAttributes).not.toHaveBeenCalled();
     expect(api.sealPendingReminders).not.toHaveBeenCalled();
     expect(api.getSubscriptions).not.toHaveBeenCalled();
+    expect(api.markEventContentBound).toHaveBeenCalledTimes(1);
+  });
+
+  it("binds unbound events once each, and marks the account only when none are left", async () => {
+    const api = fakeApi({
+      eventsWithReadableAttributes: ["a", "b"],
+      eventsWithUnboundContent: ["b", "c"],
+    });
+
+    await upgradeStoredEncryption(api);
+
+    expect(api.resealEventAttributes.mock.calls.map(([id]) => id)).toEqual(["a", "b", "c"]);
+    expect(api.markEventContentBound).not.toHaveBeenCalled();
+  });
+
+  it("keeps the account unmarked while the trash still holds unbound events a restore would bring back", async () => {
+    const api = fakeApi({ trashWithUnboundContent: 1 });
+
+    await upgradeStoredEncryption(api);
+
+    expect(api.markEventContentBound).not.toHaveBeenCalled();
+  });
+
+  it("binds feed URLs sealed before binding, and marks the account only once all are bound", async () => {
+    const api = fakeApi({
+      unboundSubscriptionUrls: [
+        { id: "s2", url: "https://example.com/s2.ics" },
+        { id: "s3", url: "https://example.com/s3.ics" },
+      ],
+    });
+    api.updateSubscription.mockImplementation(async (id) => {
+      if (id === "s3") throw new Error("offline");
+      return {} as never;
+    });
+
+    await upgradeStoredEncryption(api);
+
+    expect(api.updateSubscription.mock.calls).toEqual([
+      ["s2", { url: "https://example.com/s2.ics" }],
+      ["s3", { url: "https://example.com/s3.ics" }],
+    ]);
+    expect(api.markEventContentBound).not.toHaveBeenCalled();
   });
 
   it("seals readable feed names by renaming each feed to its own name", async () => {
@@ -151,6 +202,14 @@ describe("upgradeStoredEncryption", () => {
       name: "Therapy practice",
       expectedNameRevision: "original-revision",
     }]]);
+  });
+
+  it("seals readable feed URLs by saving each feed's own URL, and skips sealed ones", async () => {
+    const api = fakeApi({ subscriptionsWithReadableUrls: ["s1", "s2", "gone"] });
+
+    await upgradeStoredEncryption(api);
+
+    expect(api.updateSubscription.mock.calls).toEqual([["s1", { url: "https://example.com/private.ics" }]]);
   });
 
   it("keeps a newer rename when the subscription changes after the sweep reads it", async () => {

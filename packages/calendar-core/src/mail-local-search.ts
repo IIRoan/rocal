@@ -20,7 +20,25 @@ function receivedMs(document: TitleIndexDocument): number {
   return document.timestamp ? Date.parse(document.timestamp) : Number.NaN;
 }
 
-function matchesIndexedCondition(
+function hasIndexStageFields(condition: MailSearchFilterCondition): boolean {
+  return Boolean(
+    condition.from || condition.to || condition.subject || condition.body ||
+      condition.text || condition.before || condition.after,
+  );
+}
+
+/** True when part of the search can only be checked on messages fetched by id. */
+export function hasRowStageConditions(conditions: MailSearchFilterCondition[]): boolean {
+  return conditions.some(
+    (condition) =>
+      condition.hasAttachment || condition.isFlagged || condition.isUnread ||
+      condition.isRead || condition.cc || condition.label ||
+      condition.minSize !== undefined || condition.maxSize !== undefined ||
+      (condition.inMailbox && condition.negated),
+  );
+}
+
+function matchesIndexFields(
   document: TitleIndexDocument,
   condition: MailSearchFilterCondition,
   timezone: string | null | undefined,
@@ -29,11 +47,29 @@ function matchesIndexedCondition(
   if (!contains(document.to, condition.to)) return false;
   if (!contains(document.title, condition.subject)) return false;
   if (!contains(document.body, condition.body)) return false;
+  if (
+    condition.text &&
+    ![document.title, document.from ?? document.subtitle, document.to, document.body].some(
+      (value) => value && contains(value, condition.text),
+    )
+  ) {
+    return false;
+  }
   const before = condition.before ? toJmapUtcDate(condition.before, timezone) : null;
   if (before && !(receivedMs(document) < Date.parse(before))) return false;
   const after = condition.after ? toJmapUtcDate(condition.after, timezone) : null;
   if (after && !(receivedMs(document) >= Date.parse(after))) return false;
   return true;
+}
+
+/** A stage skips conditions with none of its fields, and inverts only the negated ones it owns. */
+function matchesIndexedCondition(
+  document: TitleIndexDocument,
+  condition: MailSearchFilterCondition,
+  timezone: string | null | undefined,
+): boolean {
+  if (!hasIndexStageFields(condition)) return true;
+  return matchesIndexFields(document, condition, timezone) !== Boolean(condition.negated);
 }
 
 /** Message ids in a mailbox matching the search on this device, best text match first, else newest first. */
@@ -65,17 +101,77 @@ export function searchIndexedMailbox(
     .map((document) => document.messageId ?? document.id.replace(/^mail:/, ""));
 }
 
-/** The keyword and attachment parts of a search, checked on the messages fetched by id. */
+export type MailSearchRowMessage = {
+  keywords?: Record<string, boolean> | null;
+  hasAttachment?: boolean | null;
+  attachments?: readonly unknown[] | null;
+  cc?: { email?: string | null; name?: string | null }[] | null;
+  size?: number | null;
+  mailboxIds?: Record<string, boolean> | null;
+};
+
+function matchesRowFields(
+  message: MailSearchRowMessage,
+  condition: MailSearchFilterCondition,
+): boolean {
+  const size = message.size;
+  return (
+    (!condition.hasAttachment ||
+      message.hasAttachment === true ||
+      (message.attachments?.length ?? 0) > 0) &&
+    (!condition.isFlagged || message.keywords?.$flagged === true) &&
+    (!condition.isUnread || message.keywords?.$seen !== true) &&
+    (!condition.isRead || message.keywords?.$seen === true) &&
+    (!condition.cc ||
+      (message.cc ?? []).some((address) =>
+        contains(`${address.name ?? ""} ${address.email ?? ""}`, condition.cc),
+      )) &&
+    (!condition.label || message.keywords?.[`label:${condition.label.id}`] === true) &&
+    (condition.minSize === undefined || (typeof size === "number" && size >= condition.minSize)) &&
+    (condition.maxSize === undefined || (typeof size === "number" && size <= condition.maxSize)) &&
+    (!condition.inMailbox || !condition.negated || message.mailboxIds?.[condition.inMailbox.id] === true)
+  );
+}
+
+/** The keyword, attachment, cc, label, size and excluded-folder parts of a search, checked on the messages fetched by id. */
 export function matchesMessageConditions(
-  message: { keywords?: Record<string, boolean> | null; hasAttachment?: boolean | null },
+  message: MailSearchRowMessage,
   conditions: MailSearchFilterCondition[],
 ): boolean {
   return conditions.every(
     (condition) =>
-      (!condition.hasAttachment || message.hasAttachment === true) &&
-      (!condition.isFlagged || message.keywords?.$flagged === true) &&
-      (!condition.isUnread || message.keywords?.$seen !== true),
+      !hasRowStageConditions([condition]) ||
+      matchesRowFields(message, condition) !== Boolean(condition.negated),
   );
+}
+
+/** Searches one mailbox on this device and fetches the hits by id, so the words never reach the mail server. */
+export async function searchIndexedMailboxMessages<T extends MailSearchRowMessage & { id: string }>(input: {
+  documents: TitleIndexDocument[];
+  mailboxId: string;
+  text?: string;
+  conditions: MailSearchFilterCondition[];
+  timezone?: string | null;
+  limit: number;
+  getMessagesByIds: (ids: string[]) => Promise<T[]>;
+}): Promise<{ messages: T[]; matchCount: number }> {
+  const { mailboxId, conditions, limit } = input;
+  const ids = searchIndexedMailbox(input.documents, {
+    mailboxId,
+    text: input.text,
+    conditions,
+    timezone: input.timezone,
+    limit: hasRowStageConditions(conditions) ? LOCAL_MAIL_SEARCH_LIMIT : limit,
+  });
+  const messages = ids.length > 0 ? await input.getMessagesByIds(ids) : [];
+  return {
+    messages: orderByIds(messages, ids)
+      // The index can still list a message in a folder it has left, such as one moved to Trash.
+      .filter((message) => message.mailboxIds?.[mailboxId] === true)
+      .filter((message) => matchesMessageConditions(message, conditions))
+      .slice(0, limit),
+    matchCount: ids.length,
+  };
 }
 
 /** Native's field search as conditions, without the list toggles (those apply to the fetched messages). */

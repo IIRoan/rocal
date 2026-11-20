@@ -92,7 +92,6 @@ jobs:
       - name: Check mail service helpers
         run: |
           python3 -B -m unittest discover -s apps/stalwart/tests -v
-          python3 -B -m unittest discover -s apps/gatus/tests -v
           python3 -B -m unittest discover -s scripts/e2e -p 'test_*.py' -v
       - name: Check iOS notification extension configuration
         run: node scripts/tests/notification-extension.cjs
@@ -104,6 +103,8 @@ jobs:
         run: node scripts/tests/easignore.cjs
       - name: Check App Store release automation
         run: bun test scripts/tests/app-store-release.test.ts
+      - name: Check security.txt copies match and are not about to expire
+        run: bun test scripts/tests/security-txt.test.ts
 
       - name: Upload UI coverage
         if: always()
@@ -160,6 +161,9 @@ jobs:
 
       - name: Verify PostgreSQL subject search on encrypted drafts
         run: python3 -B apps/stalwart/tests/probe_subject_search.py --assert-fixed
+
+      - name: Verify the JMAP vacation responder and send holds
+        run: python3 -B apps/stalwart/tests/probe_jmap_send_features.py --assert
 
       - name: Verify disposable probe cleanup
         env:

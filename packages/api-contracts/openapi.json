@@ -187,6 +187,84 @@
         }
       }
     },
+    "/api/auth/recovery/complete": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Sets the new password and its envelope, ends every session and consumes the kit; the client then signs in as usual.",
+        "operationId": "completeAccountRecovery",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecoveryCompleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusFlag"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/recovery/start": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "The account keys wrapped under the recovery key, for the key's holder to open on the device.",
+        "operationId": "startAccountRecovery",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecoveryStartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/calendars": {
       "get": {
         "tags": [
@@ -574,6 +652,75 @@
         }
       }
     },
+    "/api/e2ee/recovery-kit": {
+      "get": {
+        "tags": [
+          "E2EE"
+        ],
+        "summary": "Whether the caller has a recovery kit.",
+        "operationId": "getRecoveryKit",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryKitStatus"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "E2EE"
+        ],
+        "summary": "Stores a new recovery kit after checking the current password, replacing any earlier one.",
+        "operationId": "putRecoveryKit",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecoveryKitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryKitStatus"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "E2EE"
+        ],
+        "summary": "Removes the caller's recovery kit, so it can no longer reset the password.",
+        "operationId": "deleteRecoveryKit",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessMessage"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The caller has no recovery kit"
+          }
+        }
+      }
+    },
     "/api/e2ee/reset-snapshot": {
       "get": {
         "tags": [
@@ -920,6 +1067,14 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "includeExceptions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -931,6 +1086,110 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/events/trash": {
+      "get": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "The caller's deleted events, newest first, restorable for 30 days.",
+        "operationId": "listTrashedEvents",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrashedEventList"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Deletes every event in the caller's trash for good.",
+        "operationId": "emptyEventTrash",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessMessage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events/trash/{id}": {
+      "delete": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Deletes one trashed event for good.",
+        "operationId": "deleteTrashedEvent",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessMessage"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not in the caller's trash"
+          }
+        }
+      }
+    },
+    "/api/events/trash/{id}/restore": {
+      "post": {
+        "tags": [
+          "Events"
+        ],
+        "summary": "Restores a trashed event under its id, into its calendar or the default one when that is gone.",
+        "operationId": "restoreTrashedEvent",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Event"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not in the caller's trash"
           }
         }
       }
@@ -2627,7 +2886,7 @@
         "tags": [
           "Calendar Subscriptions"
         ],
-        "summary": "Syncs a feed now, paused or not; a failed fetch is recorded and answered as an error.",
+        "summary": "Syncs a feed now, paused or not; a sealed feed's URL comes in the body. A failed fetch is recorded and answered as an error.",
         "operationId": "syncSubscription",
         "parameters": [
           {
@@ -2639,6 +2898,22 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/SyncSubscriptionRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -3061,6 +3336,7 @@
           "name",
           "nameRevision",
           "url",
+          "encryptedUrl",
           "isActive",
           "syncIntervalMinutes",
           "lastSyncAt",
@@ -3086,6 +3362,13 @@
           },
           "createdAt": {
             "$ref": "#/components/schemas/Timestamp"
+          },
+          "encryptedUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The feed URL sealed on the device; the server cannot open it."
           },
           "etag": {
             "type": [
@@ -3140,7 +3423,8 @@
             "$ref": "#/components/schemas/Timestamp"
           },
           "url": {
-            "type": "string"
+            "type": "string",
+            "description": "The feed URL, or `sealed:<id>` once `encryptedUrl` holds it."
           },
           "userId": {
             "$ref": "#/components/schemas/UserId"
@@ -3313,6 +3597,7 @@
       "CreateEventRequest": {
         "type": "object",
         "required": [
+          "id",
           "start",
           "end",
           "calendarId",
@@ -3350,6 +3635,10 @@
           },
           "end": {
             "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/EventId",
+            "description": "A client-proposed row id (32 lowercase hex) that the event content is bound to."
           },
           "invitationContent": {
             "$ref": "#/components/schemas/InvitationContent",
@@ -3397,6 +3686,7 @@
         "type": "object",
         "description": "Current clients send `encryptedName`; a readable `name` is only accepted from shipped binaries.",
         "required": [
+          "id",
           "url"
         ],
         "properties": {
@@ -3407,15 +3697,23 @@
             "type": "string",
             "description": "The name sealed as a calendar name; stored on the mirrored calendar."
           },
+          "encryptedUrl": {
+            "type": "string"
+          },
           "encryptionKeyVersion": {
             "type": "integer",
             "format": "int32"
+          },
+          "id": {
+            "$ref": "#/components/schemas/SubscriptionId",
+            "description": "A client-proposed id (32 lowercase hex) that the sealed URL is bound to."
           },
           "name": {
             "type": "string"
           },
           "url": {
-            "type": "string"
+            "type": "string",
+            "description": "Probed and synced once, then stored only as `encryptedUrl` when that is sent."
           }
         },
         "additionalProperties": false
@@ -3631,6 +3929,10 @@
             "type": "string",
             "description": "`this_only`, `this_and_future` or `all`."
           },
+          "newEventId": {
+            "$ref": "#/components/schemas/EventId",
+            "description": "The row id a `this_only` or `this_and_future` child takes, which its new content is bound to."
+          },
           "occurrenceDate": {
             "type": "string",
             "description": "The occurrence instant; required for `this_only` and `this_and_future`."
@@ -3703,6 +4005,7 @@
       "EncryptedIcsEvent": {
         "type": "object",
         "required": [
+          "id",
           "externalId",
           "start",
           "end",
@@ -3738,6 +4041,10 @@
           },
           "externalId": {
             "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/EventId",
+            "description": "A client-proposed row id that the event content is bound to."
           },
           "occurrenceDate": {
             "$ref": "#/components/schemas/Timestamp"
@@ -3963,10 +4270,12 @@
             "type": "string"
           },
           "wrappedAccountKey": {
-            "type": "string"
+            "type": "string",
+            "description": "Empty when the device keeps its wrapped keys only on itself."
           },
           "wrappedSearchKey": {
-            "type": "string"
+            "type": "string",
+            "description": "Empty when the device keeps its wrapped keys only on itself."
           }
         }
       },
@@ -4103,9 +4412,12 @@
         "required": [
           "eventsWithReadableAttributes",
           "eventsWithUnsealedReminders",
+          "eventsWithUnboundContent",
+          "trashWithUnboundContent",
           "readableInvitations",
           "unsealedSettings",
-          "subscriptionsWithReadableNames"
+          "subscriptionsWithReadableNames",
+          "subscriptionsWithReadableUrls"
         ],
         "properties": {
           "eventsWithReadableAttributes": {
@@ -4114,6 +4426,13 @@
               "$ref": "#/components/schemas/EventId"
             },
             "description": "Sealed events whose colour or category still sits in a readable column."
+          },
+          "eventsWithUnboundContent": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventId"
+            },
+            "description": "Sealed events whose content is not yet bound to their row id."
           },
           "eventsWithUnsealedReminders": {
             "type": "array",
@@ -4133,6 +4452,18 @@
               "$ref": "#/components/schemas/SubscriptionId"
             },
             "description": "Feeds whose name is still stored readable."
+          },
+          "subscriptionsWithReadableUrls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SubscriptionId"
+            },
+            "description": "Feeds whose URL is still stored readable."
+          },
+          "trashWithUnboundContent": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Trash entries whose events are not yet bound; a restore lists them above, and none may remain before the account is marked bound."
           },
           "unsealedSettings": {
             "type": "boolean",
@@ -4600,6 +4931,10 @@
           },
           "success": {
             "type": "boolean"
+          },
+          "trashId": {
+            "$ref": "#/components/schemas/TrashedEventId",
+            "description": "The trash entry that can restore the event for 30 days; absent when the delete was permanent."
           }
         }
       },
@@ -4836,6 +5171,13 @@
         "type": "object",
         "description": "`GET /api/events/search-corpus`: pages of the owner's events for on-device indexing.",
         "properties": {
+          "includeExceptions": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Series rows carry `recurrenceExceptions`, for an export built on the device."
+          },
           "limit": {
             "type": [
               "integer",
@@ -5050,6 +5392,7 @@
         "type": "object",
         "required": [
           "externalId",
+          "eventId",
           "encryptedContent"
         ],
         "properties": {
@@ -5065,6 +5408,10 @@
           "encryptionKeyVersion": {
             "type": "integer",
             "format": "int32"
+          },
+          "eventId": {
+            "$ref": "#/components/schemas/EventId",
+            "description": "The row id the content is bound to: a new copy takes it (32 lowercase hex), an existing copy is sealed only when it is its id."
           },
           "externalId": {
             "type": "string"
@@ -6358,6 +6705,8 @@
           "kdfAlgorithm",
           "kdfSalt",
           "kdfIterations",
+          "kdfMemoryKiB",
+          "kdfParallelism",
           "wrappedAccountKey",
           "wrappedSearchKey",
           "wrapAlgorithm",
@@ -6377,7 +6726,24 @@
           },
           "kdfIterations": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "PBKDF2 iterations, or Argon2id passes."
+          },
+          "kdfMemoryKiB": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Argon2id memory in KiB; null for PBKDF2."
+          },
+          "kdfParallelism": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Argon2id lanes; null for PBKDF2."
           },
           "kdfSalt": {
             "type": "string"
@@ -6417,6 +6783,16 @@
           "kdfIterations": {
             "type": "integer",
             "format": "int32"
+          },
+          "kdfMemoryKiB": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Required for Argon2id, absent for PBKDF2."
+          },
+          "kdfParallelism": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Required for Argon2id, absent for PBKDF2."
           },
           "kdfSalt": {
             "type": "string"
@@ -6681,6 +7057,120 @@
           }
         }
       },
+      "RecoveryCompleteRequest": {
+        "type": "object",
+        "description": "Resets the password with the recovery key: the new auth key and the account keys rewrapped for it.",
+        "required": [
+          "email",
+          "recoveryAuthKey",
+          "newPassword",
+          "passwordEnvelope"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "newPassword": {
+            "type": "string",
+            "description": "The auth key derived from the new password; a raw password is refused."
+          },
+          "passwordEnvelope": {
+            "$ref": "#/components/schemas/PasswordEnvelopeRequest"
+          },
+          "recoveryAuthKey": {
+            "type": "string"
+          },
+          "removePasskeys": {
+            "type": "boolean",
+            "description": "Deletes every passkey, for someone who lost theirs."
+          }
+        },
+        "additionalProperties": false
+      },
+      "RecoveryEnvelope": {
+        "type": "object",
+        "description": "The account keys wrapped under the recovery key, which only the key's holder can open.",
+        "required": [
+          "wrappedAccountKey",
+          "wrappedSearchKey",
+          "keyVersion"
+        ],
+        "properties": {
+          "keyVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "wrappedAccountKey": {
+            "type": "string"
+          },
+          "wrappedSearchKey": {
+            "type": "string"
+          }
+        }
+      },
+      "RecoveryKitRequest": {
+        "type": "object",
+        "description": "A new recovery kit: the account keys wrapped under the recovery key, and the key that proves it.",
+        "required": [
+          "currentPassword",
+          "recoveryAuthKey",
+          "wrappedAccountKey",
+          "wrappedSearchKey"
+        ],
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "description": "The auth key the client derived from the current password."
+          },
+          "keyVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recoveryAuthKey": {
+            "type": "string",
+            "description": "`rk1:` and the base64url HKDF output of the recovery key."
+          },
+          "wrappedAccountKey": {
+            "type": "string"
+          },
+          "wrappedSearchKey": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RecoveryKitStatus": {
+        "type": "object",
+        "description": "Whether the caller has a recovery kit; the key itself is never stored or returned.",
+        "required": [
+          "exists"
+        ],
+        "properties": {
+          "createdAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "exists": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RecoveryStartRequest": {
+        "type": "object",
+        "description": "Proves the recovery key for an email, before the client unwraps the account keys.",
+        "required": [
+          "email",
+          "recoveryAuthKey"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "recoveryAuthKey": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "RecurrenceException": {
         "type": "object",
         "required": [
@@ -6894,6 +7384,10 @@
           },
           "success": {
             "type": "boolean"
+          },
+          "trashId": {
+            "$ref": "#/components/schemas/TrashedEventId",
+            "description": "Set when `delete_all` moved the series to the trash."
           }
         }
       },
@@ -6963,9 +7457,7 @@
         "type": "object",
         "required": [
           "deviceId",
-          "publicKey",
-          "wrappedAccountKey",
-          "wrappedSearchKey"
+          "publicKey"
         ],
         "properties": {
           "deviceId": {
@@ -6988,7 +7480,8 @@
             "type": "string"
           },
           "wrappedAccountKey": {
-            "type": "string"
+            "type": "string",
+            "description": "Both or neither; current clients keep their wrapped keys only on the device."
           },
           "wrappedSearchKey": {
             "type": "string"
@@ -7773,10 +8266,115 @@
           }
         }
       },
+      "SyncSubscriptionRequest": {
+        "type": "object",
+        "description": "Body of `POST /api/subscriptions/:id/sync`; a sealed feed needs its URL, which is used once and never stored.",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "Timestamp": {
         "type": "string",
         "format": "date-time",
         "description": "A UTC instant as JavaScript's `toISOString()` writes it: three fractional digits and `Z`."
+      },
+      "TrashedEvent": {
+        "type": "object",
+        "description": "A deleted event in the trash, read from its stored row: ciphertext only, restorable until `purgeAt`.",
+        "required": [
+          "id",
+          "eventId",
+          "calendarId",
+          "calendarMissing",
+          "title",
+          "encryptedContent",
+          "encryptionState",
+          "encryptionKeyVersion",
+          "start",
+          "end",
+          "allDay",
+          "timezone",
+          "recurrence",
+          "trashedAt",
+          "purgeAt"
+        ],
+        "properties": {
+          "allDay": {
+            "type": "boolean"
+          },
+          "calendarId": {
+            "$ref": "#/components/schemas/CalendarId"
+          },
+          "calendarMissing": {
+            "type": "boolean",
+            "description": "The original calendar is gone or read-only, so a restore lands in the default calendar."
+          },
+          "encryptedContent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "encryptionKeyVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "encryptionState": {
+            "type": "string"
+          },
+          "end": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "eventId": {
+            "$ref": "#/components/schemas/EventId",
+            "description": "The id the event keeps when restored."
+          },
+          "id": {
+            "$ref": "#/components/schemas/TrashedEventId"
+          },
+          "purgeAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "recurrence": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "trashedAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        }
+      },
+      "TrashedEventId": {
+        "type": "string"
+      },
+      "TrashedEventList": {
+        "type": "object",
+        "description": "`GET /api/events/trash`, newest first.",
+        "required": [
+          "events"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrashedEvent"
+            }
+          }
+        }
       },
       "UnregisterPushDeviceRequest": {
         "type": "object",
@@ -8031,6 +8629,10 @@
           },
           "encryptedName": {
             "type": "string"
+          },
+          "encryptedUrl": {
+            "type": "string",
+            "description": "Replaces the readable URL with this sealed one."
           },
           "encryptionKeyVersion": {
             "type": "integer",

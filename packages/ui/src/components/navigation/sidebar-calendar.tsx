@@ -161,8 +161,8 @@ export function SidebarCalendar({
         >
           <span className="font-semibold text-foreground">
             {format(calendarMonth, "MMMM")}
-          </span>
-          <span className="text-muted-foreground ml-0.5">
+          </span>{" "}
+          <span className="text-muted-foreground">
             {format(calendarMonth, "yyyy")}
           </span>
         </button>

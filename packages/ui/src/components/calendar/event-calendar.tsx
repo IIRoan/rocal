@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useLayoutEffect, useRef } from "react";
+import { useDeferredValue, useLayoutEffect, useRef, useState } from "react";
 import { createLogger } from "@workspace/logger";
 import {
   getCalendarViewAnimationKey,
@@ -14,20 +14,23 @@ import { toast } from "../../lib/toast";
 
 import { useCalendarContext } from "./calendar-context";
 import { CalendarDndProvider } from "./calendar-dnd-context";
+import { CalendarShortcutsDialog } from "./calendar-shortcuts-dialog";
 import { EventCalendarContextMenu } from "./event-calendar-context-menu";
 import {
   persistDraggedCalendarEvent,
+  type DraggedEventVerb,
   type MoveRecurringCalendarEvent,
 } from "./event-calendar-mutations";
 import { EventCalendarToolbar } from "./event-calendar-toolbar";
 import { EventCalendarViewStage } from "./event-calendar-views";
 import { CalendarSkeleton } from "./calendar-skeleton";
+import { GoToDateDialog } from "./go-to-date-dialog";
 import {
   EventGap,
   EventHeight,
   WeekCellsHeight,
 } from "./constants";
-import { useCalendarViewShortcuts } from "./use-calendar-view-shortcuts";
+import { useCalendarShortcuts } from "./use-calendar-view-shortcuts";
 import { useEventCalendarContextMenu } from "./use-event-calendar-context-menu";
 import { addMinutesToDate } from "./utils";
 import type { CalendarEvent, CalendarView } from "./types";
@@ -90,6 +93,10 @@ export interface EventCalendarProps {
   onSetPreview?: (event: CalendarEvent | null) => void;
   onSidebarToggle?: () => void;
   onPrefetchRange?: (range: { start: Date; end: Date }) => void;
+  /** Single-key shortcuts; the account's sealed preference, on unless turned off. */
+  keyboardShortcuts?: boolean;
+  onCreateShortcut?: () => void;
+  onSearchShortcut?: () => void;
 }
 
 export function EventCalendar({
@@ -113,6 +120,9 @@ export function EventCalendar({
   onSetPreview,
   onSidebarToggle,
   onPrefetchRange,
+  keyboardShortcuts = true,
+  onCreateShortcut,
+  onSearchShortcut,
 }: EventCalendarProps) {
   const { currentDate, setCurrentDate, currentView, setCurrentView } =
     useCalendarContext();
@@ -123,8 +133,8 @@ export function EventCalendar({
   const viewStageRef = useRef<HTMLDivElement>(null);
   const shouldReduceMotion = usePrefersReducedMotion();
   const updateEvent = onUpdateEvent || (async () => {});
-
-  useCalendarViewShortcuts(setCurrentView);
+  const [goToDateOpen, setGoToDateOpen] = useState(false);
+  const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false);
 
   const {
     handleContextMenuCapture,
@@ -172,6 +182,25 @@ export function EventCalendar({
     navigateTo(new Date());
   };
 
+  const handleGoToDate = (date: Date) => {
+    navDirectionRef.current = currentDate < date ? 1 : -1;
+    navigateTo(date);
+  };
+
+  useCalendarShortcuts(
+    {
+      onViewChange: setCurrentView,
+      onPrevious: handlePrevious,
+      onNext: handleNext,
+      onToday: handleToday,
+      onGoToDate: () => setGoToDateOpen(true),
+      onCreate: onCreateShortcut,
+      onSearch: onSearchShortcut,
+      onHelp: () => setShortcutsHelpOpen(true),
+    },
+    keyboardShortcuts && !loading && !error,
+  );
+
   const calendarViewKey = getCalendarViewAnimationKey(
     view,
     currentDate,
@@ -198,7 +227,11 @@ export function EventCalendar({
     onEventEdit?.(event);
   };
 
-  const handleEventCreate = (startTime: Date) => {
+  const handleEventCreate = (
+    startTime: Date,
+    endTime?: Date,
+    anchor?: { x: number; y: number },
+  ) => {
     startTime.setSeconds(0);
     startTime.setMilliseconds(0);
 
@@ -206,7 +239,7 @@ export function EventCalendar({
       id: "",
       title: "",
       start: startTime,
-      end: addMinutesToDate(startTime, defaultEventDuration),
+      end: endTime ?? addMinutesToDate(startTime, defaultEventDuration),
       allDay: false,
       calendarId: defaultCalendarId || "",
       userId: "",
@@ -214,7 +247,7 @@ export function EventCalendar({
       updatedAt: new Date(),
       timezone: resolvedTimezone,
     };
-    const anchorPos = lastClickPositionRef.current;
+    const anchorPos = anchor ?? lastClickPositionRef.current;
     if (anchorPos) {
       onEventEdit?.(newEvent, { mode: "popover", anchorPosition: anchorPos });
       return;
@@ -227,7 +260,10 @@ export function EventCalendar({
     if (event) onEventDeleteRequest?.(event);
   };
 
-  const handleEventUpdate = (updatedEvent: CalendarEvent) =>
+  const handleEventUpdate = (
+    updatedEvent: CalendarEvent,
+    verb?: DraggedEventVerb,
+  ) =>
     persistDraggedCalendarEvent({
       timezone: resolvedTimezone,
       timeFormat,
@@ -235,6 +271,7 @@ export function EventCalendar({
       moveRecurringEvent: onMoveRecurringEvent,
       originalEvent: events.find((event) => event.id === updatedEvent.id),
       updatedEvent,
+      verb,
     });
 
   if (loading) {
@@ -299,6 +336,7 @@ export function EventCalendar({
             onSidebarToggle={onSidebarToggle}
             onToday={handleToday}
             onViewChange={setCurrentView}
+            showShortcuts={keyboardShortcuts}
             timezone={resolvedTimezone}
             view={view}
             weekStartDay={weekStartDay}
@@ -338,6 +376,17 @@ export function EventCalendar({
         position={menuPosition}
         target={menuTarget}
         timezone={resolvedTimezone}
+      />
+      <GoToDateDialog
+        currentDate={currentDate}
+        onGoToDate={handleGoToDate}
+        onOpenChange={setGoToDateOpen}
+        open={goToDateOpen}
+        timezone={resolvedTimezone}
+      />
+      <CalendarShortcutsDialog
+        onOpenChange={setShortcutsHelpOpen}
+        open={shortcutsHelpOpen}
       />
     </ErrorBoundary>
   );

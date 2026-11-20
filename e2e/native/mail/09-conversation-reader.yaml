@@ -12,7 +12,7 @@ appId: ${APP_ID}
 - runFlow: ../common/conversation-cycle.yaml
 - runFlow: ../common/conversation-cycle.yaml
 - takeScreenshot: ${SCREENSHOT_DIR}/conversation-cached-message-switching
-- tapOn: Go back
+- runFlow: ../common/go-back.yaml
 - waitForAnimationToEnd
 - tapOn: ".*Maestro conversation.*"
 - runFlow:
@@ -22,4 +22,4 @@ appId: ${APP_ID}
       OPEN_TIMEOUT_MS: 5000
 - assertVisible: ".*Maestro conversation.*\\[3\\].*"
 - takeScreenshot: ${SCREENSHOT_DIR}/conversation-reopened-without-restart
-- tapOn: Go back
+- runFlow: ../common/go-back.yaml

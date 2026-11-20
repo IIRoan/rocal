@@ -6,7 +6,10 @@ use super::*;
 #[tokio::test]
 async fn mailer_uses_the_configured_private_gate() {
     let settings = Settings::from_pairs(&[
-        ("STALWART_BASE_URL", "http://stalwart.railway.internal:8081"),
+        (
+            "STALWART_BASE_URL",
+            "http://stalwart-gate.solace.internal:8081",
+        ),
         ("STALWART_GATE_KEY", "solace-test-private-gate"),
         ("STALWART_JMAP_USERNAME", "noreply@solace.test"),
         ("STALWART_JMAP_PASSWORD", "test-password"),
@@ -20,7 +23,7 @@ async fn mailer_uses_the_configured_private_gate() {
     assert_eq!(
         mailer
             .gate
-            .key_for("http://stalwart.railway.internal:8081/jmap/"),
+            .key_for("http://stalwart-gate.solace.internal:8081/jmap/"),
         Some("solace-test-private-gate")
     );
 }

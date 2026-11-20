@@ -52,6 +52,12 @@ export const SHARED_SETTINGS_SEARCH_ENTRIES: AccountSheetSearchEntry[] = [
   },
   {
     pageId: "security",
+    label: "Recovery kit",
+    location: "Security · Recovery",
+    keywords: "forgot password reset recovery key",
+  },
+  {
+    pageId: "security",
     label: "Passkeys",
     location: "Security · Passkeys",
     keywords: "add passkey passwordless biometric",

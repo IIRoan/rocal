@@ -125,12 +125,11 @@ class HarnessTests(unittest.TestCase):
                 self.assertIn(f"/releases/download/v{target.group(1)}/", tool["url"])
                 self.assertRegex(tool["sha256"], r"^[0-9a-f]{64}$")
 
-    def test_focused_ios_diagnostic_runs_calendar_and_photo_in_order_and_stops_on_failure(self):
+    def test_focused_ios_diagnostic_runs_authentication_and_calendar_in_order_and_stops_on_failure(self):
         with patch.object(journeys, "run_journey", return_value=True) as execute, patch.object(journeys, "publish") as publish:
             journeys.main("ios", diagnostic=True)
             self.assertEqual([(call.args[0], call.args[1], call.args[2].stem) for call in execute.call_args_list],
-                             [("ios", "calendar", "01-authentication"), ("ios", "calendar", "02-calendar-management"),
-                              ("ios", "calendar", "07-profile-picture")])
+                             [("ios", "calendar", "01-authentication"), ("ios", "calendar", "02-calendar-management")])
             publish.assert_called_once()
             execute.reset_mock(return_value=True)
             publish.reset_mock()

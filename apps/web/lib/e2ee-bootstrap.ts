@@ -1,6 +1,7 @@
 import {
   lockWithoutDeviceKeys,
   resolveDeviceEnvelopeSalt,
+  shouldUpgradePasswordEnvelope,
   type E2eeLock,
 } from "@workspace/e2ee";
 import { createLogger } from "@workspace/logger";
@@ -135,6 +136,7 @@ async function activateFromRemote(
   return createAttempt(true, bootstrap);
 }
 
+/** The wrapped keys stay in this browser only; the server keeps no copy a key could be swapped into. */
 async function uploadDevice(
   localRecord: StoredE2eeDeviceRecord,
 ): Promise<E2eeDeviceRecord> {
@@ -142,8 +144,6 @@ async function uploadDevice(
     deviceId: localRecord.deviceId,
     publicKey: localRecord.publicKey,
     publicKeyAlgorithm: "RSA-OAEP-256",
-    wrappedAccountKey: localRecord.wrappedAccountKey,
-    wrappedSearchKey: localRecord.wrappedSearchKey,
     wrapAlgorithm: localRecord.wrapAlgorithm,
     keyVersion: localRecord.keyVersion,
   });
@@ -390,6 +390,15 @@ export async function storePasswordEnvelopeForActiveSession(
   return true;
 }
 
+/** Wraps the active keys with the sign-in password again; the keys are already open, so a failure only warns. */
+async function rewrapWithSignInPassword(userId: string, password: string): Promise<void> {
+  await storePasswordEnvelopeForActiveSession(userId, password).catch(
+    (error: unknown) => {
+      log.warn("Failed to store the encryption envelope", { userId, error });
+    },
+  );
+}
+
 /** Network errors reject; a wrong password resolves with `passwordUnlockFailed`. */
 /** Opens the envelope in `bootstrap`, which the caller already fetched, with a password that arrived after it ran. */
 export async function unlockE2eeWithPassword(
@@ -417,30 +426,31 @@ export async function unlockWithSignInPassword(
   // A network failure never locks here; without a device key the next page asks for a fresh sign-in.
   if (!bootstrap) return null;
 
+  const envelope = bootstrap.passwordEnvelope;
   if (result.activated) {
     // A browser holding the only keys stays signed in; only a password the server just accepted may wrap them.
-    if (!bootstrap.passwordEnvelope) {
-      await storePasswordEnvelopeForActiveSession(userId, password).catch(
-        (error: unknown) => {
-          log.warn("Failed to store the missing encryption envelope", {
-            userId,
-            error,
-          });
-        },
-      );
-    }
+    const rewrap =
+      !envelope ||
+      shouldUpgradePasswordEnvelope({
+        envelope,
+        deviceEnvelopeSalt: (await getStoredE2eeDevice(userId))?.envelopeSalt,
+      });
+    if (rewrap) await rewrapWithSignInPassword(userId, password);
     return null;
   }
 
   let opened = false;
-  if (bootstrap.passwordEnvelope && !result.passwordUnlockFailed) {
+  if (envelope && !result.passwordUnlockFailed) {
     const unlocked = await unlockE2eeWithPassword(userId, password, bootstrap);
     if (!unlocked.activated && !unlocked.passwordUnlockFailed) return null;
     opened = unlocked.activated;
+    if (opened && shouldUpgradePasswordEnvelope({ envelope, deviceEnvelopeSalt: envelope.kdfSalt })) {
+      await rewrapWithSignInPassword(userId, password);
+    }
   }
 
   return lockWithoutDeviceKeys({
-    hasEnvelope: Boolean(bootstrap.passwordEnvelope),
+    hasEnvelope: Boolean(envelope),
     hasOtherDevices: bootstrap.devices.length > 0,
     password: "sign-in",
     opened,

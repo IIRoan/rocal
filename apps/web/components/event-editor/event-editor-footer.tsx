@@ -169,6 +169,7 @@ export function EventEditorFooter({
     const canOpenEditor =
       Boolean(eventForm.selectedEvent?.id) &&
       !eventForm.selectedEvent?.isSynced &&
+      !eventForm.selectedEvent?.contentUnavailable &&
       canEditEvent &&
       !isCancelledEvent;
 
@@ -268,6 +269,7 @@ export function EventEditorFooter({
           </Button>
           {eventForm.selectedEvent?.id &&
             !eventForm.selectedEvent.isSynced &&
+            !eventForm.selectedEvent.contentUnavailable &&
             canEditEvent &&
             !isCancelledEvent && (
               <Button onClick={() => eventForm.setEventViewMode("edit")}>

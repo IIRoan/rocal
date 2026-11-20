@@ -71,6 +71,13 @@ pub fn rules() -> Vec<Rule> {
         ),
         // The app re-registers its device on launch.
         batch_delete("push_device", 180, "push_device", "last_seen_at < $1"),
+        // Deleted events can be restored for 30 days.
+        batch_delete(
+            "event_trash",
+            solace_server::events::trash::RETENTION_DAYS,
+            "event_trash",
+            "trashed_at < $1",
+        ),
     ]
 }
 
@@ -147,6 +154,7 @@ mod tests {
                 ("notification_job_dead", 30),
                 ("notification_log", 30),
                 ("push_device", 180),
+                ("event_trash", 30),
             ]
         );
     }
@@ -188,6 +196,38 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(left, [("recent".to_owned(),)]);
+    }
+
+    #[tokio::test]
+    async fn trashed_events_are_purged_after_thirty_days() {
+        let scratch = ScratchDatabase::create().await;
+        let db = PgPool::connect(&scratch.url).await.unwrap();
+        sqlx::query("INSERT INTO \"user\" (id, name, email, updated_at) VALUES ('u', 'U', 'u@solace.test', NOW())")
+            .execute(&db)
+            .await
+            .unwrap();
+        for (id, age_days) in [("expired", 31), ("restorable", 29)] {
+            sqlx::query(
+                "INSERT INTO event_trash (id, user_id, event_id, calendar_id, rows, trashed_at) VALUES ($1, 'u', 'e', 'c', '{}', timezone('UTC', NOW()) - make_interval(days => $2))",
+            )
+            .bind(id)
+            .bind(age_days)
+            .execute(&db)
+            .await
+            .unwrap();
+        }
+        let trash: Vec<Rule> = rules()
+            .into_iter()
+            .filter(|rule| rule.name == "event_trash")
+            .collect();
+        let (deleted, errors) =
+            run_rules(&db, now(), &trash, BATCH_SIZE, MAX_BATCHES_PER_RULE).await;
+        assert_eq!((deleted, errors.len()), (vec![("event_trash", 1)], 0));
+        let left: Vec<(String,)> = sqlx::query_as("SELECT id FROM event_trash")
+            .fetch_all(&db)
+            .await
+            .unwrap();
+        assert_eq!(left, [("restorable".to_owned(),)]);
     }
 
     #[tokio::test]

@@ -11,6 +11,9 @@ import {
 import { AllDayEventRow } from "./all-day-event-row";
 import { DraggableEvent } from "./draggable-event";
 import { DroppableCell } from "./droppable-cell";
+import { EventResizeHandles } from "./event-resize-handle";
+import { TimeGridSelection } from "./time-grid-selection";
+import { useTimeGridPointerRange } from "./use-time-grid-pointer-range";
 import { WeekCellsHeight, StartHour } from "./constants";
 import { useTimelineStartScroll } from "./use-timeline-start-scroll";
 import { CalendarEvent } from "./types";
@@ -25,7 +28,11 @@ interface DayViewProps {
   currentDate: Date;
   events: CalendarEvent[];
   onEventSelect: (event: CalendarEvent) => void;
-  onEventCreate: (startTime: Date) => void;
+  onEventCreate: (
+    startTime: Date,
+    endTime?: Date,
+    anchor?: { x: number; y: number },
+  ) => void;
   compactView?: boolean;
   timeFormat: TimeFormat;
   timezone?: string;
@@ -82,6 +89,10 @@ export function DayView({
   );
 
   useTimelineStartScroll(scrollContainerRef, currentDate);
+  const pointer = useTimeGridPointerRange({
+    timezone: resolvedTimezone,
+    onCreate: onEventCreate,
+  });
 
   const handlers = {
     onEventClick: handleEventClick,
@@ -112,7 +123,11 @@ export function DayView({
 
       <div
         ref={scrollContainerRef}
-        className="grid flex-1 grid-cols-[3rem_1fr] overflow-y-auto [scrollbar-gutter:stable] relative min-h-0"
+        // Focusable so keyboard users can scroll an empty day (WCAG 2.1.1).
+        role="region"
+        aria-label="Day schedule"
+        tabIndex={0}
+        className="grid flex-1 grid-cols-[3rem_1fr] overflow-y-auto [scrollbar-gutter:stable] relative min-h-0 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       >
         <div>
           {WEEK_HOUR_VALUES.map((hourValue) => (
@@ -129,7 +144,7 @@ export function DayView({
           ))}
         </div>
 
-        <div className="relative">
+        <div {...pointer.columnProps(calendarDay)} className="relative select-none">
           {positionedEvents.map((positionedEvent) => (
             <div
               key={positionedEvent.event.id}
@@ -156,8 +171,25 @@ export function DayView({
                   onView={onEventView}
                 />
               </div>
+              <EventResizeHandles
+                event={positionedEvent.event}
+                onResizeStart={(pointerEvent, edge) =>
+                  pointer.startResize(
+                    pointerEvent,
+                    positionedEvent.event,
+                    edge,
+                    calendarDay,
+                  )
+                }
+              />
             </div>
           ))}
+          {pointer.selection ? (
+            <TimeGridSelection
+              startQuarter={pointer.selection.startQuarter}
+              endQuarter={pointer.selection.endQuarter}
+            />
+          ) : null}
 
           {currentTimeVisible && (
             <CurrentTimeIndicator

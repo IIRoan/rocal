@@ -15,7 +15,7 @@ import {
   unlockEncryptedMailVault,
   unlockEncryptedMailVaultWithDerivedKey,
 } from "../../lib/mail/vault-crypto";
-import { deriveVaultKeyBytes } from "../../lib/mail/vault-kdf";
+import { argon2idBytes, deriveVaultKeyBytes } from "../../lib/mail/vault-kdf";
 
 afterEach(() => clearActiveE2eeSession());
 
@@ -29,6 +29,15 @@ describe.each(mailVaultFixtures.fixtures)("committed $id vault", (fixture) => {
 
   it("matches the independent Node/OpenSSL Argon2id known answer", async () => {
     const key = await deriveVaultKeyBytes(fixture.passphrase, fixture.kdfParams);
+    expect(Buffer.from(key).toString("hex")).toBe(fixture.expectedKeyHex);
+  });
+
+  it("derives the same key through the password-envelope Argon2id from the passphrase's UTF-8 bytes", async () => {
+    const key = await argon2idBytes(
+      new TextEncoder().encode(fixture.passphrase),
+      new Uint8Array(Buffer.from(fixture.kdfParams.saltB64, "base64")),
+      { memoryKiB: fixture.kdfParams.memoryKiB, passes: fixture.kdfParams.iterations, parallelism: fixture.kdfParams.parallelism },
+    );
     expect(Buffer.from(key).toString("hex")).toBe(fixture.expectedKeyHex);
   });
 

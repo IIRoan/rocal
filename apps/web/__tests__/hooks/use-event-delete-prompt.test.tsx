@@ -9,10 +9,19 @@ import {
   it,
   jest,
 } from "@jest/globals";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRoot, type Root } from "react-dom/client";
 
 jest.mock("sonner", () => ({
   toast: { success: jest.fn(), error: jest.fn() },
+}));
+
+jest.mock("../../hooks/use-settings", () => ({
+  useSettings: () => ({ settings: null }),
+}));
+
+jest.mock("../../lib/calendar-api-service", () => ({
+  calendarApiService: { restoreTrashedEvent: jest.fn() },
 }));
 
 jest.mock("@workspace/logger", () => ({
@@ -24,6 +33,8 @@ jest.mock("@workspace/logger", () => ({
   }),
 }));
 
+import { toast } from "sonner";
+import { calendarApiService } from "../../lib/calendar-api-service";
 import { useEventDeletePrompt } from "../../hooks/use-event-delete-prompt";
 import type { CalendarEvent } from "@workspace/ui/components/calendar";
 
@@ -53,8 +64,8 @@ const occurrence = {
 let container: HTMLDivElement;
 let root: Root;
 let prompt: Prompt;
-const deleteEvent = jest.fn(async (_id: string) => undefined);
-const deleteRecurringEvent = jest.fn(async (_input: unknown) => undefined);
+const deleteEvent = jest.fn(async (_id: string): Promise<string | null> => null);
+const deleteRecurringEvent = jest.fn(async (_input: unknown): Promise<string | null> => null);
 
 function Harness({ onReady }: { onReady: (value: Prompt) => void }) {
   const value = useEventDeletePrompt({ deleteEvent, deleteRecurringEvent });
@@ -75,7 +86,11 @@ describe("useEventDeletePrompt", () => {
     document.body.appendChild(container);
     root = createRoot(container);
     act(() => {
-      root.render(<Harness onReady={capturePrompt} />);
+      root.render(
+        <QueryClientProvider client={new QueryClient()}>
+          <Harness onReady={capturePrompt} />
+        </QueryClientProvider>,
+      );
     });
   });
 
@@ -120,5 +135,24 @@ describe("useEventDeletePrompt", () => {
     });
     expect(deleteEvent).not.toHaveBeenCalled();
     expect(prompt.scopePrompt.open).toBe(false);
+  });
+
+  it("offers Undo when the delete left a trash entry, and restores from it", async () => {
+    deleteEvent.mockResolvedValueOnce("trash-1");
+    jest.mocked(calendarApiService.restoreTrashedEvent).mockResolvedValue({
+      ...single,
+      calendarId: "calendar-1",
+    });
+    act(() => prompt.requestDelete(single));
+    await act(async () => prompt.confirmPrompt.onConfirm());
+
+    const [message, options] = jest.mocked(toast.success).mock.calls.at(-1) ?? [];
+    expect(message).toBe("Event moved to Trash");
+    const action = (options as { action?: { label: string; onClick: () => void } } | undefined)?.action;
+    expect(action?.label).toBe("Undo");
+
+    await act(async () => action?.onClick());
+    expect(calendarApiService.restoreTrashedEvent).toHaveBeenCalledWith("trash-1");
+    expect(toast.success).toHaveBeenLastCalledWith("Event restored");
   });
 });

@@ -187,7 +187,7 @@ async fn seed(env: &TestEnv, api: &str, database: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Per database server, so local and Railway seeds of the same database name do not overwrite each other.
+/// Per database server, so seeds of the same database name on different servers do not overwrite each other.
 pub fn seed_manifest_path(env: &TestEnv, database: &str) -> std::path::PathBuf {
     let server = url_host_port(
         &env.database_url

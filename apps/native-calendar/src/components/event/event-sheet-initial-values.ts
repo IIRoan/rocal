@@ -36,7 +36,7 @@ function eventToInitialValues(
   };
 }
 
-/** Form seed for the sheet: the saved event when editing, or a one-hour slot on the tapped day/hour when creating. */
+/** Form seed for the sheet: the saved event when editing, or the swept range or a one-hour slot on the tapped day/hour when creating. */
 export function eventSheetInitialValues(
   mode: EventSheetMode | null,
   event: CalendarEvent | undefined,
@@ -45,7 +45,15 @@ export function eventSheetInitialValues(
   if ((mode?.type === "view" || mode?.type === "edit") && event) {
     return eventToInitialValues(event, timezone);
   }
-  if (mode?.type !== "create" || !mode.date) return undefined;
+  if (mode?.type !== "create") return undefined;
+  if (mode.start && mode.end) {
+    return {
+      start: toTimezonePickerISOString(new Date(mode.start), timezone),
+      end: toTimezonePickerISOString(new Date(mode.end), timezone),
+      timezone,
+    };
+  }
+  if (!mode.date) return undefined;
   const calendarDay = parseCreateEventCalendarDay(mode.date, timezone);
   if (!calendarDay) return undefined;
   const hour = mode.hour !== undefined ? parseInt(mode.hour, 10) : NaN;

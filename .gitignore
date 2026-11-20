@@ -50,8 +50,6 @@ apps/stalwart/.local-certs/
 **/__pycache__/
 *.py[cod]
 
-# Local Railway CLI upload staging (not source)
-.railway-up-stage/
 .env*
 
 # Untracked third-party Bulwark (AGPL) reference; never commit.

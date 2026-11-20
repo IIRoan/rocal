@@ -1,5 +1,7 @@
 import {
   LIST_DENSITY_OPTIONS,
+  MAIL_AUTO_ADVANCE_OPTIONS,
+  MAIL_SWIPE_ACTION_OPTIONS,
   MARK_AS_READ_DELAY_OPTIONS,
   UNDO_TOAST_DURATION_OPTIONS,
 } from "@workspace/calendar-core";
@@ -29,12 +31,30 @@ export const MAIL_SETTINGS_SEARCH_ENTRIES: AccountSheetSearchEntry[] = [
     location: `${COMPOSING} · Signature position`,
     keywords: "above below quote reply forward",
   },
+  {
+    pageId: "composing",
+    label: "Remove photo location",
+    location: COMPOSING,
+    keywords: "image metadata exif gps camera",
+  },
+  {
+    pageId: "composing",
+    label: "Undo send",
+    location: `${COMPOSING} · Undo send`,
+    keywords: "cancel unsend delay recall",
+  },
   { pageId: "composing", label: "Signature separator", location: COMPOSING },
   {
     pageId: "composing",
     label: "Attachment reminder",
     location: COMPOSING,
     keywords: "keywords forgot",
+  },
+  {
+    pageId: "auto-reply",
+    label: "Auto-reply",
+    location: "Auto-reply",
+    keywords: "vacation away out of office",
   },
   {
     pageId: "mail-display",
@@ -56,6 +76,12 @@ export const MAIL_SETTINGS_SEARCH_ENTRIES: AccountSheetSearchEntry[] = [
   },
   {
     pageId: "mail-display",
+    label: "Confirm links before opening",
+    location: `${DISPLAY} · Privacy`,
+    keywords: "links phishing warning",
+  },
+  {
+    pageId: "mail-display",
     label: "Email appearance",
     location: `${DISPLAY} · Email appearance`,
     keywords: "dark light original mode theme reader",
@@ -72,11 +98,23 @@ export const MAIL_SETTINGS_SEARCH_ENTRIES: AccountSheetSearchEntry[] = [
     location: `${LIST} · Mark as read`,
     keywords: "read opened",
   })),
+  ...MAIL_AUTO_ADVANCE_OPTIONS.map((option) => ({
+    pageId: "mail-list",
+    label: option.label,
+    location: `${LIST} · After archiving or deleting`,
+    keywords: "auto advance next previous reader",
+  })),
   ...UNDO_TOAST_DURATION_OPTIONS.map((option) => ({
     pageId: "mail-list",
     label: option.label,
     location: `${LIST} · Undo window`,
     keywords: "toast",
+  })),
+  ...["Swipe right", "Swipe left"].map((label) => ({
+    pageId: "mail-list",
+    label,
+    location: `${LIST} · ${label}`,
+    keywords: `gesture ${MAIL_SWIPE_ACTION_OPTIONS.map((option) => option.label).join(" ")}`,
   })),
   {
     pageId: "mail-list",

@@ -41,7 +41,14 @@ import { EventViewFooter } from "./EventViewFooter";
 import { RecurringScopeModal } from "./RecurringScopeModal";
 
 export type EventSheetMode =
-  | { type: "create"; date?: string; hour?: string }
+  | {
+      type: "create";
+      date?: string;
+      hour?: string;
+      /** UTC ISO instants of a swept range; they win over `date` and `hour`. */
+      start?: string;
+      end?: string;
+    }
   | { type: "view"; eventId: string }
   | {
       type: "edit";
@@ -317,6 +324,8 @@ export function EventSheet({
               initialReminders={isCreate ? undefined : eventReminders}
               timezone={resolvedTimezone}
               timeFormat={timeFormat}
+              isCreate={isCreate}
+              defaultDurationMinutes={settings?.defaultEventDuration}
             />
           </View>
         )}

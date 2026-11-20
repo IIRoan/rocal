@@ -4,8 +4,19 @@ import {
   getColorSwatchValue,
   useCalendarContext,
 } from "@workspace/ui/components/calendar";
-import { ChevronRight, Eye, EyeOff, Globe, Plus, Tag } from "lucide-react";
+import {
+  ChevronRight,
+  Download,
+  Eye,
+  EyeOff,
+  Globe,
+  Loader2,
+  Plus,
+  Tag,
+  Trash2,
+} from "lucide-react";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
+import { useCalendarIcsExport } from "@/hooks/use-calendar-ics-export";
 import { partitionCalendarsByKind } from "@/lib/calendar-ui-helpers";
 import { CalendarManagerHeader } from "./calendar-manager-header";
 
@@ -25,20 +36,28 @@ function ActionRow({
   icon: Icon,
   label,
   onClick,
+  pending = false,
 }: {
   icon: ComponentType<{ className?: string }>;
   label: string;
   onClick: () => void;
+  pending?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center gap-3 px-3 py-2 w-full cursor-pointer ${ROW_BUTTON_CLASS}`}
+      disabled={pending}
+      aria-busy={pending || undefined}
+      className={`flex items-center gap-3 px-3 py-2 w-full cursor-pointer disabled:cursor-default ${ROW_BUTTON_CLASS}`}
     >
       <Icon className="size-4 text-muted-foreground shrink-0" />
       <span className="text-[15px] leading-[130%]">{label}</span>
-      <ChevronRight className="ml-auto size-3.5 text-muted-foreground/40 shrink-0" />
+      {pending ? (
+        <Loader2 className="ml-auto size-3.5 text-muted-foreground shrink-0 animate-spin" />
+      ) : (
+        <ChevronRight className="ml-auto size-3.5 text-muted-foreground/40 shrink-0" />
+      )}
     </button>
   );
 }
@@ -130,16 +149,19 @@ export function CalendarListView({
   onEdit,
   onGoToSubscriptions,
   onGoToCategories,
+  onGoToTrash,
 }: {
   onBack: () => void;
   onCreate: () => void;
   onEdit: (calendar: Calendar) => void;
   onGoToSubscriptions: (calendarId?: string) => void;
   onGoToCategories: () => void;
+  onGoToTrash: () => void;
 }) {
   const { calendars } = useSharedCalendarData();
   const { ownedCalendars, publicCalendars, subscribedCalendars } =
     partitionCalendarsByKind(calendars);
+  const icsExport = useCalendarIcsExport();
 
   return (
     <div className="flex flex-col">
@@ -160,6 +182,17 @@ export function CalendarListView({
             onClick={() => onGoToSubscriptions()}
           />
           <ActionRow icon={Tag} label="Categories" onClick={onGoToCategories} />
+          <ActionRow icon={Trash2} label="Trash" onClick={onGoToTrash} />
+          <ActionRow
+            icon={Download}
+            label={icsExport.isPending ? "Exporting…" : "Export all calendars"}
+            pending={icsExport.isPending}
+            onClick={() =>
+              icsExport.mutate(
+                ownedCalendars.filter((calendar) => !calendar.isSyncOnly),
+              )
+            }
+          />
         </div>
 
         <div className={SECTION_LABEL_CLASS}>Your Calendars</div>

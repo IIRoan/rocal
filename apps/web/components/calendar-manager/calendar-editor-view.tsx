@@ -4,8 +4,9 @@ import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
 import { Label } from "@workspace/ui/components/ui/label";
 import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
-import { Loader2, Save, Star, Trash2 } from "lucide-react";
+import { Download, Loader2, Save, Star, Trash2 } from "lucide-react";
 import { useSharedCalendarData } from "@/components/calendar-data-provider";
+import { useCalendarIcsExport } from "@/hooks/use-calendar-ics-export";
 import {
   handleCalendarCreate,
   handleCalendarDelete,
@@ -127,6 +128,7 @@ export function CalendarEditorView({
   const setters = calendarFormSetters(dispatch);
   const copy = EDITOR_COPY[mode];
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const icsExport = useCalendarIcsExport();
   const { name, color, isDefault, saving, editingCalendar } = form;
   const editedCalendar = mode === "edit" ? editingCalendar : null;
 
@@ -211,6 +213,22 @@ export function CalendarEditorView({
               >
                 <Trash2 className="size-3.5 mr-1.5" />
                 Delete
+              </Button>
+            )}
+            {editedCalendar && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => icsExport.mutate([editedCalendar])}
+                disabled={saving || icsExport.isPending}
+                className="h-8"
+              >
+                {icsExport.isPending ? (
+                  <Loader2 className="size-3.5 animate-spin mr-1.5" />
+                ) : (
+                  <Download className="size-3.5 mr-1.5" />
+                )}
+                Export as .ics
               </Button>
             )}
             <div className="ml-auto">

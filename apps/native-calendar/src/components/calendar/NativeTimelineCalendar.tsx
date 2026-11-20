@@ -22,6 +22,7 @@ import {
   type DateOrDateTime,
   type DraggingEventProps,
   type EventItem,
+  type OnCreateEventResponse,
   type OnEventResponse,
   type PackedAllDayEvent,
   type PackedEvent,
@@ -47,6 +48,7 @@ import {
   KIT_INITIAL_SCROLL_Y,
   KIT_NUMBER_OF_DAYS,
   kitBackgroundToCreateSlot,
+  kitCreatedRangeToInstants,
   kitDropToEventMove,
   kitDropToVisibleDate,
   kitScrollByDay,
@@ -91,10 +93,13 @@ interface NativeTimelineCalendarProps {
   weekStartDay: number;
   workingDays: readonly number[];
   timeFormat: TimeFormat;
+  defaultEventDuration: number;
   swipeEnabled?: boolean;
   isLoading?: boolean;
   onEventPress: (eventId: string) => void;
   onTimeSlotPress: (slot: KitCreateSlot) => void;
+  /** A range swept with a long press and drag, as UTC instants. */
+  onTimeRangeCreate: (range: { start: string; end: string }) => void;
   onDateChange: (date: Date, committed: boolean) => void;
   onEventMove: (move: KitEventMove) => void | Promise<void>;
 }
@@ -111,10 +116,12 @@ export const NativeTimelineCalendar = forwardRef<
     weekStartDay,
     workingDays,
     timeFormat,
+    defaultEventDuration,
     swipeEnabled = true,
     isLoading = false,
     onEventPress,
     onTimeSlotPress,
+    onTimeRangeCreate,
     onDateChange,
     onEventMove,
   },
@@ -258,6 +265,19 @@ export const NativeTimelineCalendar = forwardRef<
       }
     },
     [eventsById, onDateChange, onEventMove, resolvedTimezone, view],
+  );
+
+  const handleDragCreateStart = useCallback(() => {
+    isDraggingRef.current = true;
+  }, []);
+
+  const handleDragCreateEnd = useCallback(
+    (created: OnCreateEventResponse) => {
+      isDraggingRef.current = false;
+      const range = kitCreatedRangeToInstants(created);
+      if (range) onTimeRangeCreate(range);
+    },
+    [onTimeRangeCreate],
   );
 
   const renderDraggingEvent = useCallback(
@@ -417,7 +437,9 @@ export const NativeTimelineCalendar = forwardRef<
         allowHorizontalSwipe={swipeEnabled}
         allowPinchToZoom={false}
         allowDragToEdit
-        allowDragToCreate={false}
+        allowDragToCreate
+        dragToCreateMode="date-time"
+        defaultDuration={defaultEventDuration}
         dragStep={KIT_DRAG_STEP_MINUTES}
         useHaptic
         scrollToNow={false}
@@ -429,6 +451,8 @@ export const NativeTimelineCalendar = forwardRef<
         onPressDayNumber={handlePressDayNumber}
         onDragEventStart={handleDragEventStart}
         onDragEventEnd={handleDragEventEnd}
+        onDragCreateEventStart={handleDragCreateStart}
+        onDragCreateEventEnd={handleDragCreateEnd}
       >
         <CalendarHeader
           dayBarHeight={52}

@@ -30,6 +30,7 @@ Add it to the matching module (`repository`, `comments`, `client`, `typescript`,
 | `forbidden-dependencies` | Workspace manifests must not depend on banned mail, analytics, error-reporting, state, validation, HTTP, date, motion, or CSS-in-JS libraries. |
 | `no-pii-tracking-config` | Error reporting never sends default PII, never enables IP tracking, and the query cache is never persisted. |
 | `no-committed-secrets` | Only `.env*.example` files (and the public web production env) and no private keys may be committed. |
+| `pinned-workflow-actions` | Every `uses:` in `.github/workflows` is a local `./` workflow or pinned to a full 40-character commit SHA. |
 | `no-alternate-mail-transport` | Mail runs over JMAP only: no SMTP/IMAP/POP3 URLs or Resend, and the provisioning token stays in the admin client. |
 | `comments-one-line` | Every comment, including JSDoc, is a single line: no multi-line blocks, no `//` pair wrapping one sentence. |
 | `no-commented-out-code` | Delete dead code instead of commenting it out. |

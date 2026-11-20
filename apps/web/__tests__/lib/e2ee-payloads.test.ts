@@ -61,14 +61,14 @@ describe("e2ee payload helpers", () => {
       calendarId: "cal-1",
     };
 
-    await expect(attachEventEncryptionShadow(request)).rejects.toThrow(
+    await expect(attachEventEncryptionShadow(request, "event-1")).rejects.toThrow(
       "Encryption is not ready",
     );
     await expect(
       attachCalendarEncryptionShadow({ name: "Therapy", color: "blue" }),
     ).rejects.toThrow("Encryption is not ready");
     await expect(
-      attachEventEncryptionShadow({ start: request.start, end: request.end }),
+      attachEventEncryptionShadow({ start: request.start, end: request.end }, "event-1"),
     ).resolves.toEqual({ start: request.start, end: request.end });
     await expect(
       attachCalendarEncryptionShadow({ isVisible: false }),
@@ -84,7 +84,7 @@ describe("e2ee payload helpers", () => {
       calendarId: "cal-1",
     };
 
-    await expect(attachEventEncryptionShadow(request)).resolves.toEqual({
+    await expect(attachEventEncryptionShadow(request, "event-1")).resolves.toEqual({
       start: request.start,
       end: request.end,
       calendarId: request.calendarId,
@@ -109,6 +109,7 @@ describe("e2ee payload helpers", () => {
 
     const result = (await attachEventEncryptionShadow(
       request,
+      "event-1",
     )) as typeof request & {
       encryptedContent?: string;
     };
@@ -128,7 +129,7 @@ describe("e2ee payload helpers", () => {
       calendarId: "cal-1",
     };
 
-    const result = await attachEventEncryptionShadow(request);
+    const result = await attachEventEncryptionShadow(request, "event-1");
 
     expect(mockEncryptJsonPayload).toHaveBeenCalledWith(
       activeSession.accountKey,
@@ -139,7 +140,7 @@ describe("e2ee payload helpers", () => {
         color: null,
         categoryId: null,
       },
-      "event-content:v1",
+      "event-content:v2:event-1",
     );
     expect(result).toEqual({
       start: request.start,
@@ -151,7 +152,7 @@ describe("e2ee payload helpers", () => {
         iv: "iv",
         ciphertext: "ciphertext",
       }),
-      encryptionKeyVersion: 1,
+      encryptionKeyVersion: 2,
       attributesEncrypted: true,
     });
   });
@@ -209,7 +210,7 @@ describe("e2ee payload helpers", () => {
       end: "2026-05-01T11:00:00.000Z",
       calendarId: "cal-1",
       participants: [{ email: "guest@example.com", role: "attendee" }],
-    });
+    }, "event-1");
 
     expect(result).not.toHaveProperty("title");
     expect(result.invitationContent).toEqual({ title: "Planning" });

@@ -17,6 +17,13 @@ import {
   type JmapMethodCallLike,
   type MailServerPolicy,
 } from "./mail-server-policy";
+import {
+  assertMailSendHold,
+  scheduledSendKeyword,
+  SCHEDULED_SEND_KEYWORD_PREFIX,
+  type MailSendHold,
+  type ScheduledMailSend,
+} from "./mail-scheduled-send";
 
 export type JmapEmailSetMethodCall = [
   "Email/set",
@@ -161,6 +168,8 @@ export type OutgoingJmapMessage = OutgoingEmailHeaders & {
   references?: string[];
   /** Draft this message replaces; destroyed only once the submission is queued. */
   previousDraftId?: string;
+  /** RFC 4865 hold: an undo window or a scheduled release. */
+  hold?: MailSendHold;
 };
 
 export type JmapDraft = OutgoingEmailHeaders & {
@@ -185,6 +194,18 @@ const MAIL_CAPABILITIES = [
   "urn:ietf:params:jmap:core",
   "urn:ietf:params:jmap:mail",
 ];
+const SUBMISSION_CAPABILITIES = [...MAIL_CAPABILITIES, "urn:ietf:params:jmap:submission"];
+
+function holdParameters(input: OutgoingJmapMessage): Record<string, string> {
+  const hold = input.hold;
+  if (!hold) return {};
+  if ("forSeconds" in hold) {
+    if (!Number.isInteger(hold.forSeconds) || hold.forSeconds < 1 || hold.forSeconds > 2_592_000) throw new Error("Invalid send time.");
+    return { HOLDFOR: String(hold.forSeconds) };
+  }
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(hold.until) || !input.submissionToken) throw new Error("Invalid send time.");
+  return { HOLDUNTIL: hold.until };
+}
 
 export function buildSendMessageMethodCalls(
   input: OutgoingJmapMessage,
@@ -195,6 +216,15 @@ export function buildSendMessageMethodCalls(
     throw new Error("Encrypted attachment mail must use the import transport.");
   }
   if (input.submissionToken && !/^[a-f0-9]{32}$/.test(input.submissionToken)) throw new Error("Invalid submission reference.");
+  const holdParams = holdParameters(input);
+  const scheduledKeyword =
+    input.hold && "until" in input.hold && input.submissionToken
+      ? { [scheduledSendKeyword(input.submissionToken)]: true }
+      : {};
+  const mailFromParams = {
+    ...(input.submissionToken ? { ENVID: input.submissionToken } : {}),
+    ...holdParams,
+  };
   const headers = buildEmailHeaders(input);
   const seenEnvelopeRecipients = new Set<string>();
   const envelopeRecipients: { email: string }[] = [];
@@ -215,10 +245,11 @@ export function buildSendMessageMethodCalls(
     ...(input.inReplyTo?.length ? { inReplyTo: input.inReplyTo } : {}),
     ...(input.references?.length ? { references: input.references } : {}),
   };
+  const sealedDraftKeywords = input.sentCopyCiphertext ? {} : scheduledKeyword;
   const create: Record<string, unknown> = {
     draft1: {
       mailboxIds: { [input.draftsMailboxId]: true },
-      keywords: { $seen: true, $draft: true },
+      keywords: { $seen: true, $draft: true, ...sealedDraftKeywords },
       ...threading,
       ...headers,
       ...buildEmailContentFields(input),
@@ -231,7 +262,7 @@ export function buildSendMessageMethodCalls(
         emailId: "#draft1",
         identityId: input.identityId,
         envelope: {
-          mailFrom: { email: input.fromEmail.trim(), ...(input.submissionToken ? { parameters: { ENVID: input.submissionToken } } : {}) },
+          mailFrom: { email: input.fromEmail.trim(), ...(Object.keys(mailFromParams).length ? { parameters: mailFromParams } : {}) },
           rcptTo: envelopeRecipients,
         },
       },
@@ -244,7 +275,7 @@ export function buildSendMessageMethodCalls(
     if (input.sentMailboxId) {
       create[SENT_COPY_CREATION_ID] = {
         mailboxIds: { [input.sentMailboxId]: true },
-        keywords: { $seen: true },
+        keywords: { $seen: true, ...scheduledKeyword },
         ...threading,
         ...headers,
         ...buildPgpMimeContentFields(input.sentCopyCiphertext),
@@ -269,7 +300,7 @@ export function buildSendMessageMethodCalls(
               draft1: {
                 blobId: imported.blobId,
                 mailboxIds: { [input.draftsMailboxId]: true },
-                keywords: { $seen: true, $draft: true },
+                keywords: { $seen: true, $draft: true, ...sealedDraftKeywords },
               },
             },
           },
@@ -796,9 +827,10 @@ async function performSend(
     await finishAcceptedSend(message, context).catch(context.onCleanupError);
     return receipt;
   }
+  assertMailSendHold(message, Date.now());
   attempt.accountId = context.mailAccountId;
   attempt.fingerprint = fingerprint;
-  const using = [...MAIL_CAPABILITIES, "urn:ietf:params:jmap:submission"];
+  const using = SUBMISSION_CAPABILITIES;
   let imported: JmapPgpMimeCiphertext | undefined;
   if (message.pgpMimeMessage) {
     if (!context.uploadMessage)
@@ -953,6 +985,120 @@ export async function sendJmapMessage(
   return sending.finally(() => {
     context.attempt.inFlight = null;
   });
+}
+
+type HeldSubmissionContext = {
+  mailAccountId: string;
+  submissionAccountId: string;
+  request: JmapRequest;
+};
+
+const cancelResultSchema = z.object({
+  updated: z.record(z.string(), z.unknown()).nullish(),
+  notUpdated: z.record(z.string(), z.object({ type: z.string() })).nullish(),
+});
+
+/** "canceledInSent": the server canceled the send but the sealed copy could not be moved out of Sent. */
+export type HeldSubmissionCancelResult = "canceled" | "canceledInSent" | "sent";
+
+export async function moveCanceledJmapCopyToDrafts(input: {
+  mailAccountId: string;
+  request: JmapRequest;
+  copyEmailId: string;
+  draftsMailboxId: string;
+}): Promise<void> {
+  const moved = await input.request(MAIL_CAPABILITIES, [
+    ["Email/set", {
+      accountId: input.mailAccountId,
+      update: { [input.copyEmailId]: { mailboxIds: { [input.draftsMailboxId]: true }, keywords: { $draft: true, $seen: true } } },
+    }, "c1"],
+  ]);
+  assertSuccessfulJmapResponses(moved, "Move to Drafts");
+  const update = z.object({ updated: z.record(z.string(), z.unknown()).nullish() }).safeParse(resultOf(moved, "Email/set"));
+  if (!update.success || !update.data.updated || !(input.copyEmailId in update.data.updated)) throw new Error("Could not move the message to Drafts.");
+}
+
+/** Moves the sealed copy back to Drafts only after the server confirmed the cancel. */
+export async function cancelHeldJmapSubmission(
+  input: HeldSubmissionContext & {
+    submissionId: string;
+    copyEmailId: string;
+    draftsMailboxId: string;
+    onMoveError: (error: unknown) => void;
+  },
+): Promise<HeldSubmissionCancelResult> {
+  const canceled = await input.request(SUBMISSION_CAPABILITIES, [
+    ["EmailSubmission/set", { accountId: input.submissionAccountId, update: { [input.submissionId]: { undoStatus: "canceled" } } }, "c1"],
+  ]);
+  const result = cancelResultSchema.safeParse(resultOf(canceled, "EmailSubmission/set"));
+  if (!result.success) throw findJmapResponseError(canceled, "Cancel send") ?? new Error("Could not cancel the send.");
+  if (result.data.notUpdated?.[input.submissionId]?.type === "cannotUnsend") return "sent";
+  if (!result.data.updated || !(input.submissionId in result.data.updated)) throw new Error("Could not cancel the send.");
+  return moveCanceledJmapCopyToDrafts(input).then(
+    () => "canceled" as const,
+    (error: unknown) => {
+      input.onMoveError(error);
+      return "canceledInSent" as const;
+    },
+  );
+}
+
+const pendingSubmissionsSchema = z.object({
+  list: z.array(z.object({
+    id: z.string().min(1),
+    sendAt: z.string().min(1),
+    undoStatus: z.string(),
+    envelope: z.object({ mailFrom: z.object({ parameters: z.record(z.string(), z.unknown()).nullish() }) }).nullish(),
+  })).max(100),
+});
+const jmapAddressListSchema = z.array(z.object({ email: z.string().nullish(), name: z.string().nullish() })).nullish();
+const scheduledCopiesSchema = z.object({
+  list: z.array(z.object({
+    id: z.string().min(1),
+    subject: z.string().nullish(),
+    to: jmapAddressListSchema,
+    cc: jmapAddressListSchema,
+    bcc: jmapAddressListSchema,
+    keywords: z.record(z.string(), z.boolean()).nullish(),
+  })).max(100),
+});
+
+/** Joins pending scheduled submissions to their sealed copies by the `$solace-scheduled-<ENVID>` keyword; undo-window holds carry none. */
+export async function listScheduledJmapSends(input: HeldSubmissionContext): Promise<ScheduledMailSend[]> {
+  const submissions = await input.request(SUBMISSION_CAPABILITIES, [
+    ["EmailSubmission/query", { accountId: input.submissionAccountId, filter: { undoStatus: "pending" }, limit: 100 }, "q"],
+    ["EmailSubmission/get", { accountId: input.submissionAccountId, "#ids": { resultOf: "q", name: "EmailSubmission/query", path: "/ids" }, properties: ["id", "sendAt", "undoStatus", "envelope"] }, "g"],
+  ]);
+  assertSuccessfulJmapResponses(submissions, "List scheduled mail");
+  const pending = new Map<string, { id: string; sendAt: string }>();
+  for (const submission of pendingSubmissionsSchema.parse(resultOf(submissions, "EmailSubmission/get")).list) {
+    const token = submission.envelope?.mailFrom.parameters?.ENVID;
+    if (submission.undoStatus === "pending" && typeof token === "string" && /^[a-f0-9]{32}$/.test(token)) {
+      pending.set(scheduledSendKeyword(token), { id: submission.id, sendAt: submission.sendAt });
+    }
+  }
+  if (!pending.size) return [];
+  const copies = await input.request(MAIL_CAPABILITIES, [
+    ["Email/query", { accountId: input.mailAccountId, filter: { operator: "OR", conditions: [...pending.keys()].map((hasKeyword) => ({ hasKeyword })) }, limit: 100 }, "q"],
+    ["Email/get", { accountId: input.mailAccountId, "#ids": { resultOf: "q", name: "Email/query", path: "/ids" }, properties: ["id", "subject", "to", "cc", "bcc", "keywords"] }, "g"],
+  ]);
+  assertSuccessfulJmapResponses(copies, "List scheduled mail");
+  const sends: ScheduledMailSend[] = [];
+  for (const copy of scheduledCopiesSchema.parse(resultOf(copies, "Email/get")).list) {
+    const keyword = Object.keys(copy.keywords ?? {}).find((key) => key.startsWith(SCHEDULED_SEND_KEYWORD_PREFIX) && pending.has(key));
+    const submission = keyword ? pending.get(keyword) : undefined;
+    if (!submission) continue;
+    sends.push({
+      submissionId: submission.id,
+      emailId: copy.id,
+      sendAt: submission.sendAt,
+      subject: copy.subject ?? "",
+      recipients: [...(copy.to ?? []), ...(copy.cc ?? []), ...(copy.bcc ?? [])]
+        .map((address) => address.email ?? "")
+        .filter(Boolean),
+    });
+  }
+  return [...sends].sort((left, right) => Date.parse(left.sendAt) - Date.parse(right.sendAt));
 }
 
 export async function saveJmapDraft(

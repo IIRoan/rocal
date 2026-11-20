@@ -36,13 +36,14 @@ const QUICK_BOOLEAN_FIELDS = SEARCH_FILTER_FIELDS.filter((f) => f.type === "bool
 function removeConditionField(
   conditions: MailSearchFilterCondition[],
   field: keyof MailSearchFilterCondition,
-  value: string | boolean,
+  value: MailSearchChip["value"],
 ): MailSearchFilterCondition[] {
   return conditions.flatMap((condition) => {
     const next = { ...condition };
     if (next[field] === value) delete next[field];
-    const active = Object.values(next).some(
-      (entry) => entry !== undefined && entry !== false && entry !== "",
+    const active = Object.entries(next).some(
+      ([key, entry]) =>
+        key !== "negated" && entry !== undefined && entry !== false && entry !== "",
     );
     return active ? [next] : [];
   });
@@ -62,13 +63,22 @@ export function AdvancedSearchPanel({
   const valueInputRef = useRef<HTMLInputElement>(null);
   const valueErrorId = useId();
 
-  const chips = filtersToChips(filters);
+  const chipCounts = new Map<string, number>();
+  // Repeated conditions give identical chips, so the key counts earlier repeats instead of using the index.
+  const chips = filtersToChips(filters).map((chip) => {
+    const value = `${chip.field}:${chip.label}`;
+    const seen = chipCounts.get(value) ?? 0;
+    chipCounts.set(value, seen + 1);
+    return { ...chip, key: `${seen}:${value}` };
+  });
   const activeFieldMeta =
     ADDABLE_FIELDS.find((field) => field.field === activeField) ?? ADDABLE_FIELDS[0];
 
   const activeBooleanFields = new Set<keyof MailSearchFilterCondition>(
     QUICK_BOOLEAN_FIELDS.flatMap((field) =>
-      filters.conditions.some((condition) => condition[field.field] === true)
+      filters.conditions.some(
+        (condition) => condition[field.field] === true && !condition.negated,
+      )
         ? [field.field]
         : [],
     ),
@@ -202,9 +212,9 @@ export function AdvancedSearchPanel({
 
       {chips.length > 0 ? (
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-          {chips.map((chip, index) => (
+          {chips.map((chip) => (
             <span
-              key={`${chip.field}-${index}`}
+              key={chip.key}
               className="inline-flex items-center gap-1 rounded-md border border-accent/20 bg-accent/10 px-1.5 py-0.5 text-[11px] font-medium text-accent"
             >
               {chip.label}

@@ -1,4 +1,5 @@
 import {
+  EVENT_CONTENT_UNAVAILABLE_MESSAGE,
   hasOptionalEventParticipants,
   isCancelledCalendarEvent,
 } from "@workspace/calendar-core";
@@ -173,6 +174,9 @@ export function EventEditorReadView({
           </div>
         )}
       </div>
+      {eventForm.selectedEvent?.contentUnavailable && (
+        <p className="text-sm text-muted-foreground">{EVENT_CONTENT_UNAVAILABLE_MESSAGE}</p>
+      )}
 
       <div className="space-y-1">
         <EventEditorRow desktop icon={Clock} label="Date and time">

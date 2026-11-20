@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  analyzeEmailHtml,
   buildEmailContentSecurityPolicy,
   buildEmailHtmlDocument,
   darkenCssColor,
@@ -328,5 +329,118 @@ describe("processEmailHtml", () => {
 
     expect(processed).not.toContain("p.gif");
     expect(processed).toContain("banner.png");
+  });
+});
+
+describe("processEmailHtml link rewrite", () => {
+  it("hands each link and its text to rewriteLink and keeps the original in the title", () => {
+    const seen: { href: string; text: string }[] = [];
+    const processed = processEmailHtml({
+      html: '<a href="mailto:a@example.org?subject=x&amp;body=y" title="Sender title"><b>Write</b>  to us</a><a href="https://example.org/">site</a>',
+      isDark: false,
+      blockTrackingPixels: false,
+      rewriteLink: (link) => {
+        seen.push(link);
+        return link.href.startsWith("mailto:") ? "https://solace.test/mail/link#id.0" : null;
+      },
+    });
+
+    expect(seen).toEqual([
+      { href: "mailto:a@example.org?subject=x&body=y", text: "Write to us" },
+      { href: "https://example.org/", text: "site" },
+    ]);
+    expect(processed).toContain('href="https://solace.test/mail/link#id.0"');
+    expect(processed).toContain('title="mailto:a@example.org?subject=x&amp;body=y"');
+    expect(processed).not.toContain("Sender title");
+    expect(processed).toContain('href="https://example.org/"');
+  });
+
+  it("keeps a legacy `&name=` query key literal when it decodes the href", () => {
+    const hrefs: string[] = [];
+    processEmailHtml({
+      html: '<a href="https://example.org/?view=1&tab=inbox&amp;lt=2">x</a>',
+      isDark: false,
+      blockTrackingPixels: false,
+      rewriteLink: ({ href }) => {
+        hrefs.push(href);
+        return null;
+      },
+    });
+    expect(hrefs).toEqual(["https://example.org/?view=1&tab=inbox&lt=2"]);
+  });
+});
+
+describe("processEmailHtml tracking parameters", () => {
+  it("strips click trackers from every link and re-escapes the query", () => {
+    const processed = processEmailHtml({
+      html: '<a href="https://shop.example/p?utm_source=mail&amp;id=7&amp;fbclid=x&amp;copy=2">Shop</a><a href="https://example.org/">Plain</a>',
+      isDark: false,
+      blockTrackingPixels: false,
+    });
+
+    expect(processed).toContain('href="https://shop.example/p?id=7&amp;copy=2"');
+    expect(processed).not.toMatch(/utm_source|fbclid/);
+    expect(processed).toContain('href="https://example.org/"');
+  });
+});
+
+describe("known trackers", () => {
+  const TRACKERS =
+    '<p>Hi</p><img src="https://us5.list-manage.com/track/open.php?u=1" width="600" height="200">' +
+    '<img data-src="https://cdn.example/ok.png" src="https://mailtrack.io/trace/mail/a.png">' +
+    '<img src="https://us5.list-manage.com/track/open.php?u=2" alt="a>b">' +
+    '<img src="https://cdn.example/p.gif" width="1" height="1"><img src="cid:logo" width="1" height="1">' +
+    '<table background="https://mandrillapp.com/track/open.php?u=1"><tr><td>x</td></tr></table>' +
+    '<img src="https://cdn.example/banner.png" width="600">';
+
+  it("removes known trackers of any size even when remote images are allowed", () => {
+    const processed = processEmailHtml({ html: TRACKERS, isDark: false, blockTrackingPixels: true, blockRemoteImages: false });
+
+    expect(processed).not.toMatch(/list-manage|mailtrack|mandrillapp|p\.gif|cid:logo/);
+    expect(processed).toContain("banner.png");
+    expect(processed).toContain("<table>");
+  });
+
+  it("counts remote trackers once per image and lists unique hosts", () => {
+    expect(analyzeEmailHtml({ html: TRACKERS, isDark: false, blockTrackingPixels: true })).toEqual({
+      hasRemoteContent: true,
+      trackers: {
+        count: 5,
+        hosts: ["cdn.example", "mailtrack.io", "mandrillapp.com", "us5.list-manage.com"],
+      },
+    });
+  });
+
+  it("removes and counts known trackers in inline styles and style blocks, escaped or in image-set()", () => {
+    const html =
+      '<style>.a{background:url(https://mail\\74 rack.io/trace/mail/b.png)}.b{background:\\75rl("https://mailtrack.io/trace/mail/c")}' +
+      '.c{background-image:image-set("https://mailtrack.io/trace/mail/d" 1x)}.d{background:url(https://cdn.example/bg.png)}</style>' +
+      '<div style="background-image:url(&quot;https://mailtrack.io/trace/mail/test&quot;);color:red">x</div>';
+    const processed = processEmailHtml({ html, isDark: false, blockTrackingPixels: true, blockRemoteImages: false });
+
+    expect(processed).not.toMatch(/mailtrack|\\74|\\75/);
+    expect(processed).toContain("url(https://cdn.example/bg.png)");
+    expect(processed).toContain('style="background-image:none;color:red"');
+    expect(analyzeEmailHtml({ html, isDark: false, blockTrackingPixels: true }).trackers).toEqual({
+      count: 4,
+      hosts: ["mailtrack.io"],
+    });
+  });
+
+  it("leaves no known tracker in CSS however the style blocks and attributes interleave", () => {
+    const html =
+      '<style>.a{background:url(https://mailtrack.io/trace/mail/a)}</style><p style="background:url(https://mailtrack.io/trace/mail/b)">' +
+      '<style>.b{background:url(https://mailtrack.io/trace/mail/c)}</style>x</p>';
+    const processed = processEmailHtml({ html, isDark: false, blockTrackingPixels: true, blockRemoteImages: false });
+
+    expect(processed).not.toContain("mailtrack");
+    expect(processEmailHtml({ html: processed, isDark: false, blockTrackingPixels: true, blockRemoteImages: false })).toBe(processed);
+    expect(analyzeEmailHtml({ html, isDark: false, blockTrackingPixels: true }).trackers.count).toBe(3);
+  });
+
+  it("counts nothing when tracker blocking is off", () => {
+    const result = analyzeEmailHtml({ html: TRACKERS, isDark: false, blockTrackingPixels: false });
+    expect(result.trackers).toEqual({ count: 0, hosts: [] });
+    expect(processEmailHtml({ html: TRACKERS, isDark: false, blockTrackingPixels: false })).toContain("list-manage");
   });
 });

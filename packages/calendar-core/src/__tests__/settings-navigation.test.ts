@@ -42,6 +42,7 @@ describe("settings navigation catalog", () => {
         "composing",
         "mail-display",
         "mail-list",
+        "auto-reply",
       ]),
     );
     expect(getSettingsMailItems("web").map((item) => item.id)).toEqual([
@@ -51,6 +52,7 @@ describe("settings navigation catalog", () => {
       "composing",
       "mail-display",
       "mail-list",
+      "auto-reply",
     ]);
   });
 

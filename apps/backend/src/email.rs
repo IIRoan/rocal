@@ -8,10 +8,10 @@ use crate::state::AppState;
 use crate::telemetry;
 
 const SHELL: &str = include_str!("email/shell.html");
-const PASSWORD_UPDATED: &str = include_str!("email/password_updated.html");
+const ACCOUNT_SECURITY: &str = include_str!("email/account_security.html");
 const INVITE: &str = include_str!("email/invite.html");
 const EVENT_INVITATION: &str = include_str!("email/event_invitation.html");
-/// Password resets go through support until account recovery exists; mirrors `supportEmail` in `product-info.json`.
+/// Where to turn when an account change was not the owner's; mirrors `supportEmail` in `product-info.json`.
 const SUPPORT_EMAIL: &str = "support@solace.onl";
 const LOGO_URL: &str = "https://solace.onl/favicon-192x192.png";
 const APP_URL: &str = "https://solace.onl";
@@ -56,33 +56,108 @@ fn layout(template: &str, title: &str, preview: &str, fill: &[(&str, &str)]) -> 
         .replace("{{FOOTER}}", &footer)
 }
 
-pub fn password_updated(name: &str, sign_in_url: &str) -> Message {
+/// The name a notice greets, or "there" when the account has none.
+pub fn greeting(name: &str) -> String {
+    let name = name.trim();
+    if name.is_empty() {
+        "there".into()
+    } else {
+        name.to_owned()
+    }
+}
+
+/// The sign-in page account notices link to.
+pub fn sign_in_url(state: &AppState) -> String {
+    format!("{}/login", state.config.frontend_url.trim_end_matches('/'))
+}
+
+/// A notice about a change to how the account is opened, with the support address for an owner who did not make it.
+fn account_security(
+    subject: &str,
+    heading: &str,
+    name: &str,
+    message: &str,
+    detail: &str,
+    sign_in_url: &str,
+) -> Message {
     let html = layout(
-        PASSWORD_UPDATED,
-        "Your Solace password was changed",
-        "Your Solace password was successfully changed.",
+        ACCOUNT_SECURITY,
+        heading,
+        message,
         &[
+            ("HEADING", &escape_html(heading)),
             ("NAME", &escape_html(name)),
+            ("MESSAGE", &escape_html(message)),
+            ("DETAIL", &escape_html(detail)),
             ("SIGN_IN_URL", &escape_html(sign_in_url)),
             ("SUPPORT_EMAIL", &escape_html(SUPPORT_EMAIL)),
         ],
     );
+    let mut letters = message.chars();
+    // The HTML continues "Hi {name}, " with the message; on its own line it opens a sentence.
+    let sentence: String = letters
+        .next()
+        .map(|first| first.to_uppercase().chain(letters).collect())
+        .unwrap_or_default();
     let text = [
         format!("Hi {name},"),
         String::new(),
-        "This is a confirmation that your Solace password was changed.".into(),
-        "If you made this change, no further action is needed.".into(),
-        "Solace also uses this password to protect your encryption keys on every device.".into(),
-        format!("If you did not make this change, email {SUPPORT_EMAIL} from another address right away."),
+        sentence,
+        detail.to_owned(),
+        format!("If this wasn't you, email {SUPPORT_EMAIL} from another address right away."),
     ]
     .join("\n");
     Message {
-        subject: "Your Solace password was updated".into(),
+        subject: subject.into(),
         text,
         html,
         attachments: Vec::new(),
         message_id: None,
     }
+}
+
+pub fn password_updated(name: &str, sign_in_url: &str) -> Message {
+    account_security(
+        "Your Solace password was updated",
+        "Your password was changed",
+        name,
+        "the password for your Solace account was changed. If you made this change, no further action is needed.",
+        "Solace also uses this password to protect your encryption keys on every device.",
+        sign_in_url,
+    )
+}
+
+pub fn recovery_kit_changed(name: &str, created: bool, sign_in_url: &str) -> Message {
+    if created {
+        account_security(
+            "A new Solace recovery kit was created",
+            "New recovery kit",
+            name,
+            "a new recovery kit was created for your Solace account. Any earlier kit no longer works.",
+            "Anyone with the kit and your email can reset your password, so keep it somewhere safe.",
+            sign_in_url,
+        )
+    } else {
+        account_security(
+            "Your Solace recovery kit was removed",
+            "Recovery kit removed",
+            name,
+            "the recovery kit for your Solace account was removed.",
+            "Without a recovery kit, a forgotten password can only be handled by support.",
+            sign_in_url,
+        )
+    }
+}
+
+pub fn account_recovered(name: &str, sign_in_url: &str) -> Message {
+    account_security(
+        "Your Solace password was reset with your recovery kit",
+        "Your password was reset",
+        name,
+        "your recovery kit was used to set a new password for your Solace account, and every device was signed out.",
+        "The kit is used up. Sign in with the new password and create a new recovery kit in Settings.",
+        sign_in_url,
+    )
 }
 
 pub fn invite(inviter: &str, signup_url: &str, token: &str) -> Message {
@@ -345,8 +420,38 @@ mod tests {
                 .text
                 .contains("email support@solace.onl from another address")
         );
-        assert!(changed.html.contains("Hi &lt;Roan&gt;"));
+        assert!(changed.html.contains("Hi &lt;Roan&gt;, the password"));
+        assert!(
+            changed
+                .text
+                .contains("Hi <Roan>,\n\nThe password for your Solace account")
+        );
         assert!(!changed.html.contains("{{"), "every placeholder is filled");
+    }
+
+    #[test]
+    fn recovery_notices_say_what_happened_and_where_to_turn() {
+        let url = "https://solace.test/login";
+        for (message, subject) in [
+            (
+                recovery_kit_changed("Roan", true, url),
+                "A new Solace recovery kit was created",
+            ),
+            (
+                recovery_kit_changed("Roan", false, url),
+                "Your Solace recovery kit was removed",
+            ),
+            (
+                account_recovered("Roan", url),
+                "Your Solace password was reset with your recovery kit",
+            ),
+        ] {
+            assert_eq!(message.subject, subject);
+            assert!(message.text.contains("support@solace.onl"), "{subject}");
+            assert!(!message.html.contains("{{"), "{subject}");
+        }
+        assert!(account_recovered("Roan", url).text.contains("signed out"));
+        assert_eq!(greeting("  "), "there");
     }
 
     /// A state without a database; its mailer, when configured, points at a closed port.

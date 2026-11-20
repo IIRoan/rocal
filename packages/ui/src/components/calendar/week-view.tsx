@@ -21,7 +21,11 @@ interface WeekViewProps {
   currentDate: Date;
   events: CalendarEvent[];
   onEventSelect: (event: CalendarEvent) => void;
-  onEventCreate: (startTime: Date) => void;
+  onEventCreate: (
+    startTime: Date,
+    endTime?: Date,
+    anchor?: { x: number; y: number },
+  ) => void;
   compactView?: boolean;
   timeFormat: TimeFormat;
   weekStartDay?: number;

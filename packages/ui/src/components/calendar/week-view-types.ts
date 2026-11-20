@@ -4,7 +4,11 @@ import type { CalendarEvent } from "./types";
 
 export type WeekEventHandlers = {
   onEventClick: (event: CalendarEvent, event_: MouseEvent) => void;
-  onEventCreate: (startTime: Date) => void;
+  onEventCreate: (
+    startTime: Date,
+    endTime?: Date,
+    anchor?: { x: number; y: number },
+  ) => void;
   onEventDelete?: (event: CalendarEvent) => void;
   onEventEdit?: (event: CalendarEvent) => void;
   onEventView?: (event: CalendarEvent) => void;
