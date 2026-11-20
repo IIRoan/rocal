@@ -6,7 +6,7 @@ Each device job owns a disposable `solace_test_e2e` database, the real Rust API,
 
 The apps use separate `.e2e` bundle IDs, App Groups and keychains. `SOLACE_E2E=1` is accepted only for a locally configured preview build pointing at a loopback HTTP API; remote updates are disabled. The test-only transport settings cannot be enabled for an EAS or production build. Android Release builds exercise minification as well as the real native modules.
 
-iOS journeys use Xcode 26.6 and the iOS 26.5 runtime. Setup opens Simulator with hardware-keyboard input disabled, and text entry waits for the software keyboard. These explicit settings keep input independent of the runner's default simulator preferences and newer toolchains.
+iOS release binaries are built with Xcode 27.1 on GitHub's `xcode-27` image. The Maestro journeys install those binaries on the iOS 26.5 simulator using Xcode 26.6. CI keeps this simulator toolchain while Maestro has intermittent driver startup failures on Xcode 27. Setup selects an iPhone that supports the configured runtime and opens Simulator with hardware-keyboard input disabled. Local Xcode installations without Simulator.app boot headless. Text entry waits for the software keyboard.
 
 ## Coverage
 

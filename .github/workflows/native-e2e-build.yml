@@ -16,9 +16,10 @@ permissions:
 jobs:
   build:
     name: Release app
-    runs-on: ${{ inputs.platform == 'ios' && 'macos-latest' || 'ubuntu-latest' }}
+    runs-on: ${{ inputs.platform == 'ios' && 'xcode-27' || 'ubuntu-latest' }}
     timeout-minutes: 100
     env:
+      DEVELOPER_DIR: ${{ inputs.platform == 'ios' && '/Applications/Xcode_27.1.app/Contents/Developer' || '' }}
       SOLACE_E2E: "1"
       APP_VARIANT: preview
       EXPO_PUBLIC_API_URL: http://127.0.0.1:4001
