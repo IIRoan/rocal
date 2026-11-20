@@ -110,11 +110,13 @@ function render(
   value: string,
   placeholder = "Message",
   onChangeText = jest.fn(),
+  bodySourceVersion = 0,
 ) {
   act(() =>
     root.render(
       <ComposeBodyEditor
         value={value}
+        bodySourceVersion={bodySourceVersion}
         onChangeText={onChangeText}
         placeholder={placeholder}
       />,
@@ -164,7 +166,7 @@ it("shows the seeded body while the WebView is loading without exposing an edita
 it("keeps a late-ready editor synchronized with the latest preview value", () => {
   mockPaintDocument = false;
   render("First body");
-  render("Latest body");
+  render("Latest body", "Message", undefined, 1);
 
   expect(container.textContent).toContain("Latest body");
   expect(container.textContent).not.toContain("First body");
@@ -185,13 +187,31 @@ it("labels only the editable body so accessibility actions focus the text field"
 it("keeps the editor page while the text changes and pushes the text into it instead", () => {
   render("Hello");
   editorReady();
-  render("Hello there");
+  render("Hello there", "Message", undefined, 1);
 
   expect(mockPages).toHaveLength(1);
   expect(mockInject).toHaveBeenCalledWith(
     expect.stringContaining("window.setHtml("),
   );
   expect(mockInject.mock.calls.at(-1)?.[0]).toContain("Hello there");
+});
+
+it("does not write an older React value back into the WebView after newer typing", () => {
+  const onChangeText = jest.fn();
+  render("", "Message", onChangeText);
+  editorReady();
+
+  act(() => {
+    for (const html of ["<p>Maestro</p>", "<p>Maestro body</p>"]) {
+      mockWebView?.onMessage({
+        nativeEvent: { data: JSON.stringify({ type: "change", html }) },
+      });
+    }
+  });
+  render("Maestro", "Message", onChangeText);
+
+  expect(onChangeText).toHaveBeenLastCalledWith("Maestro body");
+  expect(mockInject).not.toHaveBeenCalled();
 });
 
 it("rebuilds the page with the current text when its chrome changes", () => {
