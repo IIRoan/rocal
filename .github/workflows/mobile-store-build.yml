@@ -54,8 +54,11 @@ jobs:
 
   build:
     needs: [meta, checks]
-    runs-on: macos-latest
+    # App Store Connect requires the iOS 27 SDK (ITMS-90725); pin the Xcode, not the image default.
+    runs-on: xcode-27
     timeout-minutes: 120
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.meta.outputs.matrix) }}

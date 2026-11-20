@@ -104,13 +104,14 @@ jobs:
     needs: [meta, checks]
     # Dependabot PRs build native E2E apps instead of credentialed internal releases.
     if: github.event_name != 'pull_request' || github.event.pull_request.user.login != 'dependabot[bot]'
-    runs-on: macos-latest
+    runs-on: xcode-27
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.meta.outputs.matrix) }}
     env:
       PROFILE: ${{ needs.meta.outputs.profile }}
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
     steps:
       - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
         with:

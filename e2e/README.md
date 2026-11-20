@@ -6,7 +6,7 @@ Each device job owns a disposable `solace_test_e2e` database, the real Rust API,
 
 The apps use separate `.e2e` bundle IDs, App Groups and keychains. `SOLACE_E2E=1` is accepted only for a locally configured preview build pointing at a loopback HTTP API; remote updates are disabled. The test-only transport settings cannot be enabled for an EAS or production build. Android Release builds exercise minification as well as the real native modules.
 
-iOS journeys use Xcode 26.6 and the iOS 26.5 runtime. Setup opens Simulator with hardware-keyboard input disabled, and text entry waits for the software keyboard. These explicit settings keep input independent of the runner's default simulator preferences and newer toolchains.
+iOS journeys use Xcode 27.1 and the iOS 27.1 runtime on GitHub's `xcode-27` image. Setup opens Simulator with hardware-keyboard input disabled, and text entry waits for the software keyboard. These explicit settings keep input independent of the runner's default simulator preferences and newer toolchains.
 
 ## Coverage
 
@@ -65,7 +65,7 @@ For focused iOS diagnosis, dispatch `gh workflow run native-e2e.yml --ref YOUR_B
 
 The helpers require `SOLACE_E2E=1` and an absolute `SOLACE_E2E_DIR` whose final directory is `solace-e2e`. Use a new temporary directory. Do not share it with another run. Ports 4001, 55432, 58080 and 59000 must be free; macOS also uses SMTP port 2525 and Android uses the isolated emulator port 5580.
 
-Use the repository's pinned Bun, Node and Rust. Linux needs Podman, Android SDK tools and Java 21. macOS needs Xcode 26.6 with iOS 26.5, CocoaPods, Java 21 and Homebrew `postgresql@18`/Python 3.13. The workflow contains the reproducible setup sequence.
+Use the repository's pinned Bun, Node and Rust. Linux needs Podman, Android SDK tools and Java 21. macOS needs Xcode 27.1 with iOS 27.1, CocoaPods, Java 21 and Homebrew `postgresql@18`/Python 3.13. The workflow contains the reproducible setup sequence.
 
 ```sh
 export SOLACE_E2E=1 APP_VARIANT=preview EXPO_NO_DOTENV=1
