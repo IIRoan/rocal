@@ -116,3 +116,35 @@ it("drops script links but keeps web, mail, phone and relative links", () => {
     editor.destroy();
   }
 });
+
+it("folds a reply's quoted message behind a button and leaves a forward open", () => {
+  const reply = new Editor({
+    extensions: richTextEditorExtensions,
+    content: "<p>Thanks</p><div><p>On Nov 16, Maestro wrote:</p></div><div data-quoted-html><p>Quoted line</p></div>",
+  });
+  const forward = new Editor({
+    extensions: richTextEditorExtensions,
+    content: "<div>---------- Forwarded message ----------<br>From: peer@solace.test</div><div data-quoted-html><p>Forwarded line</p></div>",
+  });
+
+  try {
+    const island = reply.view.dom.querySelector<HTMLElement>(".quoted-html-island");
+    const toggle = reply.view.dom.querySelector<HTMLButtonElement>("button[aria-expanded]");
+    expect(island?.hidden).toBe(true);
+    expect(toggle?.getAttribute("aria-label")).toBe("Show quoted message");
+    expect(toggle?.className).toContain("active:not-disabled:scale-[0.96]");
+
+    toggle?.click();
+
+    expect(island?.hidden).toBe(false);
+    expect(reply.view.dom.querySelector("button[aria-expanded]")).toBeNull();
+    // Folding is view-only: the sent HTML still carries the quote.
+    expect(serializeEditorContent(reply)).toContain("<div data-quoted-html><p>Quoted line</p></div>");
+
+    expect(forward.view.dom.querySelector<HTMLElement>(".quoted-html-island")?.hidden).toBe(false);
+    expect(forward.view.dom.querySelector("button[aria-expanded]")).toBeNull();
+  } finally {
+    reply.destroy();
+    forward.destroy();
+  }
+});

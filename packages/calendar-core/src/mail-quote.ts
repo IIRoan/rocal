@@ -1,0 +1,20 @@
+/** The header both apps write above a forwarded message. */
+export const FORWARDED_MESSAGE_HEADER = "---------- Forwarded message ----------";
+
+/** Accessible name of the control that unfolds a reply's quoted message. */
+export const QUOTE_FOLD_LABEL = "Show quoted message";
+
+/** Source of the reply-quote header pattern, shared with the native editor's page script. */
+export const REPLY_QUOTE_HEADER_PATTERN = "^On [\\s\\S]+ wrote:";
+
+const replyQuoteHeader = new RegExp(REPLY_QUOTE_HEADER_PATTERN);
+
+/** The line both apps write above a reply's quoted message. */
+export function formatReplyQuoteHeader(date: string, sender: string): string {
+  return `On ${date}, ${sender} wrote:`;
+}
+
+/** Whether a block starts with the reply-quote header, so the quote under it can start folded. */
+export function isReplyQuoteHeader(text: string): boolean {
+  return replyQuoteHeader.test(text.trimStart());
+}
