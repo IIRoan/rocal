@@ -33,7 +33,11 @@ appId: ${APP_ID}
                   id: calendar-name
                   focused: true
                 timeout: 15000
-      - eraseText
+      - runFlow:
+          file: ../common/clear-unsaved-name.yaml
+          env:
+            INPUT_ID: calendar-name
+            EMPTY_LABEL: Calendar name
       - runFlow:
           file: ../common/type.yaml
           env:
