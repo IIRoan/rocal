@@ -9,6 +9,9 @@ on:
       diagnostic:
         type: boolean
         default: false
+      smoke:
+        type: boolean
+        default: false
       app:
         type: string
         default: ""
@@ -75,6 +78,8 @@ jobs:
         with:
           shared-key: native-e2e-${{ runner.os }}
           cache-on-failure: "true"
+          # PR copies of this ~1 GB cache evicted each other from the 10 GB budget; PRs restore master's.
+          save-if: ${{ github.ref == 'refs/heads/master' }}
       - name: Build the guarded test harness
         run: cargo build -p xtask
       - name: Start disposable Postgres, Stalwart and avatar storage
@@ -94,11 +99,11 @@ jobs:
         run: python3 scripts/e2e/device.py "$E2E_PLATFORM"
       - name: Exercise Calendar authentication and management
         id: calendar
-        if: ${{ !inputs.diagnostic && inputs.app != 'mail' }}
+        if: ${{ !inputs.diagnostic && !inputs.smoke && inputs.app != 'mail' }}
         shell: bash
         run: python3 scripts/e2e/run.py "$E2E_PLATFORM" --calendar-start
       - name: Upload initial Calendar evidence
-        if: ${{ !cancelled() && !inputs.diagnostic && (steps.calendar.outcome == 'success' || steps.calendar.outcome == 'failure') }}
+        if: ${{ !cancelled() && !inputs.diagnostic && !inputs.smoke && (steps.calendar.outcome == 'success' || steps.calendar.outcome == 'failure') }}
         uses: chainguard-actions/actions-upload-artifact@c91615377dcc230c6b156542d25044f9b8d80dd8 # v7.0.2
         with:
           name: native-e2e-${{ inputs.platform }}-calendar-start
@@ -111,16 +116,20 @@ jobs:
         shell: bash
         run: python3 scripts/e2e/run.py "$E2E_PLATFORM" --continue
       - name: Exercise Mail journeys
-        if: ${{ !inputs.diagnostic && inputs.app == 'mail' }}
+        if: ${{ !inputs.diagnostic && !inputs.smoke && inputs.app == 'mail' }}
         shell: bash
         run: python3 scripts/e2e/run.py "$E2E_PLATFORM"
+      - name: Exercise smoke journeys
+        if: ${{ !inputs.diagnostic && inputs.smoke }}
+        shell: bash
+        run: python3 scripts/e2e/run.py "$E2E_PLATFORM" --smoke
       - name: Exercise focused iOS journeys
         if: ${{ inputs.diagnostic }}
         shell: bash
         run: python3 scripts/e2e/run.py "$E2E_PLATFORM" --diagnostic
       - name: Check persisted encryption and account state
         if: ${{ !inputs.diagnostic }}
-        run: ./target/debug/xtask e2e verify ${{ inputs.app }}
+        run: ./target/debug/xtask e2e verify ${{ inputs.smoke && 'smoke' || inputs.app }}
       - name: Publish test evidence
         if: always()
         shell: bash
@@ -129,7 +138,7 @@ jobs:
         if: always()
         uses: chainguard-actions/actions-upload-artifact@c91615377dcc230c6b156542d25044f9b8d80dd8 # v7.0.2
         with:
-          name: native-e2e-${{ inputs.platform }}${{ inputs.app && format('-{0}', inputs.app) || '' }}${{ inputs.diagnostic && '-diagnostics' || '' }}
+          name: native-e2e-${{ inputs.platform }}${{ inputs.app && format('-{0}', inputs.app) || '' }}${{ inputs.diagnostic && '-diagnostics' || '' }}${{ inputs.smoke && '-smoke' || '' }}
           path: ${{ runner.temp }}/solace-e2e/artifacts
           if-no-files-found: error
           overwrite: true

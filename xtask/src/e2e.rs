@@ -39,7 +39,10 @@ pub async fn run(args: &[&str]) -> anyhow::Result<()> {
         ["verify"] => verify(&env, true, true).await,
         ["verify", "calendar"] => verify(&env, true, false).await,
         ["verify", "mail"] => verify(&env, false, true).await,
-        _ => anyhow::bail!("usage: cargo xtask e2e serve | seed | verify [calendar | mail]"),
+        ["verify", "smoke"] => verify(&env, false, false).await,
+        _ => {
+            anyhow::bail!("usage: cargo xtask e2e serve | seed | verify [calendar | mail | smoke]")
+        }
     }
 }
 

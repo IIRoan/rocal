@@ -3,6 +3,7 @@ import type { PendingComposeAttachment } from "./compose-attachments";
 import type { ComposeSeedPlan } from "./compose-seed";
 
 export interface ComposeFormState extends ComposeTextFields {
+  bodySourceVersion: number;
   showCcBcc: boolean;
   /** The seeded fields are the baseline: closing without edits never saves or prompts. */
   seed: ComposeTextFields | null;
@@ -27,6 +28,7 @@ export const INITIAL_COMPOSE_FORM: ComposeFormState = {
   bcc: "",
   subject: "",
   body: "",
+  bodySourceVersion: 0,
   showCcBcc: false,
   seed: null,
   draftId: null,
@@ -43,6 +45,7 @@ function withSeed(
   return {
     ...state,
     ...fields,
+    bodySourceVersion: state.bodySourceVersion + 1,
     showCcBcc: state.showCcBcc || Boolean(fields.cc || fields.bcc),
     seed: fields,
   };
@@ -55,8 +58,11 @@ export function composeFormReducer(
   switch (action.type) {
     case "edit":
       return { ...state, [action.field]: action.value };
-    case "editBody":
-      return { ...state, body: action.update(state.body) };
+    case "editBody": {
+      const body = action.update(state.body);
+      if (body === state.body) return state;
+      return { ...state, body, bodySourceVersion: state.bodySourceVersion + 1 };
+    }
     case "toggleCcBcc":
       return { ...state, showCcBcc: !state.showCcBcc };
     case "seed": {

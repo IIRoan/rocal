@@ -65,6 +65,8 @@ jobs:
         with:
           shared-key: web-e2e-${{ runner.os }}
           cache-on-failure: "true"
+          # PR copies of this ~1 GB cache evicted each other from the 10 GB budget; PRs restore master's.
+          save-if: ${{ github.ref == 'refs/heads/master' }}
       - name: Build the guarded test harness
         run: cargo build -p xtask
       - name: Build the web production bundle against the loopback API

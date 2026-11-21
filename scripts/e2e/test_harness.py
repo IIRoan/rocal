@@ -16,6 +16,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import directory
+import build
 from build import restore_binaries
 import connectivity
 import device
@@ -168,6 +169,63 @@ class HarnessTests(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "iOS only"):
                 journeys.main("android", diagnostic=True)
             execute.assert_not_called()
+
+    def test_ios_smoke_runs_only_its_short_prefix_and_stops_at_the_first_failure(self):
+        for app, steps in journeys.SMOKE.items():
+            for owner, name in steps:
+                self.assertTrue((journeys.REPO / f"e2e/native/{owner}/{name}.yaml").is_file(), name)
+        calls = []
+
+        def execute(platform, owner, flow, results, passed=True):
+            calls.append((owner, flow.stem))
+            results.append({"app": owner, "name": flow.stem, "passed": passed, "seconds": 0})
+            return passed
+
+        with patch.object(journeys, "publish") as publish:
+            with patch.dict(os.environ, {"E2E_APP": "mail"}), patch.object(journeys, "run_journey", side_effect=execute):
+                journeys.run_smoke("ios")
+            self.assertEqual(calls, [("calendar", "01-authentication"), ("mail", "01-unlock-and-draft")])
+            publish.assert_called_once()
+            calls.clear()
+            failing = lambda platform, owner, flow, results: execute(platform, owner, flow, results, passed=False)
+            with patch.dict(os.environ, {"E2E_APP": "calendar"}), patch.object(journeys, "run_journey", side_effect=failing), \
+                    self.assertRaisesRegex(SystemExit, "smoke journeys failed"):
+                journeys.run_smoke("ios")
+            self.assertEqual(calls, [("calendar", "01-authentication")])
+            with patch.dict(os.environ, {"E2E_APP": ""}), self.assertRaisesRegex(SystemExit, "calendar or mail"):
+                journeys.run_smoke("ios")
+
+    def test_a_javascript_refresh_reuses_the_cached_native_app_and_its_own_hermesc(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "solace-e2e"
+            with patch.dict(os.environ, {"SOLACE_E2E": "1", "SOLACE_E2E_DIR": str(root)}, clear=True):
+                layer = directory() / "native/mail"
+                (layer / "mail.app").mkdir(parents=True)
+                (layer / "mail.app/Solace").write_text("native")
+                (layer / "hermesc").write_text("")
+                commands = []
+                answers = iter(["warning\n/repo/apps/native-mail/index.js\n", "/repo/node_modules/@expo/cli/build/bin/cli\n"])
+                with patch.object(build, "capture", side_effect=lambda command, cwd: next(answers)), \
+                        patch.object(build, "run", side_effect=lambda command, **options: commands.append([str(part) for part in command])):
+                    build.refresh_javascript("mail")
+                target = root / "binaries/mail.app"
+                self.assertEqual((target / "Solace").read_text(), "native")
+                embed, compile_bytecode, sign = commands
+                self.assertEqual(embed[1:3], ["/repo/node_modules/@expo/cli/build/bin/cli", "export:embed"])
+                self.assertEqual(embed[embed.index("--entry-file") + 1], "/repo/apps/native-mail/index.js")
+                self.assertEqual([embed[embed.index(flag) + 1] for flag in ("--dev", "--minify", "--assets-dest")], ["false", "false", str(target)])
+                self.assertEqual(compile_bytecode[:4], [str(layer / "hermesc"), "-emit-binary", "-O", "-out"])
+                self.assertEqual(compile_bytecode[4], str(target / "main.jsbundle"))
+                self.assertEqual(sign[:3], ["codesign", "--force", "--sign"])
+                self.assertEqual(sign[-1], str(target))
+
+    def test_a_native_layer_without_its_hermesc_is_not_cached(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary) / "project"
+            (project / "ios/Pods/hermes-engine").mkdir(parents=True)
+            with patch.dict(os.environ, {"SOLACE_E2E": "1", "SOLACE_E2E_DIR": str(Path(temporary) / "solace-e2e")}, clear=True), \
+                    self.assertRaisesRegex(RuntimeError, "no hermesc"):
+                build.keep_native_layer(project, project / "built.app", "mail")
 
     def test_staged_calendar_failures_stay_visible_and_continue_the_remaining_suite(self):
         with tempfile.TemporaryDirectory() as temporary:

@@ -32,8 +32,11 @@ appId: ${APP_ID}
                   id: category-name
                   focused: true
                 timeout: 15000
-      # Clear the unsaved field so a dropped-input retry cannot append a duplicate prefix.
-      - eraseText
+      - runFlow:
+          file: ../common/clear-unsaved-name.yaml
+          env:
+            INPUT_ID: category-name
+            EMPTY_LABEL: Category name
       - runFlow:
           file: ../common/type.yaml
           env:
