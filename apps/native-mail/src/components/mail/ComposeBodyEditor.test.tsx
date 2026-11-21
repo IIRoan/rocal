@@ -251,7 +251,10 @@ it("folds a reply's quoted message to its header until it is tapped", () => {
     "\n\nOn Nov 16, Maestro wrote:\n> Hello\n> Second line\n\n---------- Forwarded message ----------\nFrom: peer@solace.test",
     "Message",
   );
-  type PageWindow = Window & { ReactNativeWebView: { postMessage: (data: string) => void } };
+  type PageWindow = Window & {
+    MouseEvent: typeof MouseEvent;
+    ReactNativeWebView: { postMessage: (data: string) => void };
+  };
   const { JSDOM } = jest.requireActual<{
     JSDOM: new (
       html: string,
