@@ -146,7 +146,8 @@ function CalendarEditForm({ calendar, calendars }: { calendar: Calendar; calenda
       <SheetSection title="Name">
         <SheetGroup>
           <SheetTextField
-            value={name}
+            // Uncontrolled: on Android a re-render pushing a stale `value` wiped text the keyboard had just entered.
+            defaultValue={calendar.name}
             onChangeText={(value) => dispatch({ type: "name", name: value })}
             placeholder="Calendar name"
             maxLength={CALENDAR_NAME_MAX_LENGTH}
