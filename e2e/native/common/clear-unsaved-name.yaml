@@ -1,0 +1,15 @@
+appId: ${APP_ID}
+---
+- runFlow:
+    when:
+      visible:
+        id: ${INPUT_ID}
+        text: "^(?!${EMPTY_LABEL}$).+"
+    commands:
+      - eraseText
+      - extendedWaitUntil:
+          notVisible:
+            id: ${INPUT_ID}
+            text: "^(?!${EMPTY_LABEL}$).+"
+          timeout: 15000
+      - waitForAnimationToEnd
