@@ -39,7 +39,7 @@ export function CalendarCreatePage() {
         <SheetGroup>
           <SheetTextField
             testID="calendar-name"
-            value={name}
+            // Uncontrolled: on Android a re-render pushing a stale `value` wiped text the keyboard had just entered.
             onChangeText={(value) => {
               setName(value);
               setNameError(undefined);

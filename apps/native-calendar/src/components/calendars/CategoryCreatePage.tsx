@@ -34,7 +34,7 @@ export function CategoryCreatePage() {
       <SheetSection title="Name">
         <SheetGroup>
           <SheetTextField
-            value={name}
+            // Uncontrolled: on Android a re-render pushing a stale `value` wiped text the keyboard had just entered.
             onChangeText={(value) => {
               setName(value);
               setNameError(undefined);
