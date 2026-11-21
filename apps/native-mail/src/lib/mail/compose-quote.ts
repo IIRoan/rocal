@@ -1,5 +1,7 @@
 import {
+  FORWARDED_MESSAGE_HEADER,
   formatQuotedMailDate,
+  formatReplyQuoteHeader,
   resolveReplyRecipients,
   stripHtmlTags,
   type QuotedDateOptions,
@@ -56,7 +58,7 @@ export function buildReplyBody(
   const source = messageText(message, plaintext);
   const quoted = `> ${source.replace(/\r?\n/g, "\n> ")}`;
 
-  return `\n\nOn ${receivedAt}, ${sender} wrote:\n${quoted}`;
+  return `\n\n${formatReplyQuoteHeader(receivedAt, sender)}\n${quoted}`;
 }
 
 export function buildForwardBody(
@@ -79,7 +81,7 @@ export function buildForwardBody(
   return [
     "",
     "",
-    "---------- Forwarded message ----------",
+    FORWARDED_MESSAGE_HEADER,
     `From: ${from}`,
     `Date: ${date}`,
     ...(to ? [`To: ${to}`] : []),

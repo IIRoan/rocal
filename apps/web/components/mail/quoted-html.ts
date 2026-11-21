@@ -3,7 +3,9 @@
 import { Node as TiptapNode, mergeAttributes } from "@tiptap/core";
 import { DOMSerializer } from "@tiptap/pm/model";
 import type { Editor } from "@tiptap/react";
+import { isReplyQuoteHeader, QUOTE_FOLD_LABEL } from "@workspace/calendar-core";
 import { sanitizeUntrustedEmailHtml } from "@workspace/calendar-core/sanitize-email-html";
+import { buttonVariants } from "@workspace/ui/components/ui/button-variants";
 
 export const QUOTED_HTML_MARKER = "data-quoted-html";
 
@@ -38,12 +40,14 @@ export const QuotedHtml = TiptapNode.create({
   addNodeView() {
     return ({ node, editor, getPos }) => {
       const dom = document.createElement("div");
-      dom.setAttribute(QUOTED_HTML_MARKER, "");
-      dom.className = "quoted-html-island";
-      dom.style.cssText =
+      const island = document.createElement("div");
+      island.setAttribute(QUOTED_HTML_MARKER, "");
+      island.className = "quoted-html-island";
+      island.style.cssText =
         "border-left:2px solid color-mix(in oklch, var(--border) 80%, transparent);padding-left:12px;margin-top:8px;";
+      dom.appendChild(island);
 
-      const shadow = dom.attachShadow({ mode: "open" });
+      const shadow = island.attachShadow({ mode: "open" });
 
       // Style tag to preserve original email layout (tables, widths, fonts)
       const style = document.createElement("style");
@@ -112,6 +116,8 @@ export const QuotedHtml = TiptapNode.create({
       };
       inner.addEventListener("input", syncBack);
 
+      const unfold = foldReplyQuote(dom, island, typeof getPos === "function" ? getPos() : undefined, editor);
+
       return {
         dom,
         ignoreMutation: () => true,
@@ -131,11 +137,32 @@ export const QuotedHtml = TiptapNode.create({
           inner.removeEventListener("focusin", onFocusIn);
           inner.removeEventListener("focusout", onFocusOut);
           inner.removeEventListener("input", syncBack);
+          unfold?.();
         },
       };
     };
   },
 });
+
+/** A reply's quoted message starts folded behind a button, as in the native editor; forwards stay open. */
+function foldReplyQuote(dom: HTMLElement, island: HTMLElement, pos: number | undefined, editor: Editor) {
+  const header = typeof pos === "number" ? editor.state.doc.resolve(pos).nodeBefore : null;
+  if (!header || !isReplyQuoteHeader(header.textContent)) return null;
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.textContent = "\u2022\u2022\u2022";
+  toggle.setAttribute("aria-label", QUOTE_FOLD_LABEL);
+  toggle.setAttribute("aria-expanded", "false");
+  toggle.className = `${buttonVariants({ variant: "ghost", size: "xs" })} mt-2 bg-hover text-muted-foreground`;
+  const open = () => {
+    island.hidden = false;
+    toggle.remove();
+  };
+  toggle.addEventListener("click", open);
+  island.hidden = true;
+  dom.insertBefore(toggle, island);
+  return () => toggle.removeEventListener("click", open);
+}
 
 export function serializeEditorContent(editor: Editor): string {
   const serializer = DOMSerializer.fromSchema(editor.schema);

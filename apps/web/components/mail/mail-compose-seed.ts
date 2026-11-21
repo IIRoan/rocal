@@ -1,6 +1,8 @@
 import {
   buildReplyContext,
+  FORWARDED_MESSAGE_HEADER,
   formatQuotedMailDate,
+  formatReplyQuoteHeader,
   resolveMessageReplyFrom,
   resolveMessageReplyRecipients,
   type MailtoDraft,
@@ -99,15 +101,15 @@ export function buildReplySeed(
         separator: settings.signatureSeparatorEnabled,
       })
     : "";
-  const quotedPlain = `\n\n---\nOn ${date}, ${sender} wrote:\n${body}`;
+  const quotedPlain = `\n\n---\n${formatReplyQuoteHeader(date, sender)}\n${body}`;
   const sanitizedQuote = rewriteCidImagesForEditor(
     sanitizeQuotedEmailHtml(htmlBody),
   );
   const quotedHtml = settings.plainTextMode
     ? ""
-    : `<p></p>${signatureBlock}<div><p>On ${date}, ${escapeHtml(fromLabel)} wrote:</p></div>${buildQuotedHtmlBlock(sanitizedQuote)}`;
+    : `<p></p>${signatureBlock}<div><p>${formatReplyQuoteHeader(date, escapeHtml(fromLabel))}</p></div>${buildQuotedHtmlBlock(sanitizedQuote)}`;
   const plainBody = settings.plainTextMode
-    ? `${embedAboveQuote ? `${settings.signatureSeparatorEnabled ? "\n\n-- \n" : "\n\n"}${getPlainTextSignature(signatureIdentity)}` : ""}\n\nOn ${date}, ${fromLabel} wrote:\n${body
+    ? `${embedAboveQuote ? `${settings.signatureSeparatorEnabled ? "\n\n-- \n" : "\n\n"}${getPlainTextSignature(signatureIdentity)}` : ""}\n\n${formatReplyQuoteHeader(date, fromLabel)}\n${body
         .split("\n")
         .map((line) => `> ${line}`)
         .join("\n")}`
@@ -181,8 +183,8 @@ export function buildForwardSeed(
   const sanitizedQuote = rewriteCidImagesForEditor(
     sanitizeQuotedEmailHtml(htmlBody),
   );
-  const forwardHeader = `<div>---------- Forwarded message ----------<br>From: ${escapeHtml(fromFull)}<br>Date: ${date}<br>Subject: ${escapeHtml(subject)}<br><br></div>`;
-  const plainForward = `---------- Forwarded message ----------\nFrom: ${fromFull}\nDate: ${date}\nSubject: ${subject}\n\n${body}`;
+  const forwardHeader = `<div>${FORWARDED_MESSAGE_HEADER}<br>From: ${escapeHtml(fromFull)}<br>Date: ${date}<br>Subject: ${escapeHtml(subject)}<br><br></div>`;
+  const plainForward = `${FORWARDED_MESSAGE_HEADER}\nFrom: ${fromFull}\nDate: ${date}\nSubject: ${subject}\n\n${body}`;
   const plainBody = settings.plainTextMode
     ? `${embedAboveQuote ? `${settings.signatureSeparatorEnabled ? "\n\n-- \n" : "\n\n"}${getPlainTextSignature(signatureIdentity)}` : ""}\n\n${plainForward}`
     : `\n\n---\nForwarded message from ${sender}:\n${body}`;

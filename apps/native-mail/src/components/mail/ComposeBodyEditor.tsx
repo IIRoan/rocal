@@ -20,7 +20,10 @@ import {
   applyComposeItalic,
   applyComposeUnderline,
   composeTextToHtml,
+  FORWARDED_MESSAGE_HEADER,
   htmlToComposeText,
+  QUOTE_FOLD_LABEL,
+  REPLY_QUOTE_HEADER_PATTERN,
   toggleComposeList,
   type TextSelection,
 } from "@workspace/calendar-core";
@@ -132,6 +135,25 @@ function buildEditorDocument(input: {
       border-left: 2px solid ${skin.borderPrimary};
       color: ${skin.textSecondary};
     }
+    #ed .quote.collapsed {
+      position: relative;
+      max-height: ${lineHeight}px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      padding-right: ${theme.spacing["10"]}px;
+      cursor: pointer;
+    }
+    #ed .quote.collapsed::after {
+      content: "\\2022\\2022\\2022";
+      position: absolute;
+      top: 0;
+      right: 0;
+      padding: 0 ${theme.spacing["2"]}px;
+      border-radius: ${theme.borderRadius.sm}px;
+      background: ${skin.borderPrimary};
+      color: ${skin.textSecondary};
+    }
     strong, b { font-weight: 700; }
     em, i { font-style: italic; }
     u { text-decoration: underline; }
@@ -147,12 +169,33 @@ function buildEditorDocument(input: {
       function post(payload) {
         window.ReactNativeWebView.postMessage(JSON.stringify(payload));
       }
-      // Class-only marking: attributes are dropped when the HTML is converted back to compose text.
+      // Marks and attributes only: they are dropped when the HTML is converted back to compose text, so the sent body keeps the quote.
+      var replyQuoteHeader = new RegExp(${JSON.stringify(REPLY_QUOTE_HEADER_PATTERN)});
+      var forwardedHeader = ${JSON.stringify(FORWARDED_MESSAGE_HEADER)};
+      var quoteExpanded = false;
+      function collapseReplyQuote(block) {
+        block.classList.add('collapsed');
+        block.setAttribute('contenteditable', 'false');
+        block.setAttribute('role', 'button');
+        block.setAttribute('aria-expanded', 'false');
+        block.setAttribute('aria-label', ${JSON.stringify(QUOTE_FOLD_LABEL)});
+      }
+      function expandReplyQuote(block) {
+        quoteExpanded = true;
+        block.classList.remove('collapsed');
+        ['contenteditable', 'role', 'aria-expanded', 'aria-label'].forEach(function(name) {
+          block.removeAttribute(name);
+        });
+      }
       function markQuotes() {
         var blocks = ed.querySelectorAll('p');
         for (var i = 0; i < blocks.length; i++) {
           var text = blocks[i].textContent || '';
-          if (/^On [\\s\\S]+ wrote:/.test(text) || text.indexOf('---------- Forwarded message ----------') === 0) {
+          if (replyQuoteHeader.test(text.replace(/^\\s+/, ''))) {
+            blocks[i].classList.add('quote');
+            // A long quoted chain under the reply crowds the editor on a phone, so it starts folded to its header.
+            if (!quoteExpanded) collapseReplyQuote(blocks[i]);
+          } else if (text.indexOf(forwardedHeader) === 0) {
             blocks[i].classList.add('quote');
           }
         }
@@ -181,7 +224,9 @@ function buildEditorDocument(input: {
       ed.addEventListener('focus', function() {
         post({ type: 'focus' });
       });
-      ed.addEventListener('click', function() {
+      ed.addEventListener('click', function(event) {
+        var quote = event.target && event.target.closest ? event.target.closest('.quote.collapsed') : null;
+        if (quote) expandReplyQuote(quote);
         post({ type: 'focus' });
       });
       ed.addEventListener('blur', function() {

@@ -245,3 +245,48 @@ it("opens a reply with an editable blank line above the quote", () => {
     "Thanks\n\nOn Nov 16, Maestro wrote:\n> Hello",
   );
 });
+
+it("folds a reply's quoted message to its header until it is tapped", () => {
+  render(
+    "\n\nOn Nov 16, Maestro wrote:\n> Hello\n> Second line\n\n---------- Forwarded message ----------\nFrom: peer@solace.test",
+    "Message",
+  );
+  type PageWindow = Window & {
+    MouseEvent: typeof MouseEvent;
+    ReactNativeWebView: { postMessage: (data: string) => void };
+  };
+  const { JSDOM } = jest.requireActual<{
+    JSDOM: new (
+      html: string,
+      options: { runScripts: "dangerously"; beforeParse: (window: PageWindow) => void },
+    ) => { window: PageWindow };
+  }>("jsdom");
+  const posted: string[] = [];
+  const page = new JSDOM(mockPages.at(-1) ?? "", {
+    runScripts: "dangerously",
+    beforeParse: (window) => {
+      window.ReactNativeWebView = { postMessage: (data) => posted.push(data) };
+    },
+  });
+  const [reply, forward] = Array.from(page.window.document.querySelectorAll(".quote"));
+  if (!reply || !forward) throw new Error("both quote headers should be marked");
+
+  expect(reply.classList.contains("collapsed")).toBe(true);
+  expect(reply.getAttribute("contenteditable")).toBe("false");
+  expect(reply.getAttribute("role")).toBe("button");
+  expect(reply.getAttribute("aria-expanded")).toBe("false");
+  expect(forward.classList.contains("collapsed")).toBe(false);
+
+  reply.dispatchEvent(new page.window.MouseEvent("click", { bubbles: true }));
+
+  expect(reply.classList.contains("collapsed")).toBe(false);
+  expect(reply.hasAttribute("contenteditable")).toBe(false);
+  expect(reply.hasAttribute("role")).toBe(false);
+  expect(posted.at(-1)).toBe(JSON.stringify({ type: "focus" }));
+
+  // A body refresh after the reader expanded the quote must not fold it again.
+  (page.window as PageWindow & { setHtml: (html: string) => void }).setHtml(
+    "<p>Thanks</p><p>On Nov 16, Maestro wrote:<br>&gt; Hello</p>",
+  );
+  expect(page.window.document.querySelector(".quote")?.classList.contains("collapsed")).toBe(false);
+});
