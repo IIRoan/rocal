@@ -1,0 +1,15 @@
+[Unit]
+Description=Check Solace JMAP and maintain its active DNS target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/.local/state/solace-jmap-failover/failover.py
+LoadCredential=cloudflare-token:%h/.local/state/solace-jmap-failover/cloudflare-token
+UMask=0077
+NoNewPrivileges=true
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=default.target

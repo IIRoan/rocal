@@ -87,6 +87,8 @@ The application mail gateways still use a compatibility host alias for the priva
 
 ## Direct public ingress
 
+Public JMAP uses a dedicated [direct DNS failover service](bootstrap/jmap-failover/README.md) on roan-server.
+
 The public Traefik deployment has one replica per worker and serves the public Let’s Encrypt certificate. HTTPS on `mx.solace.onl` passes encrypted traffic through to the existing Stalwart listener with PROXY v2. The API and Stalwart gateways accept Traefik’s client IP on a dedicated port that is restricted to the public controller by NetworkPolicy.
 
 Traefik copies the public Service’s load balancer addresses to the Ingress status. Zeabur uses that status and the pod port declarations to check each route against DNS. Manage these six existing routes through the Git manifests. cert-manager owns certificate issuance and renewal, and Cloudflare hosts the authoritative DNS records.
