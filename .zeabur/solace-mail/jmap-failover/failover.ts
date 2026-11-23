@@ -4,11 +4,11 @@ export const PRIMARY = "mx.solace.onl";
 export const STANDBY = "mx2.solace.onl";
 const ORIGINS = [PRIMARY, STANDBY] as const;
 const API = "https://api.cloudflare.com/client/v4";
-const POLL_MS = 5_000;
+export const POLL_MS = 2_000;
 export const DNS_CHECK_MS = 60_000;
 export const DNS_RETRY_MS = 30_000;
 const FAILURES_TO_SWITCH = 2;
-const SUCCESSES_TO_RETURN = 12;
+const SUCCESSES_TO_RETURN = Math.ceil(60_000 / POLL_MS);
 const TOKEN_FILE = "/var/run/secrets/jmap-failover/api-token";
 const ID_PATTERN = /^[a-f0-9]{32}$/;
 const CORE = "urn:ietf:params:jmap:core";
@@ -61,7 +61,7 @@ export async function probe(origin: Origin, request: HttpRequest = fetch): Promi
       proxy: false,
       keepalive: false,
       redirect: "error",
-      signal: AbortSignal.timeout(3_000),
+      signal: AbortSignal.timeout(1_500),
     });
     const session = await readJson(response, 1_048_576);
     if (!object(session) || !object(session.capabilities)) return false;

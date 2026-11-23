@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { CloudflareDns, DNS_CHECK_MS, DNS_RETRY_MS, FailoverMonitor, HOST, PRIMARY, probe, STANDBY } from "./failover";
+import { CloudflareDns, DNS_CHECK_MS, DNS_RETRY_MS, FailoverMonitor, HOST, POLL_MS, PRIMARY, probe, STANDBY } from "./failover";
 
 const RECORD_ID = "a".repeat(32);
 const ZONE_ID = "b".repeat(32);
@@ -128,12 +128,12 @@ describe("failover reconciliation", () => {
   test("waits for two consecutive failures and two healthy alternate checks", async () => {
     const service = fixture();
     await service.poll(0, false, false);
-    await service.poll(5_000, false, true);
-    await service.poll(10_000, true, true);
-    await service.poll(15_000, false, true);
+    await service.poll(POLL_MS, false, true);
+    await service.poll(2 * POLL_MS, true, true);
+    await service.poll(3 * POLL_MS, false, true);
     expect(service.writes).toHaveLength(0);
 
-    await service.poll(20_000, false, true);
+    await service.poll(4 * POLL_MS, false, true);
     expect(service.writes).toEqual([{
       url: `https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records/${RECORD_ID}`,
       body: JSON.stringify({ content: STANDBY }),
@@ -141,15 +141,15 @@ describe("failover reconciliation", () => {
     expect(service.target).toBe(STANDBY);
   });
 
-  test("keeps DNS during a shared failure and fails back after twelve healthy checks", async () => {
+  test("keeps DNS during a shared failure and fails back after thirty healthy checks", async () => {
     const service = fixture(STANDBY);
     await service.poll(0, false, false);
-    await service.poll(5_000, false, false);
-    for (let now = 10_000; now < 65_000; now += 5_000) {
-      await service.poll(now, true, true);
+    await service.poll(POLL_MS, false, false);
+    for (let check = 2; check < 31; check++) {
+      await service.poll(check * POLL_MS, true, true);
     }
     expect(service.writes).toHaveLength(0);
-    await service.poll(65_000, true, true);
+    await service.poll(31 * POLL_MS, true, true);
     expect(service.target).toBe(PRIMARY);
     expect(service.writes).toHaveLength(1);
   });
