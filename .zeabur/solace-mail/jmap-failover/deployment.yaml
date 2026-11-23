@@ -19,6 +19,8 @@ spec:
     spec:
       automountServiceAccountToken: false
       enableServiceLinks: false
+      imagePullSecrets:
+        - name: solace-jmap-failover-registry
       nodeSelector:
         kubernetes.io/hostname: roan-server
       securityContext:
@@ -30,7 +32,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: monitor
-          image: docker.io/oven/bun:1.4.4-distroless@sha256:153a951ae40106e125898103e6e990ee0f38e6aee7f561029e26cf9fbed23470
+          image: cgr.dev/lunary.roan.zip/bun:1.4.5@sha256:3e7364a619c088e9d3d92ee0483f37785f2f2ab7bd1511b38a836de7b89f603e
           args: ["/app/failover.ts"]
           ports:
             - name: health

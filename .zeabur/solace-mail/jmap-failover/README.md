@@ -15,6 +15,8 @@ The monitor changes only the target of the DNS-only `mail.solace.onl` CNAME with
 
 Before the initial cutover, review and apply the [admin-owned networking configuration](../../bootstrap/networking/kustomization.yaml) from the same revision. The policy permits cluster DNS and outbound HTTPS to the two WireGuard gateways and to the public Internet for Cloudflare. Pod ingress is denied and the pod's Kubernetes API token is disabled.
 
+Provision the `solace-jmap-failover-registry` image pull Secret in `solace-mail` with a Chainguard OCI pull credential for `cgr.dev`. Rotate the credential before it expires.
+
 1. Verify that Flux applied the reviewed revision and the new Deployment is waiting for the DNS Secret. Verify the current DNS-only CNAME has TTL 60 and points to one of the two gateways.
 2. On `roan-server`, run `systemctl --user disable --now solace-jmap-failover.service` to stop the previous host monitor. Confirm it is inactive before provisioning the container's credential.
 3. Create the Secret `solace-jmap-failover-dns` in `solace-mail` with key `api-token`, using a Cloudflare token limited to Zone Read and DNS Edit for `solace.onl`. Pass a private file via `kubectl -n solace-mail create secret generic solace-jmap-failover-dns --from-file=api-token=/path/to/private/token`.
@@ -23,8 +25,8 @@ Before the initial cutover, review and apply the [admin-owned networking configu
 ```sh
 kubectl -n solace-mail rollout status deploy/solace-jmap-failover
 kubectl -n solace-mail logs deploy/solace-jmap-failover --tail=30
-kubectl -n solace-mail exec deploy/solace-jmap-failover -- /usr/local/bin/bun /app/failover.ts --check
-kubectl -n solace-mail exec deploy/solace-jmap-failover -- /usr/local/bin/bun /app/failover.ts --check-dns
+kubectl -n solace-mail exec deploy/solace-jmap-failover -- bun /app/failover.ts --check
+kubectl -n solace-mail exec deploy/solace-jmap-failover -- bun /app/failover.ts --check-dns
 dig +short mail.solace.onl CNAME
 ```
 
