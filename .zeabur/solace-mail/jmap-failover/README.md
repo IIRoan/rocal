@@ -7,7 +7,7 @@ The `solace-jmap-failover` Deployment in Zeabur's `solace-mail` project runs on 
 | Preferred | `mx.solace.onl` | `webdock-mail` |
 | Standby | `mx2.solace.onl` | `webdock-1` |
 
-The monitor probes both gateways every five seconds using the `mail.solace.onl` Host header and TLS identity. CoreDNS resolves each gateway hostname to its worker's WireGuard address. These probes cover each worker's HTTPS listener and the Stalwart discovery response. Public IP routing and firewall checks require an external probe. Two consecutive failures on the active gateway and two successes on the alternate trigger a switch. Twelve healthy checks restore the preferred route. If both gateways fail, the record stays where it is.
+The monitor opens a fresh HTTPS connection to each gateway every five seconds using the `mail.solace.onl` Host header and TLS identity. CoreDNS resolves each gateway hostname to its worker's WireGuard address. These probes cover each worker's HTTPS listener and the Stalwart discovery response. Public IP routing and firewall checks require an external probe. Two consecutive failures on the active gateway and two successes on the alternate trigger a switch. Twelve healthy checks restore the preferred route. If both gateways fail, the record stays where it is.
 
 The monitor changes only the target of the DNS-only `mail.solace.onl` CNAME with TTL 60. It reads the record every minute and again before any update. After a Cloudflare failure it keeps probing and waits 30 seconds before re-reading the record. That read also covers a write whose response was lost. A host or cluster outage leaves DNS on the last selected gateway. Client DNS caches and existing connections can delay recovery.
 

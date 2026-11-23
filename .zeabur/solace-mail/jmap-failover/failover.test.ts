@@ -59,6 +59,7 @@ describe("JMAP origin probes", () => {
         expect(options.headers).toEqual({ Host: HOST });
         expect(options.tls?.serverName).toBe(HOST);
         expect(options.proxy).toBe(false);
+        expect(options.keepalive).toBe(false);
         expect(options.redirect).toBe("error");
         expect(options.signal).toBeInstanceOf(AbortSignal);
         return Response.json(valid);

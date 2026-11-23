@@ -59,6 +59,7 @@ export async function probe(origin: Origin, request: HttpRequest = fetch): Promi
       headers: { Host: HOST },
       tls: { serverName: HOST },
       proxy: false,
+      keepalive: false,
       redirect: "error",
       signal: AbortSignal.timeout(3_000),
     });
