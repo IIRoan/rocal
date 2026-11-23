@@ -30,8 +30,10 @@ dig +short mail.solace.onl CNAME
 
 Verify authenticated mailbox reads on both gateways separately. SMTP uses the MX records separately. For shared failures, check the CloudNativePG primary and the `mail-pg` and `mail-database-rw` write Services, Redis and SeaweedFS. Prefer the synchronized PostgreSQL instance on `webdock-mail` for a planned promotion.
 
+For a live drill, verify that both public gateways serve authenticated JMAP first. Temporarily block the preferred worker's HTTPS address in the monitor's NetworkPolicy. Confirm the standby target on authoritative DNS, restore the policy, and verify automatic failback and authenticated JMAP.
+
 ## Recovery
 
-For a bad monitor rollout, revert the monitor changes through Git. To pause steering, set the Deployment replica count to zero in Git and confirm the pod terminated before manually editing the CNAME or re-enabling the old host unit. For an urgent pause, suspend the shared `solace` Flux Kustomization, scale the monitor to zero, and resume reconciliation after the committed replica count reflects the pause. If restoring the old host monitor, ensure the CNAME still targets one of the two gateways and verify the systemd unit and both gateways before continuing.
+For a bad code rollout, restore the prior monitor code through Git. To pause steering, set the Deployment replica count to zero in Git and confirm the pod terminated before manually editing the CNAME or re-enabling the old host unit. For an urgent pause, suspend the shared `solace` Flux Kustomization, scale the monitor to zero, and resume reconciliation after the committed replica count reflects the pause. If restoring the old host monitor, ensure the CNAME still targets one of the two gateways and verify the systemd unit and both gateways before continuing.
 
 Run the monitor tests with `bun test ./.zeabur/solace-mail/jmap-failover/failover.test.ts`. The PR workflow type-checks the monitor and runs the same tests. The tests simulate Cloudflare writes.

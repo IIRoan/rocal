@@ -18,10 +18,6 @@ type Health = Record<Origin, boolean>;
 type Streaks = Record<Origin, number>;
 type HttpRequest = (url: string, options: BunFetchRequestInit) => Promise<Response>;
 type DnsRecord = { id: string; target: Origin };
-type DnsWriter = {
-  current(): Promise<DnsRecord>;
-  switch(record: DnsRecord, target: Origin): Promise<void>;
-};
 
 class DnsError extends Error {}
 
@@ -92,7 +88,7 @@ function directRecord(value: unknown): DnsRecord {
   return { id: value.id, target: value.content };
 }
 
-export class CloudflareDns implements DnsWriter {
+export class CloudflareDns {
   private recordPath?: string;
 
   constructor(private readonly token: string, private readonly request: HttpRequest = fetch) {}
@@ -158,7 +154,7 @@ export class FailoverMonitor {
   private nextCheck = 0;
   private retryAt = 0;
 
-  constructor(private readonly dns: DnsWriter, private readonly log = console.info) {}
+  constructor(private readonly dns: CloudflareDns, private readonly log = console.info) {}
 
   ready(now: number): boolean {
     return this.active !== undefined && now < this.nextCheck + DNS_RETRY_MS && this.retryAt === 0;
@@ -200,7 +196,7 @@ async function checkOrigins(): Promise<Health> {
 }
 
 async function run(): Promise<void> {
-  const [mode] = Bun.argv.slice(2);
+  const mode = Bun.argv[2];
   if (mode === "--check") {
     const health = await checkOrigins();
     console.info(JSON.stringify(health));
@@ -208,7 +204,8 @@ async function run(): Promise<void> {
     return;
   }
 
-  const token = (await Bun.file(process.env.JMAP_DNS_TOKEN_FILE ?? TOKEN_FILE).text()).trim();
+  if (mode !== undefined && mode !== "--check-dns") throw new Error("Unknown failover monitor argument");
+  const token = (await Bun.file(TOKEN_FILE).text()).trim();
   if (!token) throw new DnsError("Cloudflare token file is empty");
   const dns = new CloudflareDns(token);
   if (mode === "--check-dns") {
@@ -216,8 +213,6 @@ async function run(): Promise<void> {
     console.info(`JMAP DNS target is ${record.target}`);
     return;
   }
-  if (mode !== undefined) throw new Error("Unknown failover monitor argument");
-
   const monitor = new FailoverMonitor(dns);
   Bun.serve({
     port: 8080,
