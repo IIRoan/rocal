@@ -7,3 +7,4 @@ resources:
   - solace-public.yaml
   - solace-public-services.yaml
   - solace-releases.yaml
+  - jmap-failover.yaml
