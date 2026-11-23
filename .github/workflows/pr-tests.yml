@@ -11,20 +11,55 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect integration test inputs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      rust: ${{ steps.inputs.outputs.rust }}
+      mail_gateway: ${{ steps.inputs.outputs.mail_gateway }}
+    steps:
+      - uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
+        with:
+          fetch-depth: 2
+      - name: Check the pull request merge diff
+        id: inputs
+        shell: bash
+        run: |
+          changed() {
+            local status=0
+            git diff --quiet HEAD^1 HEAD -- "$@" || status=$?
+            case "$status" in
+              0) printf 'false\n' ;;
+              1) printf 'true\n' ;;
+              *) return "$status" ;;
+            esac
+          }
+
+          rust=$(changed Cargo.toml Cargo.lock .cargo rust-toolchain.toml rustfmt.toml .rustfmt.toml \
+            clippy.toml .clippy.toml apps/backend apps/notifications apps/stalwart crates xtask \
+            packages/api-contracts package.json bun.lock .bun-version .node-version)
+          mail_gateway=$(changed apps/stalwart .zeabur/solace-mail/gateway \
+            .zeabur/solace-mail/stalwart-a .zeabur/solace-mail/stalwart-b scripts/check-zeabur.py)
+          printf 'rust=%s\nmail_gateway=%s\n' "$rust" "$mail_gateway" >> "$GITHUB_OUTPUT"
+
   test:
     name: Tests
+    needs: changes
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
     steps:
+      - name: Require integration input detection
+        if: needs.changes.result != 'success'
+        run: exit 1
+
       - name: Checkout
         uses: chainguard-actions/actions-checkout@37298d8de412b35988dd165ffae45f45b329d365 # v7.0.1
 
       - name: Verify selective Solace releases
         run: python3 -B scripts/test-solace-releases.py
-
-      - name: Test Solace JMAP DNS failover
-        run: python3 -B -m unittest discover -s .zeabur/bootstrap/jmap-failover -v
 
       - name: Setup Node.js
         uses: chainguard-actions/actions-setup-node@0fc7fd914070e07cca22606e4cab3cfeaf43711d # v6
@@ -38,6 +73,13 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Test Solace JMAP DNS failover
+        run: |
+          bunx --bun --no-install tsc --noEmit --strict --skipLibCheck --target ESNext \
+            --module Preserve --moduleResolution Bundler --types bun-types \
+            .zeabur/solace-mail/jmap-failover/*.ts
+          bun test ./.zeabur/solace-mail/jmap-failover/failover.test.ts
 
       - name: Validate native E2E workflow semantics
         env:
@@ -73,6 +115,7 @@ jobs:
             --flux "$RUNNER_TEMP/flux" --gateway-dir "$RUNNER_TEMP/solace-gateway"
 
       - name: Verify the deployed Zeabur mail gateway
+        if: needs.changes.outputs.mail_gateway == 'true'
         run: |
           relay="$RUNNER_TEMP/solace-test-relay"
           gateway="$RUNNER_TEMP/solace-gateway"
@@ -128,6 +171,8 @@ jobs:
 
   rust:
     name: Rust
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
