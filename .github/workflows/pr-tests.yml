@@ -23,6 +23,9 @@ jobs:
       - name: Verify selective Solace releases
         run: python3 -B scripts/test-solace-releases.py
 
+      - name: Test Solace JMAP DNS failover
+        run: python3 -B -m unittest discover -s .zeabur/bootstrap/jmap-failover -v
+
       - name: Setup Node.js
         uses: chainguard-actions/actions-setup-node@0fc7fd914070e07cca22606e4cab3cfeaf43711d # v6
         with:
