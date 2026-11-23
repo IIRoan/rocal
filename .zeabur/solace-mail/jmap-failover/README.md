@@ -17,10 +17,10 @@ Before the initial cutover, review and apply the [admin-owned networking configu
 
 Provision the `solace-jmap-failover-registry` image pull Secret in `solace-mail` with a Chainguard OCI pull credential for `cgr.dev`. Rotate the credential before it expires.
 
-1. Verify that Flux applied the reviewed revision and the new Deployment is waiting for the DNS Secret. Verify the current DNS-only CNAME has TTL 60 and points to one of the two gateways.
+1. Verify the current DNS-only CNAME has TTL 60 and points to one of the two gateways. Prepare the Secrets before reconciling the Deployment.
 2. On `roan-server`, run `systemctl --user disable --now solace-jmap-failover.service` to stop the previous host monitor. Confirm it is inactive before provisioning the container's credential.
 3. Create the Secret `solace-jmap-failover-dns` in `solace-mail` with key `api-token`, using a Cloudflare token limited to Zone Read and DNS Edit for `solace.onl`. Pass a private file via `kubectl -n solace-mail create secret generic solace-jmap-failover-dns --from-file=api-token=/path/to/private/token`.
-4. Verify the rollout and the two origins. A Ready pod has successfully read the expected Cloudflare record.
+4. Reconcile the reviewed revision through Flux and verify the rollout and both origins. The readiness probe starts after a 15-second grace period for the initial DNS lookup. A Ready pod has successfully read the expected Cloudflare record.
 
 ```sh
 kubectl -n solace-mail rollout status deploy/solace-jmap-failover
