@@ -155,7 +155,7 @@ kubectl -n solace-gitops patch kustomization solace --field-manager=rocal-solace
   --type=merge --patch-file .zeabur/bootstrap/riftbound-traefik-patch.json
 ```
 
-Use the Zeabur domain trace and probe each address with TLS hostname validation. Test the Riftbound API health and web CORS, anonymous S3 access denial, and GitHub webhook routing. `ingress.roan.dev` is a DNS target for the public ingress. The only public Cloudflare Tunnel routes are `zeabur.roan.dev` and `login.roan.dev`.
+Verify each hostname through Cloudflare with TLS hostname validation. Test the Riftbound API response and web CORS, anonymous S3 access denial, and GitHub webhook routing. Requests for these hostnames sent directly to either Webdock IP should reach no application route.
 
 The platform Traefik Helm release advertises `zeabur.roan.dev` for its Ingress objects. The login and dashboard routes share the tunnel address. In the Builder Helm release, keep `webhooks.enabled=true` and set `webhooks.ingress.enabled=false`. The bootstrap manifests provide the Builder's public Ingress.
 
@@ -163,6 +163,6 @@ The platform Traefik Helm release advertises `zeabur.roan.dev` for its Ingress o
 
 In **Networking → Add domain**, enter a first-level hostname under `roan.dev` and select **traefik/webdock-apps → https** for the route. Zeabur creates an HTTPRoute in the service's project. The project must have the standard `zeabur.com/project=true` label. New Zeabur projects receive it on creation.
 
-The DNS-only wildcard CNAME points to `ingress.roan.dev`. The public Webdock edge passes matching TLS connections and the original client IP to the Gateway's private listener. That listener uses the platform Traefik deployment's replica count and placement. cert-manager renews the Gateway's `*.roan.dev` certificate through the DNS-01 issuer in the public-project manifests. The file-provider route excludes the existing Git-managed hosts and both management hostnames. When adding a Git-managed first-level hostname, add it to the same exclusion before publishing it.
+The proxied wildcard CNAME points to the shared Zeabur tunnel. Its wildcard rule sends traffic to the Gateway's private listener on platform Traefik. cert-manager renews the Gateway's `*.roan.dev` origin certificate through DNS-01. Add a Git-managed project hostname as an explicit route before the tunnel's wildcard rule and publish a proxied CNAME to the same tunnel.
 
 Apply the administrator-owned [Traefik Helm values](bootstrap/zeabur-traefik-helm.yaml) and [Gateway resources](bootstrap/zeabur-application-gateway.yaml) after the public-project issuer is available. Wait for the Certificate to be Ready and the Gateway to be Programmed. Verify a disposable HTTPRoute externally through the wildcard tunnel.
