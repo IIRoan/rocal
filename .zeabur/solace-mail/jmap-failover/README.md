@@ -7,13 +7,15 @@ The `solace-jmap-failover` Deployment in Zeabur's `solace-mail` project runs on 
 | Preferred | `mx.solace.onl` | `webdock-mail` |
 | Standby | `mx2.solace.onl` | `webdock-1` |
 
-The monitor opens a fresh HTTPS connection to each gateway every two seconds using the `mail.solace.onl` Host header and TLS identity. Each probe has a 1.5-second timeout. CoreDNS resolves each gateway hostname to its worker's WireGuard address. These probes cover each worker's HTTPS listener and the Stalwart discovery response. Public IP routing and firewall checks require an external probe. Two consecutive failures on the active gateway and two successes on the alternate trigger a switch. Thirty healthy checks restore the preferred route after about a minute. If both gateways fail, the record stays where it is.
+The monitor checks each gateway every two seconds. It opens a fresh HTTPS connection using the `mail.solace.onl` Host header and TLS identity, with a 1.5-second timeout. CoreDNS resolves each gateway hostname to its worker's WireGuard address. The monitor also reads the public ingress Service's ready endpoints. Public IP routing and firewall checks require an external probe.
+
+Two observations of a missing active ingress endpoint and a ready alternate start the DNS switch while JMAP recovers. When both ingress endpoints are present, two failed JMAP checks on the active gateway and two successful checks on the alternate trigger the switch. A shared JMAP failure with both ingress endpoints present leaves DNS in place. Thirty healthy JMAP checks restore the preferred route after about a minute.
 
 The monitor changes only the target of the DNS-only `mail.solace.onl` CNAME with TTL 60. It reads the record every minute and again before any update. After a Cloudflare failure it keeps probing and waits 30 seconds before re-reading the record. That read also covers a write whose response was lost. A host or cluster outage leaves DNS on the last selected gateway. Client DNS caches and existing connections can delay recovery.
 
 ## Rollout
 
-Before the initial cutover, review and apply the [admin-owned networking configuration](../../bootstrap/networking/kustomization.yaml) from the same revision. The policy permits cluster DNS and outbound HTTPS to the two WireGuard gateways and to the public Internet for Cloudflare. Pod ingress is denied and the pod's Kubernetes API token is disabled.
+Before the initial cutover, review and apply the [admin-owned networking configuration](../../bootstrap/networking/kustomization.yaml) from the same revision. The policies permit cluster DNS and HTTPS to the two WireGuard gateways, the Kubernetes API, and Cloudflare. The monitor uses a projected service-account token to list EndpointSlices in `solace-mail`. Network policy blocks pod ingress.
 
 Provision the `solace-jmap-failover-registry` image pull Secret in `solace-mail` with a Chainguard OCI pull credential for `cgr.dev`. Rotate the credential before it expires.
 

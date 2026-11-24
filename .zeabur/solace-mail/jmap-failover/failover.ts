@@ -140,18 +140,23 @@ export class CloudflareDns {
   }
 }
 
-function choose(active: Origin, streaks: Streaks): Origin {
+function choose(active: Origin, streaks: Streaks, gateways: Streaks): Origin {
   const alternate = active === PRIMARY ? STANDBY : PRIMARY;
-  if (streaks[active] <= -FAILURES_TO_SWITCH && streaks[alternate] >= FAILURES_TO_SWITCH) {
-    return alternate;
-  }
+  const routeLost = gateways[active] <= -FAILURES_TO_SWITCH && gateways[alternate] >= FAILURES_TO_SWITCH;
+  const jmapFailed = streaks[active] <= -FAILURES_TO_SWITCH && streaks[alternate] >= FAILURES_TO_SWITCH;
+  if (routeLost || jmapFailed) return alternate;
   if (active === STANDBY && streaks[PRIMARY] >= SUCCESSES_TO_RETURN) return PRIMARY;
   return active;
+}
+
+function nextStreak(previous: number, healthy: boolean): number {
+  return healthy ? Math.max(previous, 0) + 1 : Math.min(previous, 0) - 1;
 }
 
 export class FailoverMonitor {
   private active?: Origin;
   private streaks: Streaks = { [PRIMARY]: 0, [STANDBY]: 0 };
+  private gatewayStreaks: Streaks = { [PRIMARY]: 0, [STANDBY]: 0 };
   private nextCheck = 0;
   private retryAt = 0;
 
@@ -161,23 +166,24 @@ export class FailoverMonitor {
     return this.active !== undefined && now < this.nextCheck + DNS_RETRY_MS && this.retryAt === 0;
   }
 
-  async poll(health: Health, now: number): Promise<void> {
+  async poll(health: Health, now: number, gateways?: Health): Promise<void> {
     for (const origin of ORIGINS) {
-      const previous = this.streaks[origin];
-      this.streaks[origin] = health[origin] ? Math.max(previous, 0) + 1 : Math.min(previous, 0) - 1;
+      this.streaks[origin] = nextStreak(this.streaks[origin], health[origin]);
+      this.gatewayStreaks[origin] = gateways ? nextStreak(this.gatewayStreaks[origin], gateways[origin]) : 0;
     }
     if (now < this.retryAt) return;
     if (
       this.active !== undefined && this.retryAt === 0 && now < this.nextCheck
-      && choose(this.active, this.streaks) === this.active
+      && choose(this.active, this.streaks, this.gatewayStreaks) === this.active
     ) return;
 
     try {
       const record = await this.dns.current();
-      const target = choose(record.target, this.streaks);
+      const target = choose(record.target, this.streaks, this.gatewayStreaks);
       if (target !== record.target) {
         await this.dns.switch(record, target);
         this.streaks = { [PRIMARY]: 0, [STANDBY]: 0 };
+        this.gatewayStreaks = { [PRIMARY]: 0, [STANDBY]: 0 };
       }
       if (this.active !== target || this.retryAt !== 0) this.log(`JMAP DNS target is ${target}`);
       this.active = target;
@@ -191,15 +197,53 @@ export class FailoverMonitor {
   }
 }
 
-async function checkOrigins(): Promise<Health> {
-  const [preferred, standby] = await Promise.all([probe(PRIMARY), probe(STANDBY)]);
-  return { [PRIMARY]: preferred, [STANDBY]: standby };
+const KUBE_CREDENTIALS = "/var/run/secrets/jmap-endpoints";
+const GATEWAY_SLICES = "https://kubernetes.default.svc/apis/discovery.k8s.io/v1/namespaces/solace-mail/endpointslices?labelSelector=kubernetes.io%2Fservice-name%3Dsolace-public";
+const GATEWAY_NODES = { [PRIMARY]: "webdock-mail", [STANDBY]: "webdock-1" } as const;
+
+export function readyGatewayNodes(result: unknown): Set<string> {
+  const nodes = new Set<string>();
+  if (!object(result) || !Array.isArray(result.items)) return nodes;
+  for (const slice of result.items) {
+    if (!object(slice) || !Array.isArray(slice.endpoints)) continue;
+    for (const endpoint of slice.endpoints) {
+      if (!object(endpoint) || typeof endpoint.nodeName !== "string" || !object(endpoint.conditions)) continue;
+      if (endpoint.conditions.ready === true && endpoint.conditions.terminating !== true) nodes.add(endpoint.nodeName);
+    }
+  }
+  return nodes;
+}
+
+async function readGatewayNodes(): Promise<Set<string> | undefined> {
+  try {
+    const [token, ca] = await Promise.all([
+      Bun.file(`${KUBE_CREDENTIALS}/token`).text(),
+      Bun.file(`${KUBE_CREDENTIALS}/ca.crt`).text(),
+    ]);
+    const response = await fetch(GATEWAY_SLICES, {
+      headers: { Authorization: `Bearer ${token.trim()}` },
+      tls: { ca },
+      proxy: false,
+      redirect: "error",
+      signal: AbortSignal.timeout(1_500),
+    });
+    return readyGatewayNodes(await readJson(response, 1_048_576));
+  } catch {
+    return undefined;
+  }
+}
+
+async function checkOrigins(): Promise<{ health: Health; gateways?: Health }> {
+  const [nodes, preferred, standby] = await Promise.all([readGatewayNodes(), probe(PRIMARY), probe(STANDBY)]);
+  const gateways = nodes && { [PRIMARY]: nodes.has(GATEWAY_NODES[PRIMARY]), [STANDBY]: nodes.has(GATEWAY_NODES[STANDBY]) };
+  const health = { [PRIMARY]: preferred && gateways?.[PRIMARY] === true, [STANDBY]: standby && gateways?.[STANDBY] === true };
+  return { health, gateways };
 }
 
 async function run(): Promise<void> {
   const mode = Bun.argv[2];
   if (mode === "--check") {
-    const health = await checkOrigins();
+    const { health } = await checkOrigins();
     console.info(JSON.stringify(health));
     if (!ORIGINS.every(origin => health[origin])) process.exitCode = 1;
     return;
@@ -226,12 +270,12 @@ async function run(): Promise<void> {
   let previous: Health | undefined;
   for (;;) {
     const start = performance.now();
-    const health = await checkOrigins();
+    const { health, gateways } = await checkOrigins();
     if (!previous || ORIGINS.some(origin => previous?.[origin] !== health[origin])) {
       console.info("JMAP gateway health", health);
       previous = health;
     }
-    await monitor.poll(health, performance.now());
+    await monitor.poll(health, performance.now(), gateways);
     await Bun.sleep(Math.max(0, POLL_MS - (performance.now() - start)));
   }
 }
