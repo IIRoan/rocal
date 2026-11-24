@@ -1,11 +1,13 @@
 http:
   middlewares:
-    strip-cloudflare-client-ip:
+    solace-direct-headers:
       headers:
         customRequestHeaders:
-          CF-Connecting-IP: ""
-    solace-tunnel-cache:
+          X-Solace-Tunnel: ""
+    solace-tunnel-headers:
       headers:
+        customRequestHeaders:
+          X-Solace-Tunnel: "1"
         customResponseHeaders:
           Cache-Control: "private, no-store"
 tcp:

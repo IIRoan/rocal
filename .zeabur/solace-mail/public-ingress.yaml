@@ -56,8 +56,8 @@ spec:
             - --log.level=WARN
             - --entryPoints.tunnel.address=:9444/tcp
             - --entryPoints.tunnel.http.tls=true
-            - --entryPoints.public.http.middlewares=strip-cloudflare-client-ip@file
-            - --entryPoints.tunnel.http.middlewares=solace-tunnel-cache@file
+            - --entryPoints.public.http.middlewares=solace-direct-headers@file
+            - --entryPoints.tunnel.http.middlewares=solace-tunnel-headers@file
           image: docker.io/traefik:v3.7.16@sha256:c8a121e4bb1347e8fd52657fab12f2cb70b68f8a018895e2068f92c9e519b9c2
           imagePullPolicy: IfNotPresent
           name: traefik

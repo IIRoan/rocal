@@ -230,6 +230,15 @@ class BackendGateTests(unittest.TestCase):
         self.assertEqual(self.request("/jmap/session", key=None, headers=headers, public=True), 200)
         self.assertEqual(self.upstream.requests[-1]["source"], "203.0.113.18")
 
+    @unittest.skipUnless(GATE_FIXTURE, "requires the deployed Zeabur gateway configuration")
+    def test_private_tunnel_listener_preserves_client_ip(self):
+        headers = {"X-Forwarded-For": "192.0.2.44", "CF-Connecting-IP": "203.0.113.18",
+                   "X-Solace-Tunnel": "1"}
+        self.assertEqual(self.request("/jmap/session", key=None, headers=headers, port=8085), 200)
+        forwarded = self.upstream.requests[-1]
+        self.assertEqual(forwarded["source"], "203.0.113.18")
+        self.assertNotIn("x-solace-tunnel", forwarded["headers"])
+
     def test_unconfigured_session_gate_denies_direct_stalwart_login(self):
         for headers in ({}, {"X-Real-IP": "203.0.113.11"}, {"X-Real-IP": "2001:db8:1::9"},
                         {"X-Real-IP": "invalid"}, {"X-Forwarded-For": "203.0.113.11"}):
