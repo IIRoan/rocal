@@ -1,0 +1,33 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicy
+metadata:
+  name: solace-app-database-apparmor
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    matchPolicy: Equivalent
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: solace-mail
+    objectSelector:
+      matchLabels:
+        cnpg.io/cluster: app-database
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE]
+        resources: [pods]
+  mutations:
+    - patchType: ApplyConfiguration
+      applyConfiguration:
+        expression: >-
+          Object{spec: Object.spec{securityContext: Object.spec.securityContext{appArmorProfile:
+          Object.spec.securityContext.appArmorProfile{type: 'Localhost', localhostProfile: 'solace-rehearsal-postgres'}}}}
+  reinvocationPolicy: Never
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicyBinding
+metadata:
+  name: solace-app-database-apparmor
+spec:
+  policyName: solace-app-database-apparmor

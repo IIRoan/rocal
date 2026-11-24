@@ -8,13 +8,16 @@ metadata:
   namespace: solace-mail
 spec:
   progressDeadlineSeconds: 600
-  replicas: 1
+  replicas: 2
   revisionHistoryLimit: 10
   selector:
     matchLabels:
       app.kubernetes.io/name: notifications
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   template:
     metadata:
       labels:
@@ -23,7 +26,13 @@ spec:
     spec:
       automountServiceAccountToken: false
       containers:
-        - envFrom:
+        - env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  key: DATABASE_URL
+                  name: app-postgres-url
+          envFrom:
             - secretRef:
                 name: notifications-runtime
           image: ${SOLACE_NOTIFICATIONS_IMAGE:=zot.zot.svc:5000/solace-api/notifications@sha256:ac23dcc1b86161328b69ccd26ebd0d11a5d208193e135730555c4358479944e3}
@@ -56,6 +65,9 @@ spec:
           volumeMounts:
             - mountPath: /etc/app-pg-ca
               name: app-pg-ca
+              readOnly: true
+            - mountPath: /etc/app-database-ca
+              name: app-database-ca
               readOnly: true
         - command:
             - haproxy
@@ -93,7 +105,14 @@ spec:
             - stalwart-gate.railway.internal
           ip: 127.0.0.1
       nodeSelector:
-        kubernetes.io/hostname: webdock-mail
+        roan.dev/provider: webdock
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: notifications
+              topologyKey: kubernetes.io/hostname
       restartPolicy: Always
       schedulerName: default-scheduler
       securityContext:
@@ -121,6 +140,12 @@ spec:
             defaultMode: 420
             name: app-pg-ca
           name: app-pg-ca
+        - secret:
+            secretName: app-database-ca
+            items:
+              - key: ca.crt
+                path: ca.crt
+          name: app-database-ca
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -133,15 +158,15 @@ metadata:
 spec:
   minReadySeconds: 8
   progressDeadlineSeconds: 600
-  replicas: 1
+  replicas: 2
   revisionHistoryLimit: 10
   selector:
     matchLabels:
       app.kubernetes.io/name: solace-api
   strategy:
     rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
+      maxSurge: 0
+      maxUnavailable: 1
     type: RollingUpdate
   template:
     metadata:
@@ -256,13 +281,23 @@ spec:
             - mountPath: /etc/app-pg-ca
               name: app-pg-ca
               readOnly: true
+            - mountPath: /etc/app-database-ca
+              name: app-database-ca
+              readOnly: true
       dnsPolicy: ClusterFirst
       hostAliases:
         - hostnames:
             - stalwart-gate.railway.internal
           ip: 127.0.0.1
       nodeSelector:
-        kubernetes.io/hostname: webdock-1
+        roan.dev/provider: webdock
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: solace-api
+              topologyKey: kubernetes.io/hostname
       restartPolicy: Always
       schedulerName: default-scheduler
       securityContext:
@@ -283,6 +318,12 @@ spec:
             defaultMode: 420
             name: app-pg-ca
           name: app-pg-ca
+        - secret:
+            secretName: app-database-ca
+            items:
+              - key: ca.crt
+                path: ca.crt
+          name: app-database-ca
         - configMap:
             defaultMode: 420
             name: api-edge-upstream

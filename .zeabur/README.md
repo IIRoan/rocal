@@ -15,13 +15,17 @@ The cluster provides K3s, Traefik, cert-manager, CloudNativePG, Longhorn, Zeabur
 
 | Namespace | Secrets supplied through the deployment or recovery process |
 | --- | --- |
-| `solace-mail` | `api-runtime`, `notifications-runtime`, `app-postgres-url`, `solace-acme-dns`, `mail-database-app`, `mail-live-auth`, `mail-object-auth`, `mail-pg-auth`, `mail-pg-crypto`, `mail-redis-sentinel-auth`, `mail-s3-crypto`, `mail-standby-relay-tls`, `app-pg-auth`, `app-pg-crypto`, `app-pg-tls` |
+| `solace-mail` | `api-runtime`, `notifications-runtime`, `app-postgres-url`, `app-database-auth`, `solace-acme-dns`, `mail-database-app`, `mail-live-auth`, `mail-object-auth`, `mail-pg-auth`, `mail-pg-crypto`, `mail-redis-sentinel-auth`, `mail-s3-crypto`, `mail-standby-relay-tls`, `app-pg-auth`, `app-pg-crypto`, `app-pg-tls` |
 
 The CA ConfigMaps contain public trust certificates. CloudNativePG manages its instance Services, accounts and volumes. Kubernetes provisions the StatefulSet claims from their templates. The long-lived mail object claim is declared explicitly. Restore the database and object data, with their encryption keys, before routing production traffic to a replacement installation.
 
 The admin networking manifests reserve the five Service IPs advertised by this Redis and Sentinel installation. Create those Services before other workloads allocate addresses on a replacement cluster. The production manifests expect the K3s Service CIDR to contain those addresses. A different CIDR requires updating the Service and Sentinel addresses together and migrating the saved Sentinel state to the verified leader. The `mail-pg` alias follows the CloudNativePG primary.
 
-On the application PostgreSQL worker, load the `solace-rehearsal-postgres` AppArmor profile from platform provisioning and verify it permits the mounted data directory, scratch directory and socket directory. When restoring existing PGDATA, check that `synchronous_standby_names` is empty so application commits can complete on the single instance.
+Load the `solace-rehearsal-postgres` AppArmor profile on both Webdock workers before creating `app-database`. The [admission policy](bootstrap/networking/app-database-apparmor.yaml) applies it to the PostgreSQL instances and their bootstrap jobs. `app-database-auth` is a `kubernetes.io/basic-auth` Secret with the `solace_app` username and its password.
+
+The API and notifications each run one replica per Webdock worker. Both use `app-postgres-url` to reach `app-database-rw.solace-mail.svc.cluster.local` with `sslmode=verify-full` and `sslrootcert=/etc/app-database-ca/ca.crt`. The two database instances run on separate encrypted volumes, with synchronous replication when both instances are available. CloudNativePG moves the write endpoint to the promoted instance. The notifications database leases allow either worker to claim pending jobs.
+
+Before cutting over from standalone `app-postgres`, verify the latest encrypted offsite backup and restore a rehearsal copy. Quiesce writes, take a final logical dump, restore it as `solace_app`, and compare row counts before switching the connection Secret. Restart both Deployments to reload it. Keep the old cluster fenced once the new database accepts writes. Have the encrypted archive job resolve `app-database` through its current primary and check a fresh offsite snapshot after the switch.
 
 Preserve the original volume bindings on the live cluster. Use apply without pruning so dormant recovery resources and controller-managed objects remain available.
 
