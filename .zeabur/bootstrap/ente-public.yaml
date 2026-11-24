@@ -35,7 +35,7 @@ metadata:
   namespace: ente
   annotations:
     kubernetes.io/ingress.class: solace-public
-    traefik.ingress.kubernetes.io/router.entrypoints: public,apps
+    traefik.ingress.kubernetes.io/router.entrypoints: apps
 spec:
   tls:
     - hosts: [ente.roan.dev, enteweb.roan.dev]

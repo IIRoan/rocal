@@ -124,18 +124,18 @@ Verify Solace HTTPS through the [tunnel runbook](tunnels/) and test both replica
 
 Move the direct SMTP listener one worker at a time. Verify which process owns it and preserve any private relay listeners in the same service. The TCP route carries the original client IP in PROXY v2 and Stalwart handles STARTTLS. Confirm the Kubernetes Service prefers a ready local gateway and uses its peer during drain.
 
-If a worker fails HTTPS checks for the direct projects below, withdraw its address from `edge.solace.onl`. If SMTP fails, remove the SMTP pool label from the affected worker and restore its public HAProxy listener. Repeat tunnel HTTPS and direct STARTTLS checks after either change.
+If SMTP fails, remove the SMTP pool label from the affected worker and restore its public HAProxy listener. Repeat tunnel HTTPS and direct STARTTLS checks after the change.
 
 ### Public routes for other Zeabur projects
 
-The shared Webdock Traefik deployment serves the public routes below. The DNS-only records point to `edge.solace.onl`. Cloudflare flattens the `roan.dev` record at the zone apex. The two Webdock addresses can serve every route. Service placement still determines whether the backend remains available during a node outage.
+The shared Zeabur tunnel delivers these hostnames to the private `apps` listener on Webdock Traefik. Cloudflare flattens the proxied `roan.dev` CNAME at the zone apex. Service placement determines whether a backend remains available during a node outage.
 
 | Hostnames | Service |
 | --- | --- |
 | `rift.solace.onl` | `riftbound/expo-web:8080` |
 | `riftapi.solace.onl` | `riftbound/rust-api:7000` |
 | `roan.dev`, `www.roan.dev` | `portfolio/goport:8080` |
-| `demo.roan.dev` | `demo/web:8080` |
+| `demo.roan.dev`, `test2.roan.dev` | `demo/web:8080` |
 | `objects.roan.dev` | `demo/files-s3:8333` |
 | `errors.roan.dev` | `errors/errex:8080` |
 | `builds.roan.dev` | `builder-system/zeabur-builder-webhooks:http` on `/hooks/` |
@@ -145,7 +145,7 @@ cert-manager issues and renews the Let's Encrypt certificates using DNS-01. Prov
 
 Set `TRUSTED_PROXY_CIDRS` in Riftbound's `rust-api-runtime` Secret to the Calico pod blocks assigned to the two Webdock workers. Riftbound's NetworkPolicies restrict the API port to its ingress and web proxies. Restart the API after updating the setting and verify both public routes.
 
-Apply the bootstrap manifests after the projects and their Services exist. The public Ingress objects use the `solace-public` class annotation and `public` entry point. Apply any new route's certificate and network policy before switching its public DNS record.
+Apply the bootstrap manifests after the projects and their Services exist. These Ingresses use the `solace-public` class annotation and the private `apps` entry point. Apply each route's certificate and network policy before switching its public DNS record.
 
 ```sh
 kubectl apply --server-side --field-manager=rocal-solace-bootstrap -f .zeabur/bootstrap/riftbound-public.yaml
@@ -165,4 +165,4 @@ In **Networking → Add domain**, enter a first-level hostname under `roan.dev` 
 
 The DNS-only wildcard CNAME points to `ingress.roan.dev`. The public Webdock edge passes matching TLS connections and the original client IP to the Gateway's private listener. That listener uses the platform Traefik deployment's replica count and placement. cert-manager renews the Gateway's `*.roan.dev` certificate through the DNS-01 issuer in the public-project manifests. The file-provider route excludes the existing Git-managed hosts and both management hostnames. When adding a Git-managed first-level hostname, add it to the same exclusion before publishing it.
 
-Apply the administrator-owned [Traefik Helm values](bootstrap/zeabur-traefik-helm.yaml) and [Gateway resources](bootstrap/zeabur-application-gateway.yaml) after the public-project issuer is available. Wait for the Certificate to be Ready and the Gateway to be Programmed, then verify HTTPS on both public addresses before publishing the wildcard CNAME. To withdraw wildcard publishing, first remove the wildcard CNAME, then remove the public TLS passthrough rule and restore the previous Helm values.
+Apply the administrator-owned [Traefik Helm values](bootstrap/zeabur-traefik-helm.yaml) and [Gateway resources](bootstrap/zeabur-application-gateway.yaml) after the public-project issuer is available. Wait for the Certificate to be Ready and the Gateway to be Programmed. Verify a disposable HTTPRoute externally through the wildcard tunnel.

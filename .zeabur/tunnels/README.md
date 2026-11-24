@@ -23,7 +23,15 @@ Create `cloudflared-credentials` in each of `traefik` and `solace-mail` with the
 
 Preserve exact DNS records for existing unrelated services and the direct DNS-only mail exchange records. For a new app, select `webdock-apps / https` in the Zeabur **Add domain** form. The HTTPRoute uses the Gateway's automatically renewed wildcard origin certificate. Cloudflare presents its own edge certificate.
 
-The Zeabur tunnel sends its explicit project hostnames to the private `apps` listener on Webdock Traefik. Generated app names continue through the shared `webdock-apps` Gateway. Existing public listeners support rollback during the DNS cutover.
+The Zeabur tunnel sends its explicit project hostnames to the private `apps` listener on Webdock Traefik. Generated app names use the shared `webdock-apps` Gateway.
+
+## Worker firewall
+
+The public application ports are TCP 25 on both VPSs, TCP 443 for the `mx.solace.onl` HTTPS compatibility listener, and the Cobblemon TCP and UDP NodePorts on VPS-01. Worker management uses SSH over WireGuard. The existing WireGuard listener on UDP 51820 carries cluster and management traffic.
+
+The worker firewall services read `/etc/zeabur-worker/firewall.nft` and `/etc/zeabur-mail-worker/firewall.nft`. Each configuration restricts new input on `eth0` to mail and WireGuard, with ICMP and link-local DHCPv6 as required. Gatus uses `10.200.31.6` and `10.200.31.2` with these hosts' SSH keys pinned.
+
+Verify management over WireGuard before reloading a worker firewall. Load and test one worker at a time with a timed rollback. The pre-cutover rules are archived on each worker under `/var/lib/zeabur-maintenance`.
 
 ## Verification and recovery
 

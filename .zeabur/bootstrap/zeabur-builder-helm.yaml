@@ -1,0 +1,17 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: builder
+  namespace: kube-system
+spec:
+  failurePolicy: reinstall
+  valuesContent: |
+    buildkitd:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+    webhooks:
+      enabled: true
+      ingress:
+        enabled: false
