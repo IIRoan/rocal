@@ -15,3 +15,12 @@ spec:
               app.kubernetes.io/instance: traefik-traefik
       ports:
         - {port: 8444, protocol: TCP}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: solace-mail
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: solace-public-ingress
+      ports:
+        - {port: 9445, protocol: TCP}

@@ -3,6 +3,28 @@ credentials-file: /etc/cloudflared/credentials/credentials.json
 originRequest:
   matchSNItoHost: true
 ingress:
+  - hostname: roan.dev
+    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9445
+  - hostname: www.roan.dev
+    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9445
+  - hostname: builds.roan.dev
+    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9445
+  - hostname: demo.roan.dev
+    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9445
+  - hostname: test2.roan.dev
+    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9445
+  - hostname: objects.roan.dev
+    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9445
+  - hostname: errors.roan.dev
+    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9445
+  - hostname: ente.roan.dev
+    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9445
+  - hostname: enteweb.roan.dev
+    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9445
+  - hostname: rift.solace.onl
+    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9445
+  - hostname: riftapi.solace.onl
+    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9445
   - hostname: '*.roan.dev'
     service: https://zeabur-app-gateway.traefik.svc.cluster.local:8444
   - service: http_status:404

@@ -58,6 +58,9 @@ spec:
             - --entryPoints.tunnel.http.tls=true
             - --entryPoints.public.http.middlewares=solace-direct-headers@file
             - --entryPoints.tunnel.http.middlewares=solace-tunnel-headers@file
+            - --entryPoints.apps.address=:9445/tcp
+            - --entryPoints.apps.http.tls=true
+            - --entryPoints.apps.http.middlewares=app-tunnel-cache@file
           image: docker.io/traefik:v3.7.16@sha256:c8a121e4bb1347e8fd52657fab12f2cb70b68f8a018895e2068f92c9e519b9c2
           imagePullPolicy: IfNotPresent
           name: traefik
@@ -67,6 +70,9 @@ spec:
               protocol: TCP
             - containerPort: 9444
               name: tunnel-https
+              protocol: TCP
+            - containerPort: 9445
+              name: apps-https
               protocol: TCP
             - containerPort: 2525
               name: smtp

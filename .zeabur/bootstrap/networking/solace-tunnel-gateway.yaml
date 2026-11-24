@@ -11,6 +11,9 @@ spec:
     - name: https
       port: 9444
       targetPort: tunnel-https
+    - name: apps-https
+      port: 9445
+      targetPort: apps-https
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -29,3 +32,12 @@ spec:
               app.kubernetes.io/name: cloudflared
       ports:
         - {port: 9444, protocol: TCP}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: traefik
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: cloudflared
+      ports:
+        - {port: 9445, protocol: TCP}
