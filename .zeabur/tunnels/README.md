@@ -1,6 +1,6 @@
 # Cloudflare tunnels
 
-`zeabur-apps-production` serves new Zeabur domains under `*.roan.dev`. `solace-production` serves the explicit hostnames in [the Solace tunnel config](solace/config.yaml). Each tunnel has its own credential and one connector per Webdock worker.
+`zeabur-apps-production` serves Zeabur projects and new domains under `*.roan.dev`. `solace-production` serves the explicit hostnames in [the Solace tunnel config](solace/config.yaml). These tunnels each have their own credential and one connector per Webdock worker. The Zeabur dashboard and login use the separate management tunnel on the control plane.
 
 ## Ownership
 
@@ -18,17 +18,26 @@ Create `cloudflared-credentials` in each of `traefik` and `solace-mail` with the
 | DNS name | Target | Proxy |
 | --- | --- | --- |
 | `*.roan.dev` | `f8fb5c01-f601-4db9-b994-df4accb06009.cfargotunnel.com` | Proxied |
+| `ingress.roan.dev` | `f8fb5c01-f601-4db9-b994-df4accb06009.cfargotunnel.com` | Proxied |
 | Explicit project hostnames in [the Zeabur tunnel config](zeabur/config.yaml) | `f8fb5c01-f601-4db9-b994-df4accb06009.cfargotunnel.com` | Proxied |
 | Each hostname listed by the Solace tunnel | `c02a554c-963f-4bd3-aa99-a6813f7933d4.cfargotunnel.com` | Proxied |
 
 Preserve exact DNS records for existing unrelated services and the direct DNS-only mail exchange records. For a new app, select `webdock-apps / https` in the Zeabur **Add domain** form. The HTTPRoute uses the Gateway's automatically renewed wildcard origin certificate. Cloudflare presents its own edge certificate.
 
-The Zeabur tunnel sends its explicit project hostnames to the private `apps` listener on Webdock Traefik. Generated app names continue through the shared `webdock-apps` Gateway. Existing public listeners support rollback during the DNS cutover.
+The Zeabur tunnel sends its explicit project hostnames to the private `apps` listener on Webdock Traefik. Generated app names use the shared `webdock-apps` Gateway.
+
+## Worker firewall
+
+The public application ports are TCP 25 on both VPSs, TCP 443 for the `mx.solace.onl` HTTPS compatibility listener, and the Cobblemon TCP and UDP NodePorts on VPS-01. Worker management uses SSH over WireGuard. The existing WireGuard listener on UDP 51820 carries cluster and management traffic.
+
+The worker firewall services read `/etc/zeabur-worker/firewall.nft` and `/etc/zeabur-mail-worker/firewall.nft`. Each configuration restricts new input on `eth0` to mail and WireGuard, with ICMP and link-local DHCPv6 as required. Gatus uses `10.200.31.6` and `10.200.31.2` with these hosts' SSH keys pinned.
+
+Verify management over WireGuard before reloading a worker firewall. Load and test one worker at a time with a timed rollback. The pre-cutover rules are archived on each worker under `/var/lib/zeabur-maintenance`.
 
 ## Verification and recovery
 
 Verify that the Gateway is Programmed and each connector Deployment has one Ready replica on each VPS. Check the HTTPRoute's Accepted and ResolvedRefs conditions, then request a fresh app hostname externally. The Gateway runs on the platform Traefik. Solace uses its own two-replica Traefik origin on the Webdock workers.
 
-Verify the public API, JMAP session and event stream, discovery and MTA-STS, the status page and SMTP STARTTLS on both MX hosts. Confirm authenticated responses remain private and that the origin receives Cloudflare's client IP. Reconcile a previous Git revision for a bad connector or origin rollout.
+Verify the public API, JMAP session and event stream, discovery and MTA-STS, the status page and SMTP STARTTLS on both MX hosts. Confirm authenticated responses remain private and that the origin receives Cloudflare's client IP.
 
-To fall back to direct HTTPS, first restore the `public` entry point on the Solace and Status Ingresses and verify both origins. Then restore the saved DNS records. Select the healthy MX target for `mail.solace.onl` manually.
+If a connector or origin rollout fails, restore the last working tunnel configuration and test the affected hostnames through Cloudflare. The application Ingresses should stay on their private entry points.

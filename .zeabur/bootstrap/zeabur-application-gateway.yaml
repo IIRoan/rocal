@@ -74,33 +74,5 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: cloudflared
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: solace-mail
-          podSelector:
-            matchLabels:
-              app.kubernetes.io/name: solace-public-ingress
-      ports:
-        - {port: 8444, protocol: TCP}
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: solace-traefik-to-zeabur-app-gateway
-  namespace: solace-mail
-spec:
-  podSelector:
-    matchLabels:
-      app.kubernetes.io/name: solace-public-ingress
-  policyTypes: [Egress]
-  egress:
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: traefik
-          podSelector:
-            matchLabels:
-              app.kubernetes.io/name: traefik
-              app.kubernetes.io/instance: traefik-traefik
       ports:
         - {port: 8444, protocol: TCP}

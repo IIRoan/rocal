@@ -92,7 +92,7 @@ metadata:
   namespace: riftbound
   annotations:
     kubernetes.io/ingress.class: solace-public
-    traefik.ingress.kubernetes.io/router.entrypoints: public,apps
+    traefik.ingress.kubernetes.io/router.entrypoints: apps
 spec:
   rules:
     - host: rift.solace.onl
@@ -160,7 +160,7 @@ metadata:
   namespace: riftbound
   annotations:
     kubernetes.io/ingress.class: solace-public
-    traefik.ingress.kubernetes.io/router.entrypoints: public,apps
+    traefik.ingress.kubernetes.io/router.entrypoints: apps
 spec:
   rules:
     - host: riftapi.solace.onl

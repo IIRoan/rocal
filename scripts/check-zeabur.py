@@ -230,7 +230,7 @@ def check_zeabur_application_gateway(tcp):
     routes = app_config["ingress"]
     assert {route["hostname"] for route in routes[:-2]} == project_hosts
     assert all(route["service"] == "https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9445" for route in routes[:-2])
-    assert all("apps" in resource["metadata"]["annotations"]["traefik.ingress.kubernetes.io/router.entrypoints"].split(",")
+    assert all(resource["metadata"]["annotations"]["traefik.ingress.kubernetes.io/router.entrypoints"] == "apps"
                for resource in project_ingresses)
     resources = read(bootstrap / "zeabur-application-gateway.yaml")
     namespace = "traefik"
@@ -252,22 +252,10 @@ def check_zeabur_application_gateway(tcp):
     (app_ingress,) = [rule for rule in policy["spec"]["ingress"] if "from" in rule]
     assert app_ingress["from"] == [{
         "podSelector": {"matchLabels": {"app.kubernetes.io/name": "cloudflared"}},
-    }, {
-        "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "solace-mail"}},
-        "podSelector": {"matchLabels": {"app.kubernetes.io/name": "solace-public-ingress"}},
     }]
     assert app_ingress["ports"] == [{"port": port["port"], "protocol": "TCP"}]
-    router = tcp["routers"]["zeabur-apps"]
-    assert router["tls"] == {"passthrough": True}
-    protected_hosts = set(re.findall(r"`([^`]+)`", router["rule"].split("&& !", 1)[-1]))
-    public = projects + read(bootstrap / "ente-public.yaml")
-    static_hosts = {rule["host"] for obj in public if obj["kind"] == "Ingress"
-                    for rule in obj["spec"]["rules"] if rule["host"].endswith(".roan.dev")}
-    assert static_hosts | {"zeabur.roan.dev", "login.roan.dev", "ingress.roan.dev"} <= protected_hosts
-    assert tcp["services"][router["service"]]["loadBalancer"] == {
-        "proxyProtocol": {"version": 2},
-        "servers": [{"address": f"zeabur-app-gateway.traefik.svc.cluster.local:{port['port']}"}],
-    }
+    assert set(tcp["routers"]) == {"mx-https", "smtp"}
+    assert set(tcp["services"]) == {"mx-https", "mail-inbound"}
 
 
 def check_gateway(deployment, configs, volume):
