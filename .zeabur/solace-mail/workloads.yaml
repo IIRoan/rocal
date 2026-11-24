@@ -313,6 +313,10 @@ spec:
           key: roan.dev/apps-only
           operator: Equal
           value: 'true'
+        - effect: NoSchedule
+          key: roan.dev/mail-only
+          operator: Equal
+          value: 'true'
       volumes:
         - configMap:
             defaultMode: 420
