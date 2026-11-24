@@ -9,7 +9,16 @@ spec:
       name: zeabur-roan-acme-account
     solvers:
       - selector:
-          dnsNames: ['*.roan.dev', builds.roan.dev, demo.roan.dev, errors.roan.dev, objects.roan.dev, roan.dev, www.roan.dev]
+          dnsNames:
+            - '*.roan.dev'
+            - builds.roan.dev
+            - demo.roan.dev
+            - errors.roan.dev
+            - objects.roan.dev
+            - roan.dev
+            - www.roan.dev
+            - test2.roan.dev
+            - monitoring-solace.roan.dev
         dns01:
           cloudflare:
             apiTokenSecretRef:
@@ -142,24 +151,13 @@ subjects:
     name: solace-tunnel-ingress
     namespace: solace-mail
 ---
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: web-webdock
-  namespace: demo
-spec:
-  dnsNames: [demo.roan.dev]
-  issuerRef:
-    kind: ClusterIssuer
-    name: zeabur-roan-public
-  secretName: web-webdock-tls
----
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: web
   namespace: demo
   annotations:
+    cert-manager.io/cluster-issuer: zeabur-roan-public
     kubernetes.io/ingress.class: solace-public
     traefik.ingress.kubernetes.io/router.entrypoints: apps
 spec:
