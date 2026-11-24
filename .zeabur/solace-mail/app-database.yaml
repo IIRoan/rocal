@@ -39,6 +39,8 @@ spec:
   enableSuperuserAccess: false
   enablePDB: true
   failoverDelay: 5
+  smartShutdownTimeout: 0
+  switchoverDelay: 45
   postgresql:
     parameters:
       max_connections: "64"
