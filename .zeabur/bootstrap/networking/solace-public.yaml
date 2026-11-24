@@ -5,7 +5,7 @@ metadata:
   namespace: solace-mail
   annotations:
     kubernetes.io/ingress.class: solace-public
-    traefik.ingress.kubernetes.io/router.entrypoints: public
+    traefik.ingress.kubernetes.io/router.entrypoints: public,tunnel
 spec:
   rules:
     - host: api.solace.onl

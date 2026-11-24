@@ -234,6 +234,8 @@ def check_zeabur_application_gateway(tcp):
     policy = find_resource(resources, "NetworkPolicy", namespace, "zeabur-app-gateway")
     (app_ingress,) = [rule for rule in policy["spec"]["ingress"] if "from" in rule]
     assert app_ingress["from"] == [{
+        "podSelector": {"matchLabels": {"app.kubernetes.io/name": "cloudflared"}},
+    }, {
         "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "solace-mail"}},
         "podSelector": {"matchLabels": {"app.kubernetes.io/name": "solace-public-ingress"}},
     }]

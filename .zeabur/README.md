@@ -97,6 +97,8 @@ The application mail gateways still use a compatibility host alias for the priva
 
 ## Direct public ingress
 
+See [Cloudflare tunnels](tunnels/) for the shared Zeabur Gateway and Solace tunnel configuration.
+
 Public JMAP uses a dedicated [DNS failover Deployment](solace-mail/jmap-failover/README.md) on roan-server.
 
 The public Traefik deployment has one replica per worker and serves the public Let’s Encrypt certificate. HTTPS on `mx.solace.onl` passes encrypted traffic through to the existing Stalwart listener with PROXY v2. The API and Stalwart gateways accept Traefik’s client IP on a dedicated port that is restricted to the public controller by NetworkPolicy.

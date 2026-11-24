@@ -11,3 +11,4 @@ resources:
   - solace-mail/public-ingress.yaml
   - solace-mail/releases
   - solace-mail/jmap-failover
+  - tunnels/solace

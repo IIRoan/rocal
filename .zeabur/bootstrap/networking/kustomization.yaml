@@ -11,3 +11,5 @@ resources:
   - solace-releases.yaml
   - jmap-failover.yaml
   - jmap-endpoints.yaml
+  - ../../tunnels/solace/network
+  - solace-tunnel-gateway.yaml

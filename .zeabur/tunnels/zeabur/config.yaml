@@ -1,0 +1,8 @@
+tunnel: f8fb5c01-f601-4db9-b994-df4accb06009
+credentials-file: /etc/cloudflared/credentials/credentials.json
+originRequest:
+  matchSNItoHost: true
+ingress:
+  - hostname: '*.roan.dev'
+    service: https://zeabur-app-gateway.traefik.svc.cluster.local:8444
+  - service: http_status:404

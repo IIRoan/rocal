@@ -1,3 +1,13 @@
+http:
+  middlewares:
+    strip-cloudflare-client-ip:
+      headers:
+        customRequestHeaders:
+          CF-Connecting-IP: ""
+    solace-tunnel-cache:
+      headers:
+        customResponseHeaders:
+          Cache-Control: "private, no-store"
 tcp:
   routers:
     smtp:
