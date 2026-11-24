@@ -95,15 +95,15 @@ The image references use digest pins and the registries approved in [the Trivy K
 
 The application mail gateways still use a compatibility host alias for the private JMAP route. The ingress controller reads TLS Secrets in its namespace. The Flux account can update workload and ConfigMap objects within the Solace namespaces. These capabilities are visible in the scanner report. The sensitive-ConfigMap check also matches the microphone permissions header, the public security contact header, and the Lua lookup of a gate key from the environment. The gateway configuration stores Secret references and public settings in Git.
 
-## Direct public ingress
+## Public ingress
 
 See [Cloudflare tunnels](tunnels/) for the shared Zeabur Gateway and Solace tunnel configuration.
 
-Public JMAP uses a dedicated [DNS failover Deployment](solace-mail/jmap-failover/README.md) on roan-server.
+Solace HTTPS, including public JMAP, enters through the dedicated Solace tunnel.
 
 The public Traefik deployment has one replica per worker and serves the public Let’s Encrypt certificate. HTTPS on `mx.solace.onl` passes encrypted traffic through to the existing Stalwart listener with PROXY v2. The API and Stalwart gateways accept Traefik’s client IP on a dedicated port that is restricted to the public controller by NetworkPolicy.
 
-Traefik copies the public Service’s load balancer addresses to the Ingress status. Zeabur uses that status and the pod port declarations to check each route against DNS. Manage these six existing routes through the Git manifests. cert-manager owns certificate issuance and renewal, and Cloudflare hosts the authoritative DNS records.
+Traefik copies the public Service’s load balancer addresses to the Ingress status. Proxied DNS returns Cloudflare addresses. Use external HTTPS checks to verify the tunnel routes. The Git manifests define the Kubernetes routes and cert-manager owns renewal of their origin certificates.
 
 Provision `solace-acme-dns` in `solace-mail` with the `api-token` key and DNS write and zone read access restricted to `solace.onl`. Flux reconciles the issuer and certificate. cert-manager renews the public certificate in `solace-public-tls`, which both Traefik replicas read. The DNS challenge works before changing the public HTTPS records. Alert on both the Certificate's readiness and the expiry served from each worker.
 
@@ -120,18 +120,11 @@ kubectl label node webdock-1 lbpool.svccontroller.k3s.cattle.io/solace-smtp=true
 kubectl label node webdock-mail lbpool.svccontroller.k3s.cattle.io/solace-smtp=true
 ```
 
-1. Bring up HTTPS on both workers. Keep the existing DNS records until the direct HTTPS probe passes on each worker. Verify client-IP rate limits, operator authorization, request sizes and streaming timeouts.
-2. Verify authenticated web and native sign-in, read and send with a synthetic attachment, incoming mail, and JMAP event reconnect while one public ingress path is unavailable. Reissue a staging certificate and check that both replicas serve it without a restart.
-3. Save the previous HTTPS records. Set up `mail.solace.onl` using the [JMAP failover runbook](solace-mail/jmap-failover/README.md). Point the other five HTTPS names at the DNS-only `edge.solace.onl` alias, which has one A record per worker. Keep the MX records as they are. Verify the exact enforced MTA-STS policy through both origins and normal DNS. If a worker fails, an operator can temporarily remove its address from the shared alias.
-4. Move SMTP separately, one worker at a time. Migrate only the public HAProxy listener after verifying the owning process and preserving any private relay listeners in the same service. The TCP route carries the original client IP in PROXY v2 and Stalwart handles STARTTLS. Confirm the Kubernetes Service prefers a ready local gateway and uses its peer during drain. Send and receive through both MXs using a controlled external mailbox. Verify queued canary mail delivers after recovery and update the host health check.
+Verify Solace HTTPS through the [tunnel runbook](tunnels/) and test both replicas independently. Exercise client-IP rate limits, operator authorization, attachment transfer, and JMAP event reconnection. Verify the enforced MTA-STS policy through normal DNS.
 
-Run the protocol probes from outside the cluster. For a test listener, set `--https-port` and `--smtp-port` to the temporary public ports. `--skip-smtp` runs only the HTTPS checks before moving SMTP.
+Move the direct SMTP listener one worker at a time. Verify which process owns it and preserve any private relay listeners in the same service. The TCP route carries the original client IP in PROXY v2 and Stalwart handles STARTTLS. Confirm the Kubernetes Service prefers a ready local gateway and uses its peer during drain.
 
-```sh
-python3 -B scripts/probe-solace-edge.py --public-dns --mx-https
-```
-
-If one worker fails HTTPS checks, remove its address from the shared `edge.solace.onl` alias until it can serve the routes using that alias. Check the JMAP failover journal and authoritative DNS answer for `mail.solace.onl`. Remove the corresponding ServiceLB pool label from a worker to withdraw its listener. If SMTP fails, remove the SMTP pool label from the affected worker and restore its public HAProxy listener. Repeat HTTPS and STARTTLS checks after either change.
+If a worker fails HTTPS checks for the direct projects below, withdraw its address from `edge.solace.onl`. If SMTP fails, remove the SMTP pool label from the affected worker and restore its public HAProxy listener. Repeat tunnel HTTPS and direct STARTTLS checks after either change.
 
 ### Public routes for other Zeabur projects
 
