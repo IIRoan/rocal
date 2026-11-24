@@ -191,6 +191,7 @@ def check_public_ingress(network, workloads):
         assert service["spec"]["externalTrafficPolicy"] == "Local"
         assert [item["port"] for item in service["spec"]["ports"]] == [port]
     ingress = find_resource(workloads, "Deployment", namespace, "solace-public-ingress")
+    check_service_targets(network, ingress, ("solace-tunnel-gateway",))
     assert ingress["metadata"]["labels"]["app.kubernetes.io/name"] == "traefik"
     template = ingress["spec"]["template"]["spec"]
     find_resource(workloads, "ServiceAccount", namespace, template["serviceAccountName"])
@@ -220,6 +221,17 @@ def check_public_ingress(network, workloads):
 def check_zeabur_application_gateway(tcp):
     bootstrap = ROOT / "bootstrap"
     projects = read(bootstrap / "zeabur-project-public.yaml")
+    project_ingresses = [
+        resource for path in ("zeabur-project-public.yaml", "ente-public.yaml", "riftbound-public.yaml")
+        for resource in read(bootstrap / path) if resource["kind"] == "Ingress"
+    ]
+    app_config, = read(ROOT / "tunnels/zeabur/config.yaml")
+    project_hosts = {rule["host"] for resource in project_ingresses for rule in resource["spec"]["rules"]}
+    routes = app_config["ingress"]
+    assert {route["hostname"] for route in routes[:-2]} == project_hosts
+    assert all(route["service"] == "https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9445" for route in routes[:-2])
+    assert all("apps" in resource["metadata"]["annotations"]["traefik.ingress.kubernetes.io/router.entrypoints"].split(",")
+               for resource in project_ingresses)
     resources = read(bootstrap / "zeabur-application-gateway.yaml")
     namespace = "traefik"
     tls = find_resource(resources, "Certificate", namespace, "zeabur-apps")["spec"]

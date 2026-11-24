@@ -69,7 +69,7 @@ metadata:
   namespace: builder-system
   annotations:
     kubernetes.io/ingress.class: solace-public
-    traefik.ingress.kubernetes.io/router.entrypoints: public
+    traefik.ingress.kubernetes.io/router.entrypoints: public,apps
 spec:
   rules:
     - host: builds.roan.dev
@@ -161,7 +161,7 @@ metadata:
   namespace: demo
   annotations:
     kubernetes.io/ingress.class: solace-public
-    traefik.ingress.kubernetes.io/router.entrypoints: public
+    traefik.ingress.kubernetes.io/router.entrypoints: public,apps
 spec:
   rules:
     - host: demo.roan.dev
@@ -174,9 +174,21 @@ spec:
                 name: web
                 port:
                   number: 8080
+    - host: test2.roan.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 8080
   tls:
     - hosts: [demo.roan.dev]
       secretName: web-webdock-tls
+    - hosts: [test2.roan.dev]
+      secretName: web-tls
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -219,7 +231,7 @@ metadata:
   namespace: demo
   annotations:
     kubernetes.io/ingress.class: solace-public
-    traefik.ingress.kubernetes.io/router.entrypoints: public
+    traefik.ingress.kubernetes.io/router.entrypoints: public,apps
 spec:
   rules:
     - host: objects.roan.dev
@@ -313,7 +325,7 @@ metadata:
   namespace: errors
   annotations:
     kubernetes.io/ingress.class: solace-public
-    traefik.ingress.kubernetes.io/router.entrypoints: public
+    traefik.ingress.kubernetes.io/router.entrypoints: public,apps
 spec:
   rules:
     - host: errors.roan.dev
@@ -405,7 +417,7 @@ metadata:
   namespace: portfolio
   annotations:
     kubernetes.io/ingress.class: solace-public
-    traefik.ingress.kubernetes.io/router.entrypoints: public
+    traefik.ingress.kubernetes.io/router.entrypoints: public,apps
 spec:
   rules:
     - host: roan.dev

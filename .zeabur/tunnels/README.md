@@ -18,11 +18,12 @@ Create `cloudflared-credentials` in each of `traefik` and `solace-mail` with the
 | DNS name | Target | Proxy |
 | --- | --- | --- |
 | `*.roan.dev` | `f8fb5c01-f601-4db9-b994-df4accb06009.cfargotunnel.com` | Proxied |
+| Explicit project hostnames in [the Zeabur tunnel config](zeabur/config.yaml) | `f8fb5c01-f601-4db9-b994-df4accb06009.cfargotunnel.com` | Proxied |
 | Each hostname listed by the Solace tunnel | `c02a554c-963f-4bd3-aa99-a6813f7933d4.cfargotunnel.com` | Proxied |
 
 Preserve exact DNS records for existing unrelated services and the direct DNS-only mail exchange records. For a new app, select `webdock-apps / https` in the Zeabur **Add domain** form. The HTTPRoute uses the Gateway's automatically renewed wildcard origin certificate. Cloudflare presents its own edge certificate.
 
-`test2.roan.dev` has its own DNS-only CNAME to `edge.solace.onl` because its existing Ingress uses the direct listener.
+The Zeabur tunnel sends its explicit project hostnames to the private `apps` listener on Webdock Traefik. Generated app names continue through the shared `webdock-apps` Gateway. Existing public listeners support rollback during the DNS cutover.
 
 ## Verification and recovery
 
