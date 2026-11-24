@@ -38,7 +38,16 @@ spec:
       dataChecksums: true
   enableSuperuserAccess: false
   enablePDB: true
-  failoverDelay: 5
+  failoverDelay: 0
+  primaryLease:
+    leaseDurationSeconds: 10
+    renewDeadlineSeconds: 7
+    retryPeriodSeconds: 1
+  probes:
+    readiness:
+      periodSeconds: 3
+      timeoutSeconds: 3
+      failureThreshold: 5
   smartShutdownTimeout: 0
   switchoverDelay: 45
   postgresql:

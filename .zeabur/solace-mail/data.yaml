@@ -863,7 +863,7 @@ spec:
         name: mail-database-app
   enablePDB: true
   enableSuperuserAccess: false
-  failoverDelay: 10
+  failoverDelay: 0
   imageName: ghcr.io/cloudnative-pg/postgresql:18-standard-trixie@sha256:37fdeea29a4d3ed14570f719488ba55bd21e8975eaea864be5ce74d25a9a13de
   inheritedMetadata: {}
   instances: 2
@@ -916,12 +916,20 @@ spec:
       number: 1
   primaryUpdateMethod: restart
   primaryUpdateStrategy: unsupervised
+  primaryLease:
+    leaseDurationSeconds: 10
+    renewDeadlineSeconds: 7
+    retryPeriodSeconds: 1
   probes:
     liveness:
       isolationCheck:
         connectionTimeout: 1000
         enabled: true
         requestTimeout: 1000
+    readiness:
+      periodSeconds: 3
+      timeoutSeconds: 3
+      failureThreshold: 5
   replicationSlots:
     highAvailability:
       enabled: true
@@ -936,7 +944,7 @@ spec:
     requests:
       cpu: 75m
       memory: 128Mi
-  smartShutdownTimeout: 15
+  smartShutdownTimeout: 0
   startDelay: 3600
   stopDelay: 1800
   storage:

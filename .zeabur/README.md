@@ -29,6 +29,12 @@ Before cutting over from standalone `app-postgres`, verify the latest encrypted 
 
 Preserve the original volume bindings on the live cluster. Use apply without pruning so dormant recovery resources and controller-managed objects remain available.
 
+### Worker failure detection
+
+The K3s server checks node health every two seconds and marks a worker unreachable after 25 seconds without a heartbeat. Each node uses `nodeLeaseDurationSeconds: 20` in its kubelet configuration, which renews heartbeats every five seconds. The K3s services use HTTP/2 read-idle and ping timeouts of 10 and five seconds so a broken connection can be detected within the node grace period.
+
+Both Solace databases start failover when Kubernetes reports the primary unavailable. The old primary stops if it cannot renew its lease within seven seconds, and a standby observes the unchanged lease for ten seconds before promoting. Keep synchronous replication, failover quorum, and the primary isolation check enabled. Apply lease changes through a rolling restart and check the live lease before testing a worker outage. Measure both the database-backed API and the public JMAP hostname, because DNS caching can extend JMAP recovery.
+
 ## Deploy from Git
 
 Flux reads `.zeabur/` on the protected `master` branch and applies it with the `solace-reconciler` service account. It polls Git every minute and checks for drift every five minutes. An administrator owns [project prerequisites](bootstrap/project.yaml) and [networking manifests](bootstrap/networking/), including namespace admission policy. Use Git as the writer for managed fields. Stalwart A reconciles after the shared workloads, and Stalwart B waits for A's healthy deployment on the same Git revision. Gateway configuration is mounted from immutable ConfigMaps whose content hashes change the pod templates. Flux leaves existing objects in place when a manifest is removed.
