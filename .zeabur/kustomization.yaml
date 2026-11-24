@@ -7,6 +7,7 @@ resources:
   - solace-mail/workloads.yaml
   - solace-mail/public-certificate.yaml
   - solace-mail/app-postgres.yaml
+  - solace-mail/app-database.yaml
   - solace-mail/public-ingress.yaml
   - solace-mail/releases
   - solace-mail/jmap-failover

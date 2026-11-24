@@ -3,6 +3,8 @@ kind: Kustomization
 resources:
   - ingress-class.yaml
   - app-postgres.yaml
+  - app-database.yaml
+  - app-database-apparmor.yaml
   - solace-mail.yaml
   - solace-public.yaml
   - solace-public-services.yaml
