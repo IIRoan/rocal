@@ -28,4 +28,6 @@ Preserve exact DNS records for existing unrelated services and the direct DNS-on
 
 Verify that the Gateway is Programmed and each connector Deployment has one Ready replica on each VPS. Check the HTTPRoute's Accepted and ResolvedRefs conditions, then request a fresh app hostname externally. The Gateway runs on the platform Traefik. Solace uses its own two-replica Traefik origin on the Webdock workers.
 
-Verify the public API, JMAP session and event stream, discovery and MTA-STS, the status page and SMTP STARTTLS on both MX hosts. Confirm authenticated responses remain private and that the origin receives Cloudflare's client IP. Reconcile a previous Git revision for a bad connector or origin rollout. During the cutover window, restore the saved Cloudflare records and keep the direct listeners available for rollback.
+Verify the public API, JMAP session and event stream, discovery and MTA-STS, the status page and SMTP STARTTLS on both MX hosts. Confirm authenticated responses remain private and that the origin receives Cloudflare's client IP. Reconcile a previous Git revision for a bad connector or origin rollout.
+
+To fall back to direct HTTPS, first restore the `public` entry point on the Solace and Status Ingresses and verify both origins. Then restore the saved DNS records. Select the healthy MX target for `mail.solace.onl` manually.

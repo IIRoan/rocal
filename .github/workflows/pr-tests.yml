@@ -74,13 +74,6 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Test Solace JMAP DNS failover
-        run: |
-          bunx --bun --no-install tsc --noEmit --strict --skipLibCheck --target ESNext \
-            --module Preserve --moduleResolution Bundler --types bun-types \
-            .zeabur/solace-mail/jmap-failover/*.ts
-          bun test ./.zeabur/solace-mail/jmap-failover/failover.test.ts
-
       - name: Validate native E2E workflow semantics
         env:
           SOLACE_E2E: "1"

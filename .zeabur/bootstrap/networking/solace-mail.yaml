@@ -220,7 +220,7 @@ spec:
                   - notifications
                   - app-postgres
                   - solace-release-controller
-                  - solace-jmap-failover
+                  - cloudflared
               - key: builder.zeabur.com/buildrun
                 operator: DoesNotExist
     - ports:
@@ -246,7 +246,7 @@ spec:
                   - notifications
                   - app-postgres
                   - solace-release-controller
-                  - solace-jmap-failover
+                  - cloudflared
               - key: builder.zeabur.com/buildrun
                 operator: DoesNotExist
     - from:
@@ -268,7 +268,7 @@ spec:
           - notifications
           - app-postgres
           - solace-release-controller
-          - solace-jmap-failover
+          - cloudflared
       - key: builder.zeabur.com/buildrun
         operator: DoesNotExist
   policyTypes:
