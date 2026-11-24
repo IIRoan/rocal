@@ -125,6 +125,27 @@ describe("Cloudflare DNS validation", () => {
 });
 
 describe("failover reconciliation", () => {
+  test("moves DNS off a lost gateway while both JMAP checks fail", async () => {
+    const service = fixture();
+    const unavailable = { [PRIMARY]: false, [STANDBY]: false };
+    const survivor = { [PRIMARY]: false, [STANDBY]: true };
+    await service.monitor.poll(unavailable, 0, survivor);
+    expect(service.writes).toHaveLength(0);
+    await service.monitor.poll(unavailable, POLL_MS, survivor);
+    expect(service.target).toBe(STANDBY);
+  });
+
+  test("requires consecutive gateway observations and a surviving endpoint", async () => {
+    const service = fixture();
+    const unavailable = { [PRIMARY]: false, [STANDBY]: false };
+    const survivor = { [PRIMARY]: false, [STANDBY]: true };
+    await service.monitor.poll(unavailable, 0, survivor);
+    await service.monitor.poll(unavailable, POLL_MS);
+    await service.monitor.poll(unavailable, 2 * POLL_MS, survivor);
+    await service.monitor.poll(unavailable, 3 * POLL_MS, unavailable);
+    expect(service.writes).toHaveLength(0);
+  });
+
   test("waits for two consecutive failures and two healthy alternate checks", async () => {
     const service = fixture();
     await service.poll(0, false, false);

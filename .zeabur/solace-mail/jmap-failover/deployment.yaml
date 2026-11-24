@@ -18,6 +18,7 @@ spec:
         app.kubernetes.io/name: solace-jmap-failover
     spec:
       automountServiceAccountToken: false
+      serviceAccountName: solace-jmap-endpoints
       enableServiceLinks: false
       imagePullSecrets:
         - name: solace-jmap-failover-registry
@@ -62,6 +63,9 @@ spec:
             - name: cloudflare
               mountPath: /var/run/secrets/jmap-failover
               readOnly: true
+            - name: gateway-endpoints
+              mountPath: /var/run/secrets/jmap-endpoints
+              readOnly: true
       volumes:
         - name: code
           configMap:
@@ -73,3 +77,15 @@ spec:
             items:
               - key: api-token
                 path: api-token
+        - name: gateway-endpoints
+          projected:
+            defaultMode: 0440
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  expirationSeconds: 3600
+              - configMap:
+                  name: kube-root-ca.crt
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
