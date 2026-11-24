@@ -1,0 +1,22 @@
+tunnel: c02a554c-963f-4bd3-aa99-a6813f7933d4
+credentials-file: /etc/cloudflared/credentials/credentials.json
+originRequest:
+  matchSNItoHost: true
+ingress:
+  - hostname: 'api.solace.onl'
+    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9444
+  - hostname: 'mail.solace.onl'
+    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9444
+  - hostname: 'autoconfig.solace.onl'
+    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9444
+  - hostname: 'autodiscover.solace.onl'
+    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9444
+  - hostname: 'ua-auto-config.solace.onl'
+    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9444
+  - hostname: 'mta-sts.solace.onl'
+    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9444
+  - hostname: 'status.solace.onl'
+    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9444
+  - hostname: 'monitoring-solace.roan.dev'
+    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9444
+  - service: http_status:404

@@ -1,0 +1,35 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: solace-status
+  namespace: solace-mail
+  annotations:
+    kubernetes.io/ingress.class: solace-public
+    traefik.ingress.kubernetes.io/router.entrypoints: public,tunnel
+spec:
+  rules:
+    - host: status.solace.onl
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: solace-status
+                port:
+                  name: http
+    - host: monitoring-solace.roan.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: solace-status
+                port:
+                  name: http
+  tls:
+    - hosts: [status.solace.onl]
+      secretName: solace-status-tls
+    - hosts: [monitoring-solace.roan.dev]
+      secretName: solace-status-alias-tls

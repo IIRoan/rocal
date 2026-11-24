@@ -198,6 +198,11 @@ def check_public_ingress(network, workloads):
     assert "--providers.kubernetesingress.ingressendpoint.publishedservice=solace-mail/solace-public" in controller["args"]
     routes_name = next(vol["configMap"]["name"] for vol in template["volumes"] if vol["name"] == "ingress-routes")
     routes = yaml.safe_load(find_resource(workloads, "ConfigMap", namespace, routes_name)["data"]["routes.yaml"])
+    for listener, value in (("direct", ""), ("tunnel", "1")):
+        entrypoint = "public" if listener == "direct" else "tunnel"
+        middleware = f"solace-{listener}-headers"
+        assert f"--entryPoints.{entrypoint}.http.middlewares={middleware}@file" in controller["args"]
+        assert routes["http"]["middlewares"][middleware]["headers"]["customRequestHeaders"] == {"X-Solace-Tunnel": value}
     assert routes["tcp"]["services"]["mail-inbound"]["loadBalancer"]["proxyProtocol"]["version"] == 2
     assert routes["tcp"]["routers"]["mx-https"] == {
         "entryPoints": ["public"],
@@ -234,6 +239,8 @@ def check_zeabur_application_gateway(tcp):
     policy = find_resource(resources, "NetworkPolicy", namespace, "zeabur-app-gateway")
     (app_ingress,) = [rule for rule in policy["spec"]["ingress"] if "from" in rule]
     assert app_ingress["from"] == [{
+        "podSelector": {"matchLabels": {"app.kubernetes.io/name": "cloudflared"}},
+    }, {
         "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "solace-mail"}},
         "podSelector": {"matchLabels": {"app.kubernetes.io/name": "solace-public-ingress"}},
     }]

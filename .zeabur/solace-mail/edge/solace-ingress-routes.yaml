@@ -1,3 +1,15 @@
+http:
+  middlewares:
+    solace-direct-headers:
+      headers:
+        customRequestHeaders:
+          X-Solace-Tunnel: ""
+    solace-tunnel-headers:
+      headers:
+        customRequestHeaders:
+          X-Solace-Tunnel: "1"
+        customResponseHeaders:
+          Cache-Control: "private, no-store"
 tcp:
   routers:
     smtp:

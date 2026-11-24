@@ -71,6 +71,9 @@ spec:
         - {port: 8443, protocol: TCP}
         - {port: 9100, protocol: TCP}
     - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: cloudflared
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: solace-mail
