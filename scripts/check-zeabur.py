@@ -162,6 +162,9 @@ def check_frontend(network, workloads):
                                else "https://127.0.0.1:9444") for r in tunnel if "hostname" in r)
     http = config("ingress-routes", "routes.yaml")["http"]
     assert http["routers"]["website"]["entryPoints"] == ["website"]
+    read_route = http["routers"]["website-read"]
+    assert read_route["middlewares"] == ["website-retry"] and "Method(`GET`)" in read_route["rule"]
+    assert "middlewares" not in http["routers"]["website"]
     backend = http["services"]["website"]["loadBalancer"]
     assert backend["healthCheck"]["path"] == frontend["readinessProbe"]["httpGet"]["path"]
     assert backend["servers"] == [

@@ -4,18 +4,30 @@ http:
       entryPoints: [website]
       rule: Host(`solace.onl`)
       service: website
+    website-read:
+      entryPoints: [website]
+      rule: Host(`solace.onl`) && (Method(`GET`) || Method(`HEAD`))
+      middlewares: [website-retry]
+      service: website
+  serversTransports:
+    website:
+      forwardingTimeouts:
+        dialTimeout: 750ms
   services:
     website:
       loadBalancer:
+        serversTransport: website
         healthCheck:
           path: /favicon-16x16.png
           method: HEAD
           interval: 500ms
-          timeout: 750ms
+          timeout: 400ms
         servers:
           - url: http://solace-web-0.solace-web.solace-mail.svc.cluster.local:3000
           - url: http://solace-web-1.solace-web.solace-mail.svc.cluster.local:3000
   middlewares:
+    website-retry:
+      retry: {attempts: 3, initialInterval: 250ms}
     solace-direct-headers:
       headers:
         customRequestHeaders:
