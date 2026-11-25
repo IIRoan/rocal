@@ -1,7 +1,13 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: solace-mail
-namePrefix: solace-
+namePrefix: solace-frontend-
 resources:
   - ../../base/network
   - origin-egress.yaml
+patches:
+  - target: {kind: NetworkPolicy, name: cloudflared-edge}
+    patch: |
+      - op: replace
+        path: /spec/podSelector/matchLabels/app.kubernetes.io~1name
+        value: solace-frontend

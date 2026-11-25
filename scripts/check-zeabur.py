@@ -119,7 +119,7 @@ def check(flux, gateway_dir):
             assert {"stalwart-a", "stalwart-b"}.isdisjoint(deployments)
             check_gateway(deployments["solace-api"], configs, "edge")
             check_service_targets(network, deployments["solace-api"], ("solace-api", "solace-api-direct"))
-            check_service_targets(network, deployments["solace-frontend"], ("solace-frontend",))
+            check_local_frontend(network, docs, deployments["solace-frontend"])
             check_gateway(deployments["notifications"], configs, "mail-gate")
             validate_redis(docs, network)
             check_public_ingress(network, docs)
@@ -135,6 +135,30 @@ def check(flux, gateway_dir):
             (gateway_dir / key).write_text(fixtures[0][key])
         (gateway_dir / "images").write_text("\n".join(dict.fromkeys(images)) + "\n")
 
+
+
+def check_local_frontend(network, workloads, deployment):
+    check_service_targets(network, deployment, ("solace-frontend",))
+    assert all(identity(doc) != ("Deployment", "solace-mail", "solace-cloudflared") for doc in workloads)
+    template = deployment["spec"]["template"]["spec"]
+    assert template["automountServiceAccountToken"] is False
+    containers = {item["name"]: item for item in template["containers"]}
+    connector = containers["cloudflared"]
+    volumes = {item["name"]: item for item in template["volumes"]}
+    config_name = volumes["tunnel-config"]["configMap"]["name"]
+    config = find_resource(workloads, "ConfigMap", "solace-mail", config_name)["data"]
+    routes = yaml.safe_load(config["config.yaml"])["ingress"]
+    (website,) = [route for route in routes if route.get("hostname") == "solace.onl"]
+    assert website["service"] == "http://127.0.0.1:3001"
+    (origin,) = [item for item in template["initContainers"] if item["name"] == "website-origin"]
+    assert origin["restartPolicy"] == "Always"
+    assert origin["startupProbe"]["tcpSocket"]["port"] == "website-origin"
+    config_name = volumes["website-origin"]["configMap"]["name"]
+    config = find_resource(workloads, "ConfigMap", "solace-mail", config_name)["data"]["haproxy.cfg"]
+    assert "server local 127.0.0.1:3000" in config
+    assert "server peer solace-frontend.solace-mail.svc.cluster.local:3000 backup" in config
+    assert "tunnel-credentials" in {mount["name"] for mount in connector["volumeMounts"]}
+    assert "tunnel-credentials" not in {mount["name"] for mount in containers["frontend"]["volumeMounts"]}
 
 
 def check_service_targets(network, deployment, service_names):

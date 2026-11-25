@@ -16,7 +16,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: solace-frontend
+  name: solace-frontend-peer
   namespace: solace-mail
 spec:
   podSelector:
@@ -27,20 +27,9 @@ spec:
     - from:
         - podSelector:
             matchLabels:
-              app.kubernetes.io/name: cloudflared
+              app.kubernetes.io/name: solace-frontend
       ports:
         - {port: 3000, protocol: TCP}
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: solace-cloudflared-to-frontend
-  namespace: solace-mail
-spec:
-  podSelector:
-    matchLabels:
-      app.kubernetes.io/name: cloudflared
-  policyTypes: [Egress]
   egress:
     - to:
         - podSelector:
