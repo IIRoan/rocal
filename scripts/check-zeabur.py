@@ -90,7 +90,7 @@ def check(flux, gateway_dir):
                    for doc in docs if doc["kind"] == "ConfigMap"}
         deployments = {doc["metadata"]["name"]: doc for doc in docs if doc["kind"] == "Deployment"}
         release_containers = {"stalwart-a": "stalwart", "stalwart-b": "stalwart",
-                              "solace-api": "api", "notifications": "worker"}
+                              "solace-api": "api", "notifications": "worker", "solace-frontend": "frontend"}
         for deployment, container in release_containers.items():
             if deployment in deployments:
                 containers = deployments[deployment]["spec"]["template"]["spec"]["containers"]
@@ -119,6 +119,7 @@ def check(flux, gateway_dir):
             assert {"stalwart-a", "stalwart-b"}.isdisjoint(deployments)
             check_gateway(deployments["solace-api"], configs, "edge")
             check_service_targets(network, deployments["solace-api"], ("solace-api", "solace-api-direct"))
+            check_service_targets(network, deployments["solace-frontend"], ("solace-frontend",))
             check_gateway(deployments["notifications"], configs, "mail-gate")
             validate_redis(docs, network)
             check_public_ingress(network, docs)
