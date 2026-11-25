@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - solace-mail/config.yaml
   - solace-mail/edge
+  - solace-mail/frontend.yaml
   - solace-mail/data.yaml
   - solace-mail/workloads.yaml
   - solace-mail/public-certificate.yaml

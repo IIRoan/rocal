@@ -18,6 +18,9 @@ const workspacePackages = [
 ] as const;
 
 const nextConfig: NextConfig = {
+  ...(process.env.SOLACE_SELF_HOSTED === "1"
+    ? { output: "standalone", outputFileTracingRoot: repoRoot }
+    : {}),
   cacheComponents: true,
   partialPrefetching: true,
   allowedDevOrigins: getAllowedNextDevOrigins(),

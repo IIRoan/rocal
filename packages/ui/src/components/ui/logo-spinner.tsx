@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { loopMotion } from "../../lib/motion";
 import { cn } from "@workspace/ui/lib/utils";
-import { default as Logo } from "../layout/logo";
+import { LogoMark } from "../layout/logo-mark";
 import { useCyclingMessage } from "../../hooks/use-cycling-message";
 import { usePrefersReducedMotion } from "../../hooks/use-prefers-reduced-motion";
 import type { COMBINED_MESSAGES } from "../../constants/loading-messages";
@@ -157,10 +157,7 @@ export function LogoSpinner({
       >
         <div className="absolute inset-[8px] rounded-[inherit] border border-border/50" />
         <div ref={logoRef} className="relative">
-          <Logo
-            className={cn("relative text-accent", LOGO_SPINNER_SIZE_CLASSES[size])}
-            fill="currentColor"
-          />
+          <LogoMark className={cn("relative", LOGO_SPINNER_SIZE_CLASSES[size])} />
         </div>
       </div>
 
@@ -216,7 +213,7 @@ function LoadingBoard({
     >
       <div className="relative flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Logo className="size-4 text-accent" fill="currentColor" />
+          <LogoMark className="size-4" />
           <span className="text-[11px] font-semibold uppercase tracking-[0.5em] text-muted-foreground/40">
             Solace
           </span>
@@ -408,10 +405,7 @@ export function InlineLogoSpinner({
   return (
     <div className={cn("flex items-center gap-2", className)}>
       <div ref={logoRef}>
-        <Logo
-          className={cn("text-accent", INLINE_LOGO_SPINNER_SIZE_CLASSES[size])}
-          fill="currentColor"
-        />
+        <LogoMark className={INLINE_LOGO_SPINNER_SIZE_CLASSES[size]} />
       </div>
       {showText ? (
         <span

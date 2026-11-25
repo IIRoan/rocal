@@ -13,7 +13,7 @@ import {
 import { Key, Eye, EyeOff, ArrowRight, Check, X, Ticket } from "lucide-react";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
 import { afterPaint, getErrorMessage } from "@workspace/calendar-core";
-import { Logo, ThemeToggle } from "@workspace/ui/components/layout";
+import { LogoMark, ThemeToggle } from "@workspace/ui/components/layout";
 import { PageLoadingOverlay } from "@workspace/ui/components/ui";
 import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
@@ -947,12 +947,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
         <div className="relative flex w-full flex-col justify-center px-6 py-10 sm:px-12 lg:w-1/2 lg:px-16 xl:px-24">
           <div className="relative z-10 mx-auto w-full max-w-md">
             <div className="mb-10 flex items-center justify-between">
-              <Logo
-                width={44}
-                height={44}
-                className="text-accent"
-                aria-label="Solace"
-              />
+              <LogoMark className="size-11" label="Solace" />
               <ThemeToggle />
             </div>
 

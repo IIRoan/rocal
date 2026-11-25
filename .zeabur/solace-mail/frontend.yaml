@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: solace-frontend
+  namespace: solace-mail
+  labels:
+    app.kubernetes.io/name: solace-frontend
+    app.kubernetes.io/part-of: solace
+  annotations:
+    zeabur.com/display-name: Solace Frontend
+spec:
+  replicas: 2
+  revisionHistoryLimit: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: solace-frontend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: solace-frontend
+        app.kubernetes.io/part-of: solace
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile: {type: RuntimeDefault}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values: [webdock-1, webdock-mail]
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: solace-frontend
+              topologyKey: kubernetes.io/hostname
+      tolerations:
+        - {key: roan.dev/apps-only, operator: Equal, value: "true", effect: NoSchedule}
+        - {key: roan.dev/mail-only, operator: Equal, value: "true", effect: NoSchedule}
+      containers:
+        - name: frontend
+          image: zot.zot.svc:5000/solace-mail/frontend@sha256:5bcae6fdbe3bc5cff9a7bb51c47732414ebf9b3ecf8ce055c338906c9844880c
+          ports:
+            - {name: http, containerPort: 3000}
+          env:
+            - {name: SOLACE_APPLE_TEAM_ID, value: HXJACWP87H}
+            - {name: STALWART_ADMIN_URL, value: "https://mail.solace.onl/admin/"}
+          lifecycle:
+            preStop:
+              exec: {command: ["/bin/sleep", "5"]}
+          startupProbe:
+            httpGet: {path: /login, port: http}
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: {path: /login, port: http}
+            periodSeconds: 2
+            failureThreshold: 1
+          resources:
+            requests: {cpu: 75m, memory: 112Mi}
+            limits: {cpu: 700m, memory: 320Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            - {name: cache, mountPath: /app/apps/web/.next/cache}
+      volumes:
+        - name: tmp
+          emptyDir: {sizeLimit: 32Mi}
+        - name: cache
+          emptyDir: {sizeLimit: 128Mi}
