@@ -90,7 +90,7 @@ def check(flux, gateway_dir):
                    for doc in docs if doc["kind"] == "ConfigMap"}
         deployments = {doc["metadata"]["name"]: doc for doc in docs if doc["kind"] == "Deployment"}
         release_containers = {"stalwart-a": "stalwart", "stalwart-b": "stalwart",
-                              "solace-api": "api", "notifications": "worker", "solace-frontend": "frontend"}
+                              "solace-api": "api", "notifications": "worker"}
         for deployment, container in release_containers.items():
             if deployment in deployments:
                 containers = deployments[deployment]["spec"]["template"]["spec"]["containers"]
@@ -119,7 +119,7 @@ def check(flux, gateway_dir):
             assert {"stalwart-a", "stalwart-b"}.isdisjoint(deployments)
             check_gateway(deployments["solace-api"], configs, "edge")
             check_service_targets(network, deployments["solace-api"], ("solace-api", "solace-api-direct"))
-            check_local_frontend(network, docs, deployments["solace-frontend"])
+            check_frontend(network, docs)
             check_gateway(deployments["notifications"], configs, "mail-gate")
             validate_redis(docs, network)
             check_public_ingress(network, docs)
@@ -137,33 +137,44 @@ def check(flux, gateway_dir):
 
 
 
-def check_local_frontend(network, workloads, deployment):
-    check_service_targets(network, deployment, ("solace-frontend",))
-    assert all(identity(doc) != ("Deployment", "solace-mail", "solace-cloudflared") for doc in workloads)
-    template = deployment["spec"]["template"]["spec"]
-    assert template["automountServiceAccountToken"] is False
-    containers = {item["name"]: item for item in template["containers"]}
-    connector = containers["cloudflared"]
-    volumes = {item["name"]: item for item in template["volumes"]}
-    config_name = volumes["tunnel-config"]["configMap"]["name"]
-    config = find_resource(workloads, "ConfigMap", "solace-mail", config_name)["data"]
-    routes = yaml.safe_load(config["config.yaml"])["ingress"]
-    (website,) = [route for route in routes if route.get("hostname") == "solace.onl"]
-    assert website["service"] == "http://127.0.0.1:3001"
-    (origin,) = [item for item in template["initContainers"] if item["name"] == "website-origin"]
-    assert origin["restartPolicy"] == "Always"
-    assert origin["startupProbe"]["tcpSocket"]["port"] == "website-origin"
-    config_name = volumes["website-origin"]["configMap"]["name"]
-    config = find_resource(workloads, "ConfigMap", "solace-mail", config_name)["data"]["haproxy.cfg"]
-    assert "server local 127.0.0.1:3000" in config
-    assert "server peer solace-frontend.solace-mail.svc.cluster.local:3000 backup" in config
-    assert "tunnel-credentials" in {mount["name"] for mount in connector["volumeMounts"]}
-    assert "tunnel-credentials" not in {mount["name"] for mount in containers["frontend"]["volumeMounts"]}
+def check_frontend(network, workloads):
+    web = find_resource(workloads, "StatefulSet", "solace-mail", "solace-web")
+    check_service_targets(network, web, ("solace-web",))
+    service = find_resource(network, "Service", "solace-mail", web["spec"]["serviceName"])
+    assert service["spec"]["clusterIP"] == "None" and service["spec"]["publishNotReadyAddresses"]
+    pod = web["spec"]["template"]["spec"]
+    (frontend,) = pod["containers"]
+    assert pod["automountServiceAccountToken"] is False and "initContainers" not in pod
+    assert frontend["name"] == "frontend" and re.fullmatch(r"[^@\s]+@sha256:[0-9a-f]{64}", frontend["image"])
+    edge = find_resource(workloads, "Deployment", "solace-mail", "solace-public-ingress")
+    pod = edge["spec"]["template"]["spec"]
+    (connector,) = pod["containers"]
+    (proxy,) = pod["initContainers"]
+    assert proxy["name"] == "traefik" and proxy["restartPolicy"] == "Always" and proxy["startupProbe"]
+    assert connector["name"] == "cloudflared" and pod["automountServiceAccountToken"] is False
+    assert {m["name"] for m in connector["volumeMounts"]} == {"tunnel-credentials", "tunnel-config"}
+    volumes = {v["name"]: v for v in pod["volumes"]}
+    def config(volume, key):
+        name = volumes[volume]["configMap"]["name"]
+        return yaml.safe_load(find_resource(workloads, "ConfigMap", "solace-mail", name)["data"][key])
+    tunnel = config("tunnel-config", "config.yaml")["ingress"]
+    assert all(r["service"] == ("http://127.0.0.1:3001" if r["hostname"] == "solace.onl"
+                               else "https://127.0.0.1:9444") for r in tunnel if "hostname" in r)
+    http = config("ingress-routes", "routes.yaml")["http"]
+    assert http["routers"]["website"]["entryPoints"] == ["website"]
+    backend = http["services"]["website"]["loadBalancer"]
+    assert backend["healthCheck"]["path"] == frontend["readinessProbe"]["httpGet"]["path"]
+    assert backend["servers"] == [
+        {"url": f"http://solace-web-{i}.solace-web.solace-mail.svc.cluster.local:3000"}
+        for i in range(web["spec"]["replicas"])
+    ]
 
 
 def check_service_targets(network, deployment, service_names):
     pod = deployment["spec"]["template"]
-    declared = {target for container in pod["spec"]["containers"] for port in container.get("ports", [])
+    containers = pod["spec"]["containers"] + [c for c in pod["spec"].get("initContainers", [])
+                                              if c.get("restartPolicy") == "Always"]
+    declared = {target for container in containers for port in container.get("ports", [])
                 for target in (port["containerPort"], port.get("name"))}
     for name in service_names:
         service = find_resource(network, "Service", "solace-mail", name)
@@ -220,7 +231,7 @@ def check_public_ingress(network, workloads):
     assert ingress["metadata"]["labels"]["app.kubernetes.io/name"] == "traefik"
     template = ingress["spec"]["template"]["spec"]
     find_resource(workloads, "ServiceAccount", namespace, template["serviceAccountName"])
-    (controller,) = template["containers"]
+    (controller,) = template["initContainers"]
     assert "--providers.kubernetesingress.ingressendpoint.publishedservice=solace-mail/solace-public" in controller["args"]
     routes_name = next(vol["configMap"]["name"] for vol in template["volumes"] if vol["name"] == "ingress-routes")
     routes = yaml.safe_load(find_resource(workloads, "ConfigMap", namespace, routes_name)["data"]["routes.yaml"])

@@ -39,7 +39,8 @@ spec:
                 matchLabels:
                   app.kubernetes.io/name: solace-public-ingress
               topologyKey: kubernetes.io/hostname
-      containers:
+      automountServiceAccountToken: false
+      initContainers:
         - args:
             - --entryPoints.public.address=:9443/tcp
             - --entryPoints.public.http.tls=true
@@ -49,7 +50,7 @@ spec:
             - --ping=true
             - --api.dashboard=false
             - --providers.kubernetesingress=true
-            - --providers.kubernetesingress.namespaces=solace-mail
+            - --providers.kubernetesingress.namespaces=solace-mail,riftbound,builder-system,demo,errors,portfolio,ente
             - --providers.kubernetesingress.ingressclass=solace-public
             - --providers.kubernetesingress.ingressendpoint.publishedservice=solace-mail/solace-public
             - --providers.kubernetesingress.disableClusterScopeResources=true
@@ -58,12 +59,19 @@ spec:
             - --entryPoints.tunnel.http.tls=true
             - --entryPoints.public.http.middlewares=solace-direct-headers@file
             - --entryPoints.tunnel.http.middlewares=solace-tunnel-headers@file
+            - --entryPoints.website.address=127.0.0.1:3001
+            - --entryPoints.website.forwardedHeaders.trustedIPs=127.0.0.1/32
             - --entryPoints.apps.address=:9445/tcp
             - --entryPoints.apps.http.tls=true
             - --entryPoints.apps.http.middlewares=app-tunnel-cache@file
-          image: docker.io/traefik:v3.7.16@sha256:c8a121e4bb1347e8fd52657fab12f2cb70b68f8a018895e2068f92c9e519b9c2
+          image: docker.io/traefik:v3.7.18@sha256:9c437ac4f09ce6f4980a8544902d3475fdf70a1a7c578729581d2535dfa7d635
           imagePullPolicy: IfNotPresent
           name: traefik
+          restartPolicy: Always
+          startupProbe:
+            httpGet: {path: /ping, port: health}
+            periodSeconds: 1
+            failureThreshold: 60
           ports:
             - containerPort: 9443
               name: public-https
@@ -108,7 +116,68 @@ spec:
             - name: ingress-routes
               mountPath: /etc/solace-ingress
               readOnly: true
+            - name: kubernetes-api
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
+      containers:
+        - name: cloudflared
+          image: docker.io/cloudflare/cloudflared:2026.11.2@sha256:55c7e3e8d89d5e8d20b75a82f3602cbf98e06db406e73e282073cfdc5a9a3af6
+          args:
+            - tunnel
+            - --config
+            - /etc/cloudflared/config/config.yaml
+            - --no-autoupdate
+            - --edge-ip-version
+            - '4'
+            - --metrics
+            - '0.0.0.0:2000'
+            - --grace-period
+            - 20s
+            - run
+          ports:
+            - {name: tunnel-metrics, containerPort: 2000}
+          startupProbe:
+            httpGet: {path: /ready, port: tunnel-metrics}
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: {path: /ready, port: tunnel-metrics}
+            periodSeconds: 2
+            failureThreshold: 1
+          livenessProbe:
+            httpGet: {path: /metrics, port: tunnel-metrics}
+            periodSeconds: 15
+          resources:
+            requests: {cpu: 20m, memory: 48Mi}
+            limits: {cpu: 250m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: tunnel-config, mountPath: /etc/cloudflared/config, readOnly: true}
+            - {name: tunnel-credentials, mountPath: /etc/cloudflared/credentials, readOnly: true}
       volumes:
+        - name: tunnel-config
+          configMap:
+            name: solace-edge-tunnel-config
+        - name: tunnel-credentials
+          secret:
+            secretName: cloudflared-credentials
+            defaultMode: 288
+        - name: kubernetes-api
+          projected:
+            sources:
+              - serviceAccountToken: {path: token, expirationSeconds: 3600}
+              - configMap:
+                  name: kube-root-ca.crt
+                  items: [{key: ca.crt, path: ca.crt}]
+              - downwardAPI:
+                  items:
+                    - path: namespace
+                      fieldRef: {fieldPath: metadata.namespace}
         - name: ingress-routes
           configMap:
             name: solace-ingress-routes
@@ -116,6 +185,7 @@ spec:
       restartPolicy: Always
       schedulerName: default-scheduler
       securityContext:
+        fsGroup: 10001
         runAsGroup: 10001
         runAsNonRoot: true
         runAsUser: 10001

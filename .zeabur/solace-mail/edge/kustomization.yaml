@@ -12,5 +12,3 @@ configMapGenerator:
     files: [haproxy.cfg=notifications-edge-upstream.haproxy.cfg]
   - name: solace-ingress-routes
     files: [routes.yaml=solace-ingress-routes.yaml]
-  - name: solace-frontend-origin
-    files: [haproxy.cfg=frontend-origin.haproxy.cfg]

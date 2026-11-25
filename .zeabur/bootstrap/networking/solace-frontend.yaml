@@ -1,39 +1,33 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: solace-frontend
+  name: solace-web
   namespace: solace-mail
   labels:
-    app.kubernetes.io/name: solace-frontend
+    app.kubernetes.io/name: solace-web
     app.kubernetes.io/part-of: solace
 spec:
   selector:
-    app.kubernetes.io/name: solace-frontend
-  trafficDistribution: PreferSameNode
+    app.kubernetes.io/name: solace-web
+  clusterIP: None
+  publishNotReadyAddresses: true
   ports:
     - {name: http, port: 3000, targetPort: http}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: solace-frontend-peer
+  name: solace-web-origin
   namespace: solace-mail
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: solace-frontend
+      app.kubernetes.io/name: solace-web
   policyTypes: [Ingress, Egress]
   ingress:
     - from:
         - podSelector:
             matchLabels:
-              app.kubernetes.io/name: solace-frontend
-      ports:
-        - {port: 3000, protocol: TCP}
-  egress:
-    - to:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/name: solace-frontend
+              app.kubernetes.io/name: solace-public-ingress
       ports:
         - {port: 3000, protocol: TCP}

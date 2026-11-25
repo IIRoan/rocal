@@ -6,5 +6,5 @@ generatorOptions:
   annotations:
     kustomize.toolkit.fluxcd.io/substitute: disabled
 configMapGenerator:
-  - name: solace-frontend-tunnel-config
+  - name: solace-edge-tunnel-config
     files: [config.yaml]

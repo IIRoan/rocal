@@ -1,4 +1,20 @@
 http:
+  routers:
+    website:
+      entryPoints: [website]
+      rule: Host(`solace.onl`)
+      service: website
+  services:
+    website:
+      loadBalancer:
+        healthCheck:
+          path: /favicon-16x16.png
+          method: HEAD
+          interval: 500ms
+          timeout: 750ms
+        servers:
+          - url: http://solace-web-0.solace-web.solace-mail.svc.cluster.local:3000
+          - url: http://solace-web-1.solace-web.solace-mail.svc.cluster.local:3000
   middlewares:
     solace-direct-headers:
       headers:

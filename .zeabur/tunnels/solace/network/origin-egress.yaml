@@ -5,29 +5,12 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: solace-frontend
+      app.kubernetes.io/name: solace-public-ingress
   policyTypes: [Egress]
   egress:
     - to:
         - podSelector:
             matchLabels:
-              app.kubernetes.io/name: solace-public-ingress
+              app.kubernetes.io/name: solace-web
       ports:
-        - {port: 9444, protocol: TCP}
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: cloudflared-to-gateway
-spec:
-  podSelector:
-    matchLabels:
-      app.kubernetes.io/name: solace-public-ingress
-  policyTypes: [Ingress]
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/name: solace-frontend
-      ports:
-        - {port: 9444, protocol: TCP}
+        - {port: 3000, protocol: TCP}

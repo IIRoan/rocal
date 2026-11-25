@@ -1,10 +1,10 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
-  name: solace-frontend
+  name: solace-web
   namespace: solace-mail
   labels:
-    app.kubernetes.io/name: solace-frontend
+    app.kubernetes.io/name: solace-web
     app.kubernetes.io/part-of: solace
   annotations:
     zeabur.com/display-name: Solace Frontend
@@ -12,18 +12,15 @@ spec:
   replicas: 2
   revisionHistoryLimit: 2
   minReadySeconds: 5
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 0
-      maxUnavailable: 1
+  serviceName: solace-web
+  podManagementPolicy: Parallel
   selector:
     matchLabels:
-      app.kubernetes.io/name: solace-frontend
+      app.kubernetes.io/name: solace-web
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: solace-frontend
+        app.kubernetes.io/name: solace-web
         app.kubernetes.io/part-of: solace
     spec:
       automountServiceAccountToken: false
@@ -46,32 +43,11 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             - labelSelector:
                 matchLabels:
-                  app.kubernetes.io/name: solace-frontend
+                  app.kubernetes.io/name: solace-web
               topologyKey: kubernetes.io/hostname
       tolerations:
         - {key: roan.dev/apps-only, operator: Equal, value: "true", effect: NoSchedule}
         - {key: roan.dev/mail-only, operator: Equal, value: "true", effect: NoSchedule}
-      initContainers:
-        - name: website-origin
-          image: cgr.dev/chainguard/haproxy:latest@sha256:da0313aa3fb0b6a445602e0032e2917fb2990e96db09bba31a49d98fcaae31fa
-          restartPolicy: Always
-          args: ["haproxy", "-f", "/etc/frontend-origin/haproxy.cfg", "-db"]
-          ports:
-            - {name: website-origin, containerPort: 3001}
-          startupProbe:
-            tcpSocket: {port: website-origin}
-            periodSeconds: 1
-            failureThreshold: 30
-          resources:
-            requests: {cpu: 10m, memory: 12Mi}
-            limits: {cpu: 150m, memory: 48Mi}
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            # Chainguard HAProxy sets NET_BIND_SERVICE on its binary.
-            capabilities: {drop: [ALL], add: [NET_BIND_SERVICE]}
-          volumeMounts:
-            - {name: website-origin, mountPath: /etc/frontend-origin, readOnly: true}
       containers:
         - name: frontend
           image: zot.zot.svc:5000/solace-mail/frontend@sha256:22e25160a90d46c9fc73cfc2f057cd7e00df732863f1e71883e9cddf5ee136eb
@@ -88,7 +64,7 @@ spec:
             periodSeconds: 2
             failureThreshold: 30
           readinessProbe:
-            httpGet: {path: /login, port: http}
+            httpGet: {path: /favicon-16x16.png, port: http}
             periodSeconds: 2
             failureThreshold: 1
           resources:
@@ -101,57 +77,8 @@ spec:
           volumeMounts:
             - {name: tmp, mountPath: /tmp}
             - {name: cache, mountPath: /app/apps/web/.next/cache}
-        - name: cloudflared
-          image: docker.io/cloudflare/cloudflared:2026.11.2@sha256:55c7e3e8d89d5e8d20b75a82f3602cbf98e06db406e73e282073cfdc5a9a3af6
-          args:
-            - tunnel
-            - --config
-            - /etc/cloudflared/config/config.yaml
-            - --no-autoupdate
-            - --edge-ip-version
-            - '4'
-            - --metrics
-            - '0.0.0.0:2000'
-            - --grace-period
-            - 20s
-            - run
-          ports:
-            - {name: tunnel-metrics, containerPort: 2000}
-          startupProbe:
-            httpGet: {path: /ready, port: tunnel-metrics}
-            periodSeconds: 5
-            failureThreshold: 30
-          readinessProbe:
-            httpGet: {path: /ready, port: tunnel-metrics}
-            periodSeconds: 2
-            failureThreshold: 1
-          livenessProbe:
-            httpGet: {path: /metrics, port: tunnel-metrics}
-            periodSeconds: 15
-          resources:
-            requests: {cpu: 20m, memory: 48Mi}
-            limits: {cpu: 250m, memory: 128Mi}
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            runAsUser: 65532
-            runAsGroup: 65532
-            capabilities: {drop: [ALL]}
-          volumeMounts:
-            - {name: tunnel-config, mountPath: /etc/cloudflared/config, readOnly: true}
-            - {name: tunnel-credentials, mountPath: /etc/cloudflared/credentials, readOnly: true}
       volumes:
         - name: tmp
           emptyDir: {sizeLimit: 32Mi}
         - name: cache
           emptyDir: {sizeLimit: 128Mi}
-        - name: website-origin
-          configMap:
-            name: solace-frontend-origin
-        - name: tunnel-config
-          configMap:
-            name: solace-frontend-tunnel-config
-        - name: tunnel-credentials
-          secret:
-            secretName: cloudflared-credentials
-            defaultMode: 288
