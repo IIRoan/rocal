@@ -53,7 +53,7 @@ spec:
         - {key: roan.dev/mail-only, operator: Equal, value: "true", effect: NoSchedule}
       initContainers:
         - name: website-origin
-          image: docker.io/library/haproxy@sha256:1c3568e520453cc8ba98c39501febcf450429c80e6cc27ecad779961d76e597c
+          image: cgr.dev/chainguard/haproxy:latest@sha256:da0313aa3fb0b6a445602e0032e2917fb2990e96db09bba31a49d98fcaae31fa
           restartPolicy: Always
           args: ["haproxy", "-f", "/etc/frontend-origin/haproxy.cfg", "-db"]
           ports:
@@ -68,7 +68,8 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
-            capabilities: {drop: [ALL]}
+            # Chainguard HAProxy sets NET_BIND_SERVICE on its binary.
+            capabilities: {drop: [ALL], add: [NET_BIND_SERVICE]}
           volumeMounts:
             - {name: website-origin, mountPath: /etc/frontend-origin, readOnly: true}
       containers:
