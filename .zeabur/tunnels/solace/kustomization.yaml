@@ -7,4 +7,4 @@ generatorOptions:
     kustomize.toolkit.fluxcd.io/substitute: disabled
 configMapGenerator:
   - name: solace-frontend-tunnel-config
-    files: [config.yaml, supervise.sh]
+    files: [config.yaml]

@@ -138,22 +138,25 @@ def check(flux, gateway_dir):
 
 
 def check_local_frontend(network, workloads, deployment):
-    assert all(identity(doc) != ("Service", "solace-mail", "solace-frontend") for doc in network)
+    check_service_targets(network, deployment, ("solace-frontend",))
     assert all(identity(doc) != ("Deployment", "solace-mail", "solace-cloudflared") for doc in workloads)
     template = deployment["spec"]["template"]["spec"]
     assert template["automountServiceAccountToken"] is False
     containers = {item["name"]: item for item in template["containers"]}
     connector = containers["cloudflared"]
-    volume = {item["name"]: item for item in template["volumes"]}
-    assert re.fullmatch(r"docker.io/cloudflare/cloudflared:[^@]+@sha256:[0-9a-f]{64}",
-                        volume["tunnel-image"]["image"]["reference"])
-    config_name = volume["tunnel-config"]["configMap"]["name"]
+    volumes = {item["name"]: item for item in template["volumes"]}
+    config_name = volumes["tunnel-config"]["configMap"]["name"]
     config = find_resource(workloads, "ConfigMap", "solace-mail", config_name)["data"]
     routes = yaml.safe_load(config["config.yaml"])["ingress"]
     (website,) = [route for route in routes if route.get("hostname") == "solace.onl"]
-    assert website["service"] == "http://127.0.0.1:3000"
-    assert connector["command"] == ["/bin/sh", "/etc/cloudflared/config/supervise.sh"]
-    assert "http://127.0.0.1:3000/login" in config["supervise.sh"]
+    assert website["service"] == "http://127.0.0.1:3001"
+    (origin,) = [item for item in template["initContainers"] if item["name"] == "website-origin"]
+    assert origin["restartPolicy"] == "Always"
+    assert origin["startupProbe"]["tcpSocket"]["port"] == "website-origin"
+    config_name = volumes["website-origin"]["configMap"]["name"]
+    config = find_resource(workloads, "ConfigMap", "solace-mail", config_name)["data"]["haproxy.cfg"]
+    assert "server local 127.0.0.1:3000" in config
+    assert "server peer solace-frontend.solace-mail.svc.cluster.local:3000 backup" in config
     assert "tunnel-credentials" in {mount["name"] for mount in connector["volumeMounts"]}
     assert "tunnel-credentials" not in {mount["name"] for mount in containers["frontend"]["volumeMounts"]}
 

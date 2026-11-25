@@ -51,6 +51,26 @@ spec:
       tolerations:
         - {key: roan.dev/apps-only, operator: Equal, value: "true", effect: NoSchedule}
         - {key: roan.dev/mail-only, operator: Equal, value: "true", effect: NoSchedule}
+      initContainers:
+        - name: website-origin
+          image: docker.io/library/haproxy@sha256:1c3568e520453cc8ba98c39501febcf450429c80e6cc27ecad779961d76e597c
+          restartPolicy: Always
+          args: ["haproxy", "-f", "/etc/frontend-origin/haproxy.cfg", "-db"]
+          ports:
+            - {name: website-origin, containerPort: 3001}
+          startupProbe:
+            tcpSocket: {port: website-origin}
+            periodSeconds: 1
+            failureThreshold: 30
+          resources:
+            requests: {cpu: 10m, memory: 12Mi}
+            limits: {cpu: 150m, memory: 48Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: website-origin, mountPath: /etc/frontend-origin, readOnly: true}
       containers:
         - name: frontend
           image: zot.zot.svc:5000/solace-mail/frontend@sha256:22e25160a90d46c9fc73cfc2f057cd7e00df732863f1e71883e9cddf5ee136eb
@@ -81,8 +101,7 @@ spec:
             - {name: tmp, mountPath: /tmp}
             - {name: cache, mountPath: /app/apps/web/.next/cache}
         - name: cloudflared
-          image: docker.io/library/busybox:1.37.0-musl@sha256:5624bb6777cf469b1fb50ae3f981b15d2715ee2fffaf20b9998cfb7843726835
-          command: ["/bin/sh", "/etc/cloudflared/config/supervise.sh"]
+          image: docker.io/cloudflare/cloudflared:2026.11.2@sha256:55c7e3e8d89d5e8d20b75a82f3602cbf98e06db406e73e282073cfdc5a9a3af6
           args:
             - tunnel
             - --config
@@ -95,8 +114,6 @@ spec:
             - --grace-period
             - 20s
             - run
-          env:
-            - {name: SSL_CERT_FILE, value: /opt/cloudflared/etc/ssl/certs/ca-certificates.crt}
           ports:
             - {name: tunnel-metrics, containerPort: 2000}
           startupProbe:
@@ -107,6 +124,9 @@ spec:
             httpGet: {path: /ready, port: tunnel-metrics}
             periodSeconds: 2
             failureThreshold: 1
+          livenessProbe:
+            httpGet: {path: /metrics, port: tunnel-metrics}
+            periodSeconds: 15
           resources:
             requests: {cpu: 20m, memory: 48Mi}
             limits: {cpu: 250m, memory: 128Mi}
@@ -117,8 +137,6 @@ spec:
             runAsGroup: 65532
             capabilities: {drop: [ALL]}
           volumeMounts:
-            - {name: tunnel-image, mountPath: /opt/cloudflared, readOnly: true}
-            - {name: tunnel-runtime, mountPath: /run/tunnel}
             - {name: tunnel-config, mountPath: /etc/cloudflared/config, readOnly: true}
             - {name: tunnel-credentials, mountPath: /etc/cloudflared/credentials, readOnly: true}
       volumes:
@@ -126,12 +144,9 @@ spec:
           emptyDir: {sizeLimit: 32Mi}
         - name: cache
           emptyDir: {sizeLimit: 128Mi}
-        - name: tunnel-image
-          image:
-            reference: docker.io/cloudflare/cloudflared:2026.11.2@sha256:55c7e3e8d89d5e8d20b75a82f3602cbf98e06db406e73e282073cfdc5a9a3af6
-            pullPolicy: IfNotPresent
-        - name: tunnel-runtime
-          emptyDir: {sizeLimit: 64Mi}
+        - name: website-origin
+          configMap:
+            name: solace-frontend-origin
         - name: tunnel-config
           configMap:
             name: solace-frontend-tunnel-config
