@@ -27,12 +27,6 @@ spec:
   policyTypes: [Ingress]
   ingress:
     - from:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/name: cloudflared
-      ports:
-        - {port: 9444, protocol: TCP}
-    - from:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: traefik

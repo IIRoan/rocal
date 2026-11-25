@@ -24,9 +24,9 @@ Create `cloudflared-credentials` in each of `traefik` and `solace-mail` with the
 
 Preserve exact DNS records for existing unrelated services and the direct DNS-only mail exchange records. For a new app, select `webdock-apps / https` in the Zeabur **Add domain** form. The HTTPRoute uses the Gateway's automatically renewed wildcard origin certificate. Cloudflare presents its own edge certificate.
 
-The Solace web frontend runs one NextRS pod on each Webdock worker. Its ClusterIP prefers a ready same-node endpoint and falls back across the WireGuard mesh. The Solace connectors are the only application pods allowed to reach the frontend. The apex uses the same proxied tunnel CNAME as the Solace API.
+The Solace web frontend runs one pod on each Webdock worker. Each pod runs a connector for the existing Solace tunnel. The apex reaches the frontend over loopback, so a stalled Kubernetes API can mark both pods unready without removing either website route. The connector starts after the local sign-in page responds and drains its Cloudflare connections if that page stops responding. The other Solace hostnames still use the private Traefik origin.
 
-Build the frontend from the repository root with `podman build -f apps/web/Dockerfile .`. Publish it to `zot.zot.svc:5000/solace-mail/frontend` and promote the complete digest-pinned reference in [the frontend deployment](../solace-mail/frontend.yaml). Preserve the previous apex record until the new deployment has passed end-to-end checks so the Vercel route is available for rollback.
+Build the frontend from the repository root with `podman build -f apps/web/Dockerfile .`. Publish it to `zot.zot.svc:5000/solace-mail/frontend` and promote the complete digest-pinned reference in [the frontend deployment](../solace-mail/frontend.yaml).
 
 The Zeabur tunnel sends its explicit project hostnames to the private `apps` listener on Webdock Traefik. Generated app names use the shared `webdock-apps` Gateway.
 
@@ -41,6 +41,8 @@ Verify management over WireGuard before reloading a worker firewall. Load and te
 ## Verification and recovery
 
 Verify that the Gateway is Programmed and each connector Deployment has one Ready replica on each VPS. Check the HTTPRoute's Accepted and ResolvedRefs conditions, then request a fresh app hostname externally. The Gateway runs on the platform Traefik. Solace uses its own two-replica Traefik origin on the Webdock workers.
+
+Probe the website continuously while one replica is replaced. Exercise a loss of frontend readiness with both local apps still serving and verify that fresh requests through Cloudflare succeed.
 
 Verify the public API, JMAP session and event stream, discovery and MTA-STS, the status page and SMTP STARTTLS on both MX hosts. Confirm authenticated responses remain private and that the origin receives Cloudflare's client IP.
 

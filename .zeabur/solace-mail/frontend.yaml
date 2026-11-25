@@ -11,6 +11,7 @@ metadata:
 spec:
   replicas: 2
   revisionHistoryLimit: 2
+  minReadySeconds: 5
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -79,8 +80,62 @@ spec:
           volumeMounts:
             - {name: tmp, mountPath: /tmp}
             - {name: cache, mountPath: /app/apps/web/.next/cache}
+        - name: cloudflared
+          image: docker.io/library/busybox:1.37.0-musl@sha256:5624bb6777cf469b1fb50ae3f981b15d2715ee2fffaf20b9998cfb7843726835
+          command: ["/bin/sh", "/etc/cloudflared/config/supervise.sh"]
+          args:
+            - tunnel
+            - --config
+            - /etc/cloudflared/config/config.yaml
+            - --no-autoupdate
+            - --edge-ip-version
+            - '4'
+            - --metrics
+            - '0.0.0.0:2000'
+            - --grace-period
+            - 20s
+            - run
+          env:
+            - {name: SSL_CERT_FILE, value: /opt/cloudflared/etc/ssl/certs/ca-certificates.crt}
+          ports:
+            - {name: tunnel-metrics, containerPort: 2000}
+          startupProbe:
+            httpGet: {path: /ready, port: tunnel-metrics}
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: {path: /ready, port: tunnel-metrics}
+            periodSeconds: 2
+            failureThreshold: 1
+          resources:
+            requests: {cpu: 20m, memory: 48Mi}
+            limits: {cpu: 250m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: tunnel-image, mountPath: /opt/cloudflared, readOnly: true}
+            - {name: tunnel-runtime, mountPath: /run/tunnel}
+            - {name: tunnel-config, mountPath: /etc/cloudflared/config, readOnly: true}
+            - {name: tunnel-credentials, mountPath: /etc/cloudflared/credentials, readOnly: true}
       volumes:
         - name: tmp
           emptyDir: {sizeLimit: 32Mi}
         - name: cache
           emptyDir: {sizeLimit: 128Mi}
+        - name: tunnel-image
+          image:
+            reference: docker.io/cloudflare/cloudflared:2026.11.2@sha256:55c7e3e8d89d5e8d20b75a82f3602cbf98e06db406e73e282073cfdc5a9a3af6
+            pullPolicy: IfNotPresent
+        - name: tunnel-runtime
+          emptyDir: {sizeLimit: 64Mi}
+        - name: tunnel-config
+          configMap:
+            name: solace-frontend-tunnel-config
+        - name: tunnel-credentials
+          secret:
+            secretName: cloudflared-credentials
+            defaultMode: 288

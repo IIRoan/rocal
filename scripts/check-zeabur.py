@@ -119,7 +119,7 @@ def check(flux, gateway_dir):
             assert {"stalwart-a", "stalwart-b"}.isdisjoint(deployments)
             check_gateway(deployments["solace-api"], configs, "edge")
             check_service_targets(network, deployments["solace-api"], ("solace-api", "solace-api-direct"))
-            check_service_targets(network, deployments["solace-frontend"], ("solace-frontend",))
+            check_local_frontend(network, docs, deployments["solace-frontend"])
             check_gateway(deployments["notifications"], configs, "mail-gate")
             validate_redis(docs, network)
             check_public_ingress(network, docs)
@@ -135,6 +135,27 @@ def check(flux, gateway_dir):
             (gateway_dir / key).write_text(fixtures[0][key])
         (gateway_dir / "images").write_text("\n".join(dict.fromkeys(images)) + "\n")
 
+
+
+def check_local_frontend(network, workloads, deployment):
+    assert all(identity(doc) != ("Service", "solace-mail", "solace-frontend") for doc in network)
+    assert all(identity(doc) != ("Deployment", "solace-mail", "solace-cloudflared") for doc in workloads)
+    template = deployment["spec"]["template"]["spec"]
+    assert template["automountServiceAccountToken"] is False
+    containers = {item["name"]: item for item in template["containers"]}
+    connector = containers["cloudflared"]
+    volume = {item["name"]: item for item in template["volumes"]}
+    assert re.fullmatch(r"docker.io/cloudflare/cloudflared:[^@]+@sha256:[0-9a-f]{64}",
+                        volume["tunnel-image"]["image"]["reference"])
+    config_name = volume["tunnel-config"]["configMap"]["name"]
+    config = find_resource(workloads, "ConfigMap", "solace-mail", config_name)["data"]
+    routes = yaml.safe_load(config["config.yaml"])["ingress"]
+    (website,) = [route for route in routes if route.get("hostname") == "solace.onl"]
+    assert website["service"] == "http://127.0.0.1:3000"
+    assert connector["command"] == ["/bin/sh", "/etc/cloudflared/config/supervise.sh"]
+    assert "http://127.0.0.1:3000/login" in config["supervise.sh"]
+    assert "tunnel-credentials" in {mount["name"] for mount in connector["volumeMounts"]}
+    assert "tunnel-credentials" not in {mount["name"] for mount in containers["frontend"]["volumeMounts"]}
 
 
 def check_service_targets(network, deployment, service_names):

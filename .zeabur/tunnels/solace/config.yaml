@@ -4,7 +4,7 @@ originRequest:
   matchSNItoHost: true
 ingress:
   - hostname: 'solace.onl'
-    service: http://solace-frontend.solace-mail.svc.cluster.local:3000
+    service: http://127.0.0.1:3000
   - hostname: 'api.solace.onl'
     service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9444
   - hostname: 'mail.solace.onl'
