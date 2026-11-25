@@ -6,19 +6,19 @@ ingress:
   - hostname: 'solace.onl'
     service: http://127.0.0.1:3001
   - hostname: 'api.solace.onl'
-    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9444
+    service: https://127.0.0.1:9444
   - hostname: 'mail.solace.onl'
-    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9444
+    service: https://127.0.0.1:9444
   - hostname: 'autoconfig.solace.onl'
-    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9444
+    service: https://127.0.0.1:9444
   - hostname: 'autodiscover.solace.onl'
-    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9444
+    service: https://127.0.0.1:9444
   - hostname: 'ua-auto-config.solace.onl'
-    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9444
+    service: https://127.0.0.1:9444
   - hostname: 'mta-sts.solace.onl'
-    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9444
+    service: https://127.0.0.1:9444
   - hostname: 'status.solace.onl'
-    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9444
+    service: https://127.0.0.1:9444
   - hostname: 'monitoring-solace.roan.dev'
-    service: https://solace-tunnel-gateway.solace-mail.svc.cluster.local:9444
+    service: https://127.0.0.1:9444
   - service: http_status:404

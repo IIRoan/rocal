@@ -24,7 +24,7 @@ Create `cloudflared-credentials` in each of `traefik` and `solace-mail` with the
 
 Preserve exact DNS records for existing unrelated services and the direct DNS-only mail exchange records. For a new app, select `webdock-apps / https` in the Zeabur **Add domain** form. The HTTPRoute uses the Gateway's automatically renewed wildcard origin certificate. Cloudflare presents its own edge certificate.
 
-The Solace web frontend runs one pod on each Webdock worker. Each pod runs a connector for the existing Solace tunnel. The apex reaches a health-checking HAProxy sidecar over loopback. HAProxy uses the local frontend first and the ready peer through the internal Service only when the local frontend fails. A stalled Kubernetes API can mark both pods unready while their local website origins continue serving. The other Solace hostnames use the private Traefik origin independently of the website health check.
+Each Webdock worker runs a Solace tunnel connector beside Traefik. The connector sends website requests to the loopback website listener and other HTTPS traffic to the private TLS listener. Frontend replicas run independently with stable pod DNS names. Traefik checks both directly through a headless Service that publishes unready addresses. The website listener preserves origin cache headers.
 
 Build the frontend from the repository root with `podman build -f apps/web/Dockerfile .`. Publish it to `zot.zot.svc:5000/solace-mail/frontend` and promote the complete digest-pinned reference in [the frontend deployment](../solace-mail/frontend.yaml).
 

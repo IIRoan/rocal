@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: solace-mail
-namePrefix: solace-frontend-
+namePrefix: solace-ingress-
 resources:
   - ../../base/network
   - origin-egress.yaml
@@ -10,4 +10,4 @@ patches:
     patch: |
       - op: replace
         path: /spec/podSelector/matchLabels/app.kubernetes.io~1name
-        value: solace-frontend
+        value: solace-public-ingress

@@ -151,8 +151,6 @@ Apply the bootstrap manifests after the projects and their Services exist. These
 kubectl apply --server-side --field-manager=rocal-solace-bootstrap -f .zeabur/bootstrap/riftbound-public.yaml
 kubectl apply --server-side --field-manager=rocal-solace-bootstrap -f .zeabur/bootstrap/zeabur-project-public.yaml
 kubectl apply --server-side --field-manager=rocal-solace-bootstrap -f .zeabur/bootstrap/ente-public.yaml
-kubectl -n solace-gitops patch kustomization solace --field-manager=rocal-solace-bootstrap \
-  --type=merge --patch-file .zeabur/bootstrap/riftbound-traefik-patch.json
 ```
 
 Verify each hostname through Cloudflare with TLS hostname validation. Test the Riftbound API response and web CORS, anonymous S3 access denial, and GitHub webhook routing. Requests for these hostnames sent directly to either Webdock IP should reach no application route.
