@@ -24,6 +24,10 @@ Create `cloudflared-credentials` in each of `traefik` and `solace-mail` with the
 
 Preserve exact DNS records for existing unrelated services and the direct DNS-only mail exchange records. For a new app, select `webdock-apps / https` in the Zeabur **Add domain** form. The HTTPRoute uses the Gateway's automatically renewed wildcard origin certificate. Cloudflare presents its own edge certificate.
 
+The Solace web frontend runs one NextRS pod on each Webdock worker. Its ClusterIP prefers a ready same-node endpoint and falls back across the WireGuard mesh. The Solace connectors are the only application pods allowed to reach the frontend. The apex uses the same proxied tunnel CNAME as the Solace API.
+
+Build the frontend from the repository root with `podman build -f apps/web/Dockerfile .`. Publish it to `zot.zot.svc:5000/solace-mail/frontend` and set `SOLACE_FRONTEND_IMAGE` in the existing `solace-release-images` ConfigMap to the complete digest-pinned reference. Preserve the previous apex record until the new deployment has passed end-to-end checks so the Vercel route is available for rollback.
+
 The Zeabur tunnel sends its explicit project hostnames to the private `apps` listener on Webdock Traefik. Generated app names use the shared `webdock-apps` Gateway.
 
 ## Worker firewall
