@@ -6,8 +6,22 @@ WORKDIR /source
 COPY . .
 RUN bun install --frozen-lockfile
 ENV NEXT_TELEMETRY_DISABLED=1 SOLACE_SELF_HOSTED=1
+ENV NEXT_PUBLIC_API_URL=https://api.solace.onl \
+    NEXT_PUBLIC_APP_URL=https://solace.onl \
+    NEXT_PUBLIC_MOBILE_AUTH_CALLBACK_URL=app.solace.onl://api/auth
 ENV SOLACE_APPLE_TEAM_ID=HXJACWP87H STALWART_ADMIN_URL=https://mail.solace.onl/admin/
 RUN cd apps/web && bun run build
+
+RUN node <<'JS'
+const { headers } = require("./apps/web/.next/routes-manifest.json");
+const policy = headers.flatMap(route => route.headers)
+  .find(header => header.key.toLowerCase() === "content-security-policy")?.value;
+const connect = policy?.split(";").map(directive => directive.trim())
+  .find(directive => directive.startsWith("connect-src "))?.split(" ");
+if (!connect?.includes(process.env.NEXT_PUBLIC_API_URL)) {
+  throw new Error("The production frontend cannot connect to the Solace API");
+}
+JS
 
 FROM bun AS runtime
 ADD --checksum=sha256:5e531967a8585233b37a989dad584b3cd2484bfdf6ecf1558a7c0c840469ada0 https://github.com/nextrs-sh/nextrs/releases/download/v0.1.0-rc.2/nextrs-v0.1.0-rc.2-linux-x86_64.tar.gz /tmp/nextrs.tar.gz
