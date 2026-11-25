@@ -8,3 +8,4 @@ export type { SidebarPrimaryActionProps } from "./sidebar-primary-action";
 export { SidebarAppSwitcher } from "./sidebar-app-switcher";
 export { ThemeToggle } from "./theme-toggle";
 export { default as Logo } from "./logo";
+export { LogoMark } from "./logo-mark";

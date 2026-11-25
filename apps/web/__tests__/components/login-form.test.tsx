@@ -82,9 +82,7 @@ jest.mock("lucide-react", () => {
 });
 
 jest.mock("@workspace/ui/components/layout", () => ({
-  Logo: (props: React.HTMLAttributes<HTMLDivElement>) => (
-    <div {...props}>Solace</div>
-  ),
+  LogoMark: ({ label }: { label?: string }) => <span role="img" aria-label={label} />,
   ThemeToggle: () => <button type="button">Theme</button>,
 }));
 

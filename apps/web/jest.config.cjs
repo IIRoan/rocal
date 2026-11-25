@@ -28,6 +28,7 @@ module.exports = {
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
   moduleNameMapper: {
     ...createReactDedupeMapper(repoRoot),
+    "^\\./solace-mark\\.png$": path.join(repoRoot, "jest.image-mock.cjs"),
     "^@/lib/auth-client$": "<rootDir>/__tests__/mocks/auth-client.ts",
     "^\\.\\./auth-client$": "<rootDir>/__tests__/mocks/auth-client.ts",
     "^(\\.\\./)+lib/auth-client$": "<rootDir>/__tests__/mocks/auth-client.ts",

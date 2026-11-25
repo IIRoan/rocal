@@ -28,13 +28,6 @@ jest.mock("../../hooks/use-prefers-reduced-motion", () => ({
   usePrefersReducedMotion: () => false,
 }));
 
-jest.mock("../layout/logo", () => ({
-  __esModule: true,
-  default: (props: React.SVGProps<SVGSVGElement>) => (
-    <svg data-testid="logo" {...props} />
-  ),
-}));
-
 function getExpectedDateParts(date: Date) {
   return {
     dayName: new Intl.DateTimeFormat(undefined, {
@@ -83,6 +76,8 @@ describe("PageLoadingOverlay", () => {
     expect(overlay).not.toBeNull();
     expect(overlay?.style.opacity).toBe("1");
     expect(overlay?.style.visibility).toBe("");
+    expect(overlay?.querySelector("svg")).toBeNull();
+    expect(overlay?.querySelector<HTMLElement>("[style*='mask-image']")?.style.maskImage).toContain("solace-mark.png");
   });
 
   it("announces one steady loading status instead of the cycling board", () => {
