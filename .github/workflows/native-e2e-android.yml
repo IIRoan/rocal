@@ -1,0 +1,56 @@
+name: Native end-to-end (Android)
+
+on:
+  pull_request:
+    branches: [master, main, testing]
+    paths: &paths
+      - "apps/native-*/**"
+      - "apps/backend/**"
+      - "apps/stalwart/**"
+      - "crates/**"
+      - "xtask/**"
+      - "packages/**"
+      - "scripts/e2e/**"
+      - "e2e/**"
+      - "patches/**"
+      - "*.json"
+      - "bun.lock"
+      - "Cargo.*"
+      - ".cargo/**"
+      - "rust-toolchain.toml"
+      - ".bun-version"
+      - ".node-version"
+      - "babel.config.cts"
+      - ".github/workflows/native-e2e*.yml"
+  push:
+    branches: [master, testing]
+    paths: *paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Android has its own run, so a failed Android job can be re-run without waiting for the iOS simulators.
+concurrency:
+  group: native-e2e-android-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-android:
+    name: Build ${{ matrix.app }} (android)
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [calendar, mail]
+    uses: ./.github/workflows/native-e2e-build.yml
+    with:
+      platform: android
+      app: ${{ matrix.app }}
+
+  android:
+    name: Android
+    needs: build-android
+    if: ${{ always() && !cancelled() }}
+    uses: ./.github/workflows/native-e2e-journeys.yml
+    with:
+      platform: android
