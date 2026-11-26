@@ -1,4 +1,4 @@
-import { buildForwardBody, buildReplyBody } from "./compose-quote";
+import { buildForwardBody, buildForwardHtml, buildReplyBody, buildReplyHtml } from "./compose-quote";
 import type { JmapEmailMessage } from "./types";
 
 const DATE_OPTIONS = { timeFormat: "24h", timezone: "Europe/Amsterdam" } as const;
@@ -44,6 +44,14 @@ describe("reply and forward quotes", () => {
     const started = performance.now();
     buildReplyBody(hostile, DATE_OPTIONS);
     buildForwardBody(hostile, DATE_OPTIONS);
+    buildReplyHtml(hostile, DATE_OPTIONS);
+    buildForwardHtml(hostile, DATE_OPTIONS);
     expect(performance.now() - started).toBeLessThan(1500);
+  });
+
+  it("quotes the decrypted text of an encrypted message, never its armor", () => {
+    const html = buildReplyHtml(message({ bodyValues: { "1": { value: "-----BEGIN PGP MESSAGE-----" } } }), DATE_OPTIONS, "Decrypted <hi>");
+    expect(html).toContain("<div data-quoted-html><p>Decrypted &lt;hi&gt;</p></div>");
+    expect(html).not.toContain("BEGIN PGP");
   });
 });

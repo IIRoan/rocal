@@ -40,6 +40,7 @@ function plan(overrides: Partial<ComposeSeedInput>) {
     fromEmail: "me@example.com",
     dateOptions: { timeFormat: "24h", timezone: "Europe/Amsterdam" },
     runtime: {} as MailRuntime,
+    plainTextMode: true,
     ...overrides,
   });
 }
@@ -61,14 +62,14 @@ describe("planComposeSeed", () => {
   it("addresses a new message from a mailto with the name shown", () => {
     expect(plan({ params: { to: "ann@example.com", toName: "Ann" }, sourceMessage: null })).toEqual({
       kind: "fields",
-      fields: { to: "Ann <ann@example.com>", cc: "", bcc: "", subject: "", body: "\n\n-- \nMe" },
+      fields: { to: "Ann <ann@example.com>", cc: "", bcc: "", subject: "", body: "\n\n-- \nMe", htmlBody: "" },
     });
   });
 
   it("opens a new message with an empty writing line above the signature, once the mailbox is in", () => {
     expect(plan({ sourceMessage: null })).toEqual({
       kind: "fields",
-      fields: { to: "", cc: "", bcc: "", subject: "", body: "\n\n-- \nMe" },
+      fields: { to: "", cc: "", bcc: "", subject: "", body: "\n\n-- \nMe", htmlBody: "" },
     });
     expect(plan({ sourceMessage: null, signatureOptions: { separator: false } })).toMatchObject({ fields: { body: "\n\nMe" } });
     expect(plan({ sourceMessage: null, signature: null })).toMatchObject({ fields: { body: "" } });
@@ -77,7 +78,7 @@ describe("planComposeSeed", () => {
   });
 
   it("reopens an undone send from its form before loading the source", () => {
-    const fields = { to: "ann@example.com", cc: "", bcc: "", subject: "Plans", body: "Hi" };
+    const fields = { to: "ann@example.com", cc: "", bcc: "", subject: "Plans", body: "Hi", htmlBody: "<p>Hi</p>" };
     const attachments = [{ id: "a", name: "a.txt", type: "text/plain", size: 1, bytes: new Uint8Array([1]) }];
     expect(plan({ params: { mode: "reply", messageId: "m", restore: { fields, attachments, draftId: "copy" } }, sourceMessage: null })).toEqual({
       kind: "fields", fields, draftId: "copy", restoredAttachments: attachments,
@@ -88,7 +89,7 @@ describe("planComposeSeed", () => {
     const mailto = { to: ["a@example.com", "b@example.com"], cc: ["c@example.com"], bcc: [], subject: "Hi", body: "Line one\nLine two" };
     expect(plan({ params: { mailto }, sourceMessage: null })).toEqual({
       kind: "fields",
-      fields: { to: "a@example.com, b@example.com", cc: "c@example.com", bcc: "", subject: "Hi", body: "Line one\nLine two\n\n-- \nMe" },
+      fields: { to: "a@example.com, b@example.com", cc: "c@example.com", bcc: "", subject: "Hi", body: "Line one\nLine two\n\n-- \nMe", htmlBody: "" },
     });
   });
 
@@ -135,7 +136,7 @@ describe("planComposeSeed", () => {
     expect(plan({ params: { mode: "draft" } })).toEqual({
       kind: "fields",
       draftId: "m1",
-      fields: { to: "me@example.com", cc: "bo@example.com", bcc: "", subject: "Plans", body: "See you there" },
+      fields: { to: "me@example.com", cc: "bo@example.com", bcc: "", subject: "Plans", body: "See you there", htmlBody: "" },
     });
   });
 
@@ -162,6 +163,53 @@ describe("planComposeSeed", () => {
     const body = reply?.kind === "fields" ? reply.fields.body : "";
     expect(body).toContain("Ann wrote:\n> See you there");
     expect(body).not.toContain("BEGIN PGP");
+  });
+});
+
+describe("planComposeSeed in rich compose", () => {
+  const rich = (overrides: Partial<ComposeSeedInput>) => plan({ plainTextMode: false, ...overrides });
+  const fields = (seed: ReturnType<typeof plan>) => (seed?.kind === "fields" ? seed.fields : null);
+
+  it("opens a new message with an empty line above the marked signature, and a mailto body above both", () => {
+    expect(fields(rich({ sourceMessage: null }))).toEqual({
+      to: "", cc: "", bcc: "", subject: "",
+      body: "--\nMe",
+      htmlBody: '<p></p><p data-signature-block="separator">-- </p><p>Me</p><p data-signature-block="end"></p>',
+    });
+    const mailto = { to: ["a@example.com"], cc: [], bcc: [], subject: "Hi", body: "Line <one>\nLine two" };
+    expect(fields(rich({ params: { mailto }, sourceMessage: null }))?.htmlBody).toBe(
+      '<p>Line &lt;one&gt;<br>Line two</p><p data-signature-block="separator">-- </p><p>Me</p><p data-signature-block="end"></p>',
+    );
+    expect(fields(rich({ sourceMessage: null, signature: null }))?.htmlBody).toBe("");
+  });
+
+  it("quotes a reply's own HTML, sanitized, under an escaped header with the signature on the chosen side", () => {
+    const sourceMessage: JmapEmailMessage = {
+      ...source,
+      from: [{ name: "Ann <boss>", email: "ann@example.com" }],
+      htmlBody: [{ partId: "2" }],
+      bodyValues: { ...source.bodyValues, "2": { value: '<p onclick="x()">See <b>you</b></p><img src="cid:logo@x">' } },
+    };
+    const below = fields(rich({ params: { mode: "reply" }, sourceMessage }))?.htmlBody ?? "";
+    expect(below).toMatch(/^<p><\/p><div><p>On .+, Ann &lt;boss&gt; wrote:<\/p><\/div><div data-quoted-html><p>See <b>you<\/b><\/p><img src="data:image\/gif;base64,[^"]+" data-cid="logo@x"><\/div><p data-signature-block="separator">/);
+    expect(below).not.toContain("onclick");
+    const above = fields(rich({ params: { mode: "reply" }, sourceMessage, replySignaturePosition: "above_quote" }))?.htmlBody ?? "";
+    expect(above.indexOf("data-signature-block")).toBeLessThan(above.indexOf("data-quoted-html"));
+  });
+
+  it("forwards with To and Cc in the header and a forward-marked quote", () => {
+    const html = fields(rich({ params: { mode: "forward" } }))?.htmlBody ?? "";
+    expect(html).toContain("---------- Forwarded message ----------<br>From: ann@example.com");
+    expect(html).toContain("To: me@example.com<br>Cc: bo@example.com<br>Subject: Plans");
+    expect(html).toContain('<div data-quoted-html="forward"><p>See you there</p></div>');
+  });
+
+  it("reopens a draft from its HTML, an older draft's markdown-lite text as formatting, else its text", () => {
+    const withHtml: JmapEmailMessage = { ...source, htmlBody: [{ partId: "2" }], bodyValues: { ...source.bodyValues, "2": { value: "<p><u>Hi</u></p>" } } };
+    expect(fields(rich({ params: { mode: "draft" }, sourceMessage: withHtml }))).toMatchObject({ htmlBody: "<p><u>Hi</u></p>", body: "Hi" });
+    const legacy = { ...source, bodyValues: { "1": { value: "**Bold** plan" } } };
+    expect(fields(rich({ params: { mode: "draft" }, sourceMessage: legacy }))?.htmlBody).toBe("<p><strong>Bold</strong> plan</p>");
+    expect(fields(rich({ params: { mode: "draft" } }))?.htmlBody).toBe("<p>See you there</p>");
   });
 });
 
@@ -207,7 +255,7 @@ describe("decryptDraftFields", () => {
   it("keeps a real text part that happens to contain MIME-looking lines editable", async () => {
     const plaintext = "Content-Type: text/plain\n\nThis is what I wrote";
     jest.mocked(decryptPgpMimeMessage).mockResolvedValueOnce({ plaintext, html: "<p>This is what I wrote</p>", signatureVerificationState: "not_signed", hasVerifiedSignature: false });
-    const result = await decryptDraftFields({} as MailRuntime, draft);
+    const result = await decryptDraftFields({} as MailRuntime, draft, true);
     expect(result.error).toBeNull();
     expect(result.fields.body).toBe(plaintext);
   });
@@ -242,7 +290,7 @@ describe("decryptDraftFields", () => {
     const runtime = {} as MailRuntime;
 
     await expect(decryptDraftFields(runtime, draft)).resolves.toEqual({
-      fields: { to: "ann@example.com", cc: "", bcc: "", subject: "Plans", body: "Meet at nine" },
+      fields: { to: "ann@example.com", cc: "", bcc: "", subject: "Plans", body: "Meet at nine", htmlBody: "<p>Meet at nine</p>" },
       error: null,
     });
     expect(decryptPgpMimeMessage).toHaveBeenCalledWith(runtime, "d1", draft.bodyStructure, undefined, MAIL_DRAFT_TEXT_LIMITS);
@@ -252,7 +300,7 @@ describe("decryptDraftFields", () => {
     (decryptPgpMimeMessage as jest.Mock).mockRejectedValueOnce(new Error("No key"));
 
     await expect(decryptDraftFields({} as MailRuntime, draft)).resolves.toEqual({
-      fields: { to: "ann@example.com", cc: "", bcc: "", subject: "Plans", body: "" },
+      fields: { to: "ann@example.com", cc: "", bcc: "", subject: "Plans", body: "", htmlBody: "" },
       error: "No key",
     });
   });

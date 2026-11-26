@@ -85,6 +85,8 @@ export type JmapAttachment = {
   name?: string | null;
   type?: string | null;
   size?: number | null;
+  disposition?: string | null;
+  cid?: string | null;
   content?: MailAttachmentContent | null;
 };
 

@@ -28,6 +28,8 @@
     "./zod": "./src/zod.ts",
     "./sanitize-email-html": "./src/sanitize-email-html.ts",
     "./mail-html": "./src/mail-html.ts",
+    "./mail-quote": "./src/mail-quote.ts",
+    "./mail-compose-html": "./src/mail-compose-html.ts",
     "./mail-mime-limits": "./src/mail-mime-limits.ts",
     "./mail-mime-parser": "./src/mail-mime-parser.ts",
     "./mail-pgp-layers": "./src/mail-pgp-layers.ts",

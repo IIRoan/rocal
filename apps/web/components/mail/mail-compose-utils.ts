@@ -1,11 +1,12 @@
 import {
+  buildEmbeddedSignatureHtml,
+  buildNewComposeHtml,
   insertPlainTextSignature,
   resolveComposeSignature,
   type MailSignatureKind,
   type SignatureSource,
 } from "@workspace/calendar-core";
 import type { JmapEmailMessage, JmapIdentity } from "@/lib/mail/types";
-import { buildEmbeddedSignatureHtml } from "@/lib/mail/signature-utils";
 import type { QuotedInlineAttachment } from "@/lib/mail/compose-editor-utils";
 import { readMailComposeSettings } from "@/lib/mail/compose-settings";
 import type { ComposeDraft, ComposeMode, MailReplyContext } from "./mail-compose-types";
@@ -17,6 +18,7 @@ export type ComposeSnapshot = {
   subject: string;
   body: string;
   htmlBody: string;
+  plainTextMode: boolean;
   attachmentCount: number;
   identityId: string | null;
 };
@@ -38,6 +40,7 @@ export function buildComposeSnapshot(draft: ComposeDraft): ComposeSnapshot {
     subject: draft.subject,
     body: draft.body,
     htmlBody: draft.htmlBody,
+    plainTextMode: draft.plainTextMode,
     attachmentCount: draft.attachments.length,
     identityId: draft.identityId,
   };
@@ -65,10 +68,11 @@ export function mapQuotedAttachments(
   }));
 }
 
-/** A new message opens with an empty writing line above the sender's signature. */
+/** A new message opens with an empty writing line above the sender's signature, in the default compose mode. */
 export function buildNewComposeBodies(identity: JmapIdentity | null): {
   body: string;
   htmlBody: string;
+  plainTextMode: boolean;
 } {
   const settings = readMailComposeSettings();
   const signature = resolveSeedSignature(
@@ -81,10 +85,14 @@ export function buildNewComposeBodies(identity: JmapIdentity | null): {
     return {
       body: insertPlainTextSignature("", signature, { separator, aboveQuote: false }),
       htmlBody: "",
+      plainTextMode: true,
     };
   }
-  const embedded = buildEmbeddedSignatureHtml(signature, { separator });
-  return { body: "", htmlBody: embedded ? `<p></p>${embedded}` : "" };
+  return {
+    body: "",
+    htmlBody: buildNewComposeHtml(buildEmbeddedSignatureHtml(signature, { separator })),
+    plainTextMode: false,
+  };
 }
 
 export type MailComposeDraftFields = {
@@ -94,6 +102,7 @@ export type MailComposeDraftFields = {
   composeSubject: string;
   composeBody: string;
   composeHtmlBody: string;
+  plainTextMode: boolean;
   composeAttachments: File[];
   composeMode: ComposeMode;
   quotedAttachments: QuotedInlineAttachment[];
@@ -113,6 +122,7 @@ export function toComposeDraft(
     subject: fields.composeSubject,
     body: fields.composeBody,
     htmlBody: fields.composeHtmlBody,
+    plainTextMode: fields.plainTextMode,
     attachments: fields.composeAttachments,
     replyContext: fields.composeReplyContext,
     identityId,

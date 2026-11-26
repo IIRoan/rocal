@@ -62,3 +62,8 @@ export function registerComposeInlineImage(entry: ComposeInlineImage): void {
 export function getComposeInlineImages(): readonly ComposeInlineImage[] {
   return composeInlineImages;
 }
+
+/** Whether `html` still holds an image the user inserted while composing (quoted images keep their blob). */
+export function hasInsertedComposeImage(html: string): boolean {
+  return composeInlineImages.some((image) => image.blobId === null && html.includes(image.cid));
+}

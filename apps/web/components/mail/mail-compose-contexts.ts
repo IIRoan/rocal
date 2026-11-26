@@ -18,7 +18,9 @@ export type MailComposeFieldsContextValue = {
   composeBody: string;
   setComposeBody: (value: string) => void;
   composeHtmlBody: string;
-  setComposeHtmlBody: (value: string) => void;
+  setComposeHtmlBody: React.Dispatch<React.SetStateAction<string>>;
+  plainTextMode: boolean;
+  setPlainTextMode: (plainTextMode: boolean) => void;
   composeAttachments: File[];
   setComposeAttachments: React.Dispatch<React.SetStateAction<File[]>>;
   mailServerLimits: MailServerLimits;
@@ -43,6 +45,9 @@ export type MailComposeChromeContextValue = {
   setIsComposeOpen: (open: boolean) => void;
   isFullCompose: boolean;
   setIsFullCompose: (open: boolean) => void;
+  /** The docked compose window is folded to its title bar. */
+  isComposeMinimized: boolean;
+  setIsComposeMinimized: (minimized: boolean) => void;
   dismissCompose: () => void;
 };
 

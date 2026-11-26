@@ -6,6 +6,7 @@ import {
   type MailSealer,
   type MailServerPolicy,
   type OutgoingMessageBody,
+  type OutgoingMailContent,
   type OutgoingMimeAttachment,
 } from "@workspace/calendar-core";
 import type { ParsedMailAttachment } from "@workspace/calendar-core/mail-mime-parser";
@@ -293,6 +294,8 @@ export function resolveOutgoingMessageBody(input: {
   html?: string;
   internalDomain: string | null;
   mimeAttachments?: OutgoingMimeAttachment[];
+  /** What the self-sealed Sent copy stores when it differs from the submitted message. */
+  sentCopyContent?: OutgoingMailContent;
   sign?: boolean;
 }): Promise<OutgoingMessageBody> {
   const verificationContext = captureMailVerificationContext();
@@ -306,6 +309,7 @@ export function resolveOutgoingMessageBody(input: {
       html: input.html,
       attachments: input.mimeAttachments,
     },
+    sentCopyContent: input.sentCopyContent,
     sealer: createMailSealer(input.activeMailbox),
     getRecipientPublicKey: async (email) => {
       if (!MAIL_KEY_CONTINUITY_ENABLED) return (await mailDemoApiService.getRecipientKey(email)).publicKeyArmored;

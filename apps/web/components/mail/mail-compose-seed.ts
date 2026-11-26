@@ -1,9 +1,15 @@
 import {
+  buildEmbeddedSignatureHtml,
+  buildForwardQuoteHtml,
   buildReplyContext,
+  buildReplyQuoteHtml,
   FORWARDED_MESSAGE_HEADER,
   formatQuotedMailDate,
   formatReplyQuoteHeader,
   insertPlainTextSignature,
+  placeComposeQuote,
+  plainTextToComposeHtml,
+  prepareQuotedComposeHtml,
   resolveMessageReplyFrom,
   resolveMessageReplyRecipients,
   type MailComposeSettings,
@@ -14,13 +20,7 @@ import {
 import { limitMailQuoteContent } from "@workspace/calendar-core/mail-mime-limits";
 import type { JmapEmailMessage, JmapIdentity } from "@/lib/mail/types";
 import { extractMessageBodies } from "@/lib/mail/message-security";
-import { buildEmbeddedSignatureHtml } from "@/lib/mail/signature-utils";
-import { buildQuotedHtmlBlock } from "@/components/mail/quoted-html";
-import {
-  escapeHtml,
-  rewriteCidImagesForEditor,
-  sanitizeQuotedEmailHtml,
-} from "@/lib/mail/compose-editor-utils";
+import { escapeHtml } from "@/lib/mail/compose-editor-utils";
 import { readMailComposeSettings } from "@/lib/mail/compose-settings";
 import type { MailComposeState } from "./mail-compose-state";
 import {
@@ -43,9 +43,8 @@ function signQuote(
 ): { html: string; plain: string } {
   const aboveQuote = settings.replySignaturePosition === "above_quote";
   const separator = settings.signatureSeparatorEnabled;
-  const block = buildEmbeddedSignatureHtml(signature, { separator });
   return {
-    html: aboveQuote ? `<p></p>${block}${quote.html}` : `<p></p>${quote.html}${block}`,
+    html: placeComposeQuote(quote.html, buildEmbeddedSignatureHtml(signature, { separator }), aboveQuote),
     plain: insertPlainTextSignature(quote.plain, signature, { separator, aboveQuote }),
   };
 }
@@ -99,18 +98,13 @@ export function buildReplySeed(
   const rawBodies = extractMessageBodies(message);
   const { text, html } = limitMailQuoteContent({ text: plaintext ?? rawBodies.text, html: rawBodies.html });
   const body = text ?? "";
-  const htmlBody = html ?? `<p>${escapeHtml(body).replace(/\n/g, "<br>")}</p>`;
   const date = formatQuotedMailDate(message.receivedAt, dateOptions);
   const sender = message.from?.[0]?.email ?? "";
   const from = message.from?.[0];
   const fromLabel = from?.name || from?.email || sender;
-  const quotedPlain = `\n\n---\n${formatReplyQuoteHeader(date, sender)}\n${body}`;
-  const sanitizedQuote = rewriteCidImagesForEditor(
-    sanitizeQuotedEmailHtml(htmlBody),
-  );
   const signed = signQuote(
     {
-      html: `<div><p>${formatReplyQuoteHeader(date, escapeHtml(fromLabel))}</p></div>${buildQuotedHtmlBlock(sanitizedQuote)}`,
+      html: buildReplyQuoteHtml({ date, sender: fromLabel, quoteHtml: prepareQuotedComposeHtml({ text: body, html }) }),
       plain: `\n\n${formatReplyQuoteHeader(date, fromLabel)}\n${body
         .split("\n")
         .map((line) => `> ${line}`)
@@ -127,8 +121,9 @@ export function buildReplySeed(
       composeCc: replyRecipients.cc.join(", "),
       composeBcc: "",
       composeSubject: subject.startsWith("Re: ") ? subject : `Re: ${subject}`,
-      composeBody: settings.plainTextMode ? signed.plain : quotedPlain,
+      composeBody: signed.plain,
       composeHtmlBody: settings.plainTextMode ? "" : signed.html,
+      plainTextMode: settings.plainTextMode,
       composeAttachments: [],
       composeReplyContext: { ...buildReplyContext(message), sourceMessage: message },
       composeMode: "reply",
@@ -156,7 +151,6 @@ export function buildForwardSeed(
   const rawBodies = extractMessageBodies(message);
   const { text, html } = limitMailQuoteContent({ text: plaintext ?? rawBodies.text, html: rawBodies.html });
   const body = text ?? "";
-  const htmlBody = html ?? `<p>${escapeHtml(body).replace(/\n/g, "<br>")}</p>`;
   const sender = message.from?.[0]?.email ?? "";
   const currentIdentity =
     identities.find((entry) => entry.id === forwardIdentityId) ??
@@ -173,13 +167,12 @@ export function buildForwardSeed(
     from?.name && from.email && from.name !== from.email
       ? `${from.name} <${from.email}>`
       : (from?.email || from?.name || sender);
-  const sanitizedQuote = rewriteCidImagesForEditor(
-    sanitizeQuotedEmailHtml(htmlBody),
-  );
-  const forwardHeader = `<div>${FORWARDED_MESSAGE_HEADER}<br>From: ${escapeHtml(fromFull)}<br>Date: ${date}<br>Subject: ${escapeHtml(subject)}<br><br></div>`;
   const plainForward = `${FORWARDED_MESSAGE_HEADER}\nFrom: ${fromFull}\nDate: ${date}\nSubject: ${subject}\n\n${body}`;
   const signed = signQuote(
-    { html: `${forwardHeader}${buildQuotedHtmlBlock(sanitizedQuote)}`, plain: `\n\n${plainForward}` },
+    {
+      html: buildForwardQuoteHtml({ from: fromFull, date, subject, quoteHtml: prepareQuotedComposeHtml({ text: body, html }) }),
+      plain: `\n\n${plainForward}`,
+    },
     signatureIdentity,
     settings,
   );
@@ -191,10 +184,9 @@ export function buildForwardSeed(
       composeCc: "",
       composeBcc: "",
       composeSubject: subject.startsWith("Fwd: ") ? subject : `Fwd: ${subject}`,
-      composeBody: settings.plainTextMode
-        ? signed.plain
-        : `\n\n---\nForwarded message from ${sender}:\n${body}`,
+      composeBody: signed.plain,
       composeHtmlBody: settings.plainTextMode ? "" : signed.html,
+      plainTextMode: settings.plainTextMode,
       composeAttachments: [],
       composeReplyContext: null,
       composeMode: "forward",
@@ -230,6 +222,7 @@ export function buildNewMessageSeed(
       composeSubject: "",
       composeBody: seeded.body,
       composeHtmlBody: seeded.htmlBody,
+      plainTextMode: seeded.plainTextMode,
       composeAttachments: [],
       composeReplyContext: null,
       composeMode: "new",
@@ -253,7 +246,7 @@ export function buildMailtoSeed(
     identities[0] ??
     null;
   const seeded = buildNewComposeBodies(identity);
-  const plainTextMode = readMailComposeSettings().plainTextMode;
+  const { plainTextMode } = seeded;
 
   return {
     patch: {
@@ -266,6 +259,7 @@ export function buildMailtoSeed(
         plainTextMode || !draft.body
           ? seeded.htmlBody
           : `<p>${escapeHtml(draft.body).replace(/\n/g, "<br>")}</p>${seeded.htmlBody}`,
+      plainTextMode,
       composeAttachments: [],
       composeReplyContext: null,
       composeMode: "new",
@@ -293,8 +287,7 @@ export function buildDraftSeed(
   const htmlBody =
     overrides?.html != null
       ? overrides.html
-      : (html ??
-        (bodyText ? `<p>${bodyText.replace(/\n/g, "<br>")}</p>` : ""));
+      : (html ?? plainTextToComposeHtml(bodyText));
   const draftFromEmail = message.from?.[0]?.email;
   const matchedIdentity = draftFromEmail
     ? identities.find((identity) => identity.email === draftFromEmail)
@@ -311,6 +304,7 @@ export function buildDraftSeed(
       composeSubject: message.subject ?? "",
       composeHtmlBody: htmlBody,
       composeBody: bodyText,
+      plainTextMode: readMailComposeSettings().plainTextMode,
       composeAttachments: [],
       composeReplyContext: buildReplyContext(message),
       composeMode: "draft",
@@ -347,6 +341,7 @@ export function buildOpenNewComposeSeed(
       draftSaveStatus: "idle",
       composeBody: seeded.body,
       composeHtmlBody: seeded.htmlBody,
+      plainTextMode: seeded.plainTextMode,
       isComposeOpen: true,
       isFullCompose: false,
     },

@@ -44,7 +44,7 @@ export function ComposeSettingsPanel({ goBack }: { goBack: () => void }) {
       <SettingToggleRow
         icon={AlignLeft}
         label="Plain text only"
-        description="Compose and send without rich formatting"
+        description="New messages start without rich formatting; the Plain text button in compose switches one message"
         checked={settings.plainTextMode}
         onToggle={() =>
           updateSettings({ plainTextMode: !settings.plainTextMode })

@@ -129,13 +129,13 @@ import {
   htmlHasUnhydratedInlinePlaceholders,
 } from "@/lib/mail/compose-editor-utils";
 import {
-  getComposeInlineImages,
   readBlobAsDataUrl,
   registerComposeInlineImage,
   waitForQuotedInlineImageHydration,
 } from "@/lib/mail/compose-inline-images";
 import type { InlineImageUpload } from "@/components/mail/rich-text-editor";
 import { readMailComposeSettings } from "@/lib/mail/compose-settings";
+import { getEmbeddedImagesSizeError, selfCopyWithEmbeddedImages } from "@workspace/calendar-core";
 import { announceHeldSend } from "@/lib/mail/held-send-toast";
 import { prepareOutgoingImageFiles } from "@/lib/mail/strip-image-metadata";
 import { MAILBOX_MESSAGES_PAGE_SIZE } from "@/lib/mail/mail-pagination";
@@ -1643,9 +1643,9 @@ export function useMailApp() {
       replyContext: composeReplyContext,
       identityId: composeIdentityId,
       draftId: composeDraftId,
+      plainTextMode,
     } = draft;
     const composeSettings = readMailComposeSettings();
-    const plainTextMode = composeSettings.plainTextMode;
     if (!composeTo.trim()) {
       toast.error("Enter a recipient email address.");
       return;
@@ -1746,39 +1746,27 @@ export function useMailApp() {
           maxBytes: mailbox.mailServerPolicy.limits.maxOutgoingAttachmentBytes,
         },
       );
-      const hasFileAttachments = preparedAttachments.length > 0;
-      const hasInlineComposeImages = getComposeInlineImages().length > 0;
-      const embedInlineImagesInEncryptedHtml =
-        willEncrypt && hasInlineComposeImages && !hasFileAttachments;
-
+      // Encrypted mail keeps its images embedded: the Solace reader drops the cid parts of decrypted mail.
       const rewritten: {
         html: string | undefined;
         attachments: ReturnType<
           typeof rewriteComposeInlineImages
         >["attachments"];
       } =
-        !plainTextMode && outgoingHtml && !embedInlineImagesInEncryptedHtml
+        !plainTextMode && outgoingHtml && !willEncrypt
           ? rewriteComposeInlineImages(outgoingHtml)
           : { html: outgoingHtml, attachments: [] };
       const htmlForSend = plainTextMode
         ? undefined
         : (rewritten.html ?? outgoingHtml);
       const inlineMimeAttachments: OutgoingMimeAttachment[] =
-        embedInlineImagesInEncryptedHtml
-          ? []
-          : getComposeInlineImages()
-              .filter((image) =>
-                rewritten.attachments.some(
-                  (attachment) => attachment.cid === image.cid,
-                ),
-              )
-              .map((image) => ({
-                filename: image.name,
-                contentType: image.type,
-                content: image.content,
-                cid: image.cid,
-                disposition: "inline" as const,
-              }));
+        rewritten.attachments.map((image) => ({
+          filename: image.name,
+          contentType: image.type,
+          content: image.content,
+          cid: image.cid,
+          disposition: "inline" as const,
+        }));
       const fileMimeAttachments: OutgoingMimeAttachment[] =
         preparedAttachments.map(({ filename, contentType, content }) => ({
           filename,
@@ -1789,6 +1777,13 @@ export function useMailApp() {
         inlineMimeAttachments.length > 0 || fileMimeAttachments.length > 0
           ? [...inlineMimeAttachments, ...fileMimeAttachments]
           : undefined;
+      const embeddedImagesError = willEncrypt && !plainTextMode ? getEmbeddedImagesSizeError(outgoingHtml) : null;
+      if (embeddedImagesError) throw new Error(embeddedImagesError);
+      // The Sent copy keeps its images embedded, since the reader drops cid parts of decrypted mail.
+      const selfCopy = selfCopyWithEmbeddedImages(
+        { text: outgoingText, html: htmlForSend, attachments: fileMimeAttachments },
+        plainTextMode ? undefined : outgoingHtml,
+      );
       const outgoing = await resolveOutgoingMessageBody({
         activeMailbox: mailbox,
         recipients: allRecipients,
@@ -1799,6 +1794,7 @@ export function useMailApp() {
           plainTextMode && fileMimeAttachments.length > 0
             ? fileMimeAttachments
             : mimeAttachments,
+        sentCopyContent: selfCopy.html === htmlForSend ? undefined : selfCopy,
         sign: composeSettings.signOutgoingMail,
       });
       const {

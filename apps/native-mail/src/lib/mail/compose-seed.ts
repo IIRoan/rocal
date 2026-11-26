@@ -1,7 +1,13 @@
 import {
+  buildEmbeddedSignatureHtml,
+  buildNewComposeHtml,
+  composeTextToHtml,
   getErrorMessage,
+  hasComposeFormatting,
+  htmlToPlainText,
   insertPlainTextSignature,
-  messageBodiesToComposeText,
+  placeComposeQuote,
+  plainTextToComposeHtml,
   resolveMessageReplyRecipients,
   type ComposeTextFields,
   type QuotedDateOptions,
@@ -9,9 +15,12 @@ import {
 } from "@workspace/calendar-core";
 import type { ComposeRequest } from "./compose-request";
 import type { PendingComposeAttachment } from "./compose-attachments";
+import type { ComposeFields } from "./compose-form";
 import {
   buildForwardBody,
+  buildForwardHtml,
   buildReplyBody,
+  buildReplyHtml,
   formatAddressList,
   prefixSubject,
 } from "./compose-quote";
@@ -36,7 +45,7 @@ const EMPTY_FIELDS: ComposeTextFields = {
 };
 
 export type ComposeSeedPlan =
-  | { kind: "fields"; fields: ComposeTextFields; draftId?: string; restoredAttachments?: PendingComposeAttachment[] }
+  | { kind: "fields"; fields: ComposeFields; draftId?: string; restoredAttachments?: PendingComposeAttachment[] }
   | { kind: "decrypt-draft"; draftId: string }
   | { kind: "decrypt-source"; draftId?: undefined };
 
@@ -55,6 +64,30 @@ export interface ComposeSeedInput {
   runtime: MailRuntime | undefined;
   /** The decrypted source body, once an encrypted message has been opened for a reply or forward. */
   sourcePlaintext?: string;
+  /** Plain-text compose seeds text and no HTML; otherwise the body is the rich editor's HTML. */
+  plainTextMode: boolean;
+}
+
+function richFields(fields: ComposeTextFields, htmlBody: string): ComposeFields {
+  return { ...fields, body: htmlToPlainText(htmlBody), htmlBody };
+}
+
+/** A draft's HTML, or its text as paragraphs; drafts from older native builds kept formatting as markdown-lite text. */
+export function draftHtml(bodies: { text?: string | null; html?: string | null }): string {
+  if (bodies.html?.trim()) return bodies.html;
+  const text = bodies.text ?? "";
+  return hasComposeFormatting(text) ? composeTextToHtml(text) : plainTextToComposeHtml(text);
+}
+
+function draftFields(
+  headers: ComposeTextFields,
+  bodies: { text?: string | null; html?: string | null },
+  plainTextMode: boolean,
+): ComposeFields {
+  if (plainTextMode) {
+    return { ...headers, body: bodies.text ?? htmlToPlainText(bodies.html ?? ""), htmlBody: "" };
+  }
+  return richFields(headers, draftHtml(bodies));
 }
 
 function newMessageFields(params: ComposeRequest): ComposeTextFields {
@@ -96,6 +129,7 @@ export function planComposeSeed({
   dateOptions,
   runtime,
   sourcePlaintext,
+  plainTextMode,
 }: ComposeSeedInput): ComposeSeedPlan | null {
   if (params.restore) {
     return {
@@ -105,16 +139,25 @@ export function planComposeSeed({
       restoredAttachments: params.restore.attachments,
     };
   }
+  const aboveQuote = replySignaturePosition === "above_quote";
   const withSignature = (body: string, quoted: boolean) =>
     insertPlainTextSignature(body, signature, {
       ...signatureOptions,
-      aboveQuote: quoted && replySignaturePosition === "above_quote",
+      aboveQuote: quoted && aboveQuote,
     });
+  const signatureBlock = buildEmbeddedSignatureHtml(signature, signatureOptions);
+  const quoteFields = (fields: ComposeTextFields, quote: () => string, plainBody: () => string): ComposeFields =>
+    plainTextMode
+      ? { ...fields, body: withSignature(plainBody(), true), htmlBody: "" }
+      : richFields(fields, placeComposeQuote(quote(), signatureBlock, aboveQuote));
   if (params.mailto || params.to || !params.mode) {
     // The signature depends on the sender, so a new message waits for the mailbox's identities.
     if (!settingsLoaded || !runtime) return null;
     const fields = newMessageFields(params);
-    return { kind: "fields", fields: { ...fields, body: withSignature(fields.body, false) } };
+    if (plainTextMode) {
+      return { kind: "fields", fields: { ...fields, body: withSignature(fields.body, false), htmlBody: "" } };
+    }
+    return { kind: "fields", fields: richFields(fields, buildNewComposeHtml(signatureBlock, plainTextToComposeHtml(fields.body))) };
   }
   if (!sourceMessage || !settingsLoaded) return null;
 
@@ -131,16 +174,19 @@ export function planComposeSeed({
     case "reply":
       return {
         kind: "fields",
-        fields: {
-          ...EMPTY_FIELDS,
-          to: resolveMessageReplyRecipients(sourceMessage, {
-            mode: "reply",
-            fromEmail,
-            identities,
-          }).to.join(", "),
-          subject: prefixSubject(sourceMessage.subject, "Re:"),
-          body: withSignature(buildReplyBody(sourceMessage, dateOptions, sourcePlaintext), true),
-        },
+        fields: quoteFields(
+          {
+            ...EMPTY_FIELDS,
+            to: resolveMessageReplyRecipients(sourceMessage, {
+              mode: "reply",
+              fromEmail,
+              identities,
+            }).to.join(", "),
+            subject: prefixSubject(sourceMessage.subject, "Re:"),
+          },
+          () => buildReplyHtml(sourceMessage, dateOptions, sourcePlaintext),
+          () => buildReplyBody(sourceMessage, dateOptions, sourcePlaintext),
+        ),
       };
     case "reply-all": {
       const recipients = formatReplyAllRecipientFields(sourceMessage, {
@@ -149,23 +195,26 @@ export function planComposeSeed({
       });
       return {
         kind: "fields",
-        fields: {
-          ...EMPTY_FIELDS,
-          to: recipients.to,
-          cc: recipients.cc,
-          subject: prefixSubject(sourceMessage.subject, "Re:"),
-          body: withSignature(buildReplyBody(sourceMessage, dateOptions, sourcePlaintext), true),
-        },
+        fields: quoteFields(
+          {
+            ...EMPTY_FIELDS,
+            to: recipients.to,
+            cc: recipients.cc,
+            subject: prefixSubject(sourceMessage.subject, "Re:"),
+          },
+          () => buildReplyHtml(sourceMessage, dateOptions, sourcePlaintext),
+          () => buildReplyBody(sourceMessage, dateOptions, sourcePlaintext),
+        ),
       };
     }
     case "forward":
       return {
         kind: "fields",
-        fields: {
-          ...EMPTY_FIELDS,
-          subject: prefixSubject(sourceMessage.subject, "Fwd:"),
-          body: withSignature(buildForwardBody(sourceMessage, dateOptions, sourcePlaintext), true),
-        },
+        fields: quoteFields(
+          { ...EMPTY_FIELDS, subject: prefixSubject(sourceMessage.subject, "Fwd:") },
+          () => buildForwardHtml(sourceMessage, dateOptions, sourcePlaintext),
+          () => buildForwardBody(sourceMessage, dateOptions, sourcePlaintext),
+        ),
       };
     case "draft": {
       if (isEncrypted(sourceMessage)) {
@@ -175,10 +224,7 @@ export function planComposeSeed({
       return {
         kind: "fields",
         draftId: sourceMessage.id,
-        fields: {
-          ...draftHeaders(sourceMessage),
-          body: messageBodiesToComposeText(extractMessageBodies(sourceMessage)),
-        },
+        fields: draftFields(draftHeaders(sourceMessage), extractMessageBodies(sourceMessage), plainTextMode),
       };
     }
   }
@@ -189,12 +235,11 @@ function isEncrypted(message: JmapEmailMessage): boolean {
   return encryption === "inline_pgp" || encryption === "pgp_mime";
 }
 
-/** The plaintext of an inline PGP or PGP/MIME message. */
-export async function decryptMessagePlaintext(
+async function decryptMessageContent(
   runtime: MailRuntime,
   message: JmapEmailMessage,
-  forDraft = false,
-): Promise<string> {
+  forDraft: boolean,
+): Promise<{ text: string; html?: string | null; truncated?: boolean }> {
   const limits = forDraft ? MAIL_DRAFT_TEXT_LIMITS : undefined;
   const decrypted =
     classifyMessageEncryption(message) === "inline_pgp"
@@ -213,25 +258,36 @@ export async function decryptMessagePlaintext(
   if (forDraft && decrypted.rawMimeFallback) {
     throw new Error("This draft could not be opened safely here. Edit it on the web. The saved draft has not been changed.");
   }
-  const content = { text: decrypted.plaintext, html: decrypted.html, truncated: decrypted.truncated };
-  if (!forDraft) return limitMailQuoteContent({ text: content.text, truncated: content.truncated }).text ?? "";
-  const sizeError = getMailDraftSizeError(content);
-  if (sizeError) throw new Error(sizeError);
-  return decrypted.plaintext;
+  return { text: decrypted.plaintext, html: decrypted.html, truncated: decrypted.truncated };
+}
+
+/** The plaintext of an inline PGP or PGP/MIME message, bounded for quoting. */
+export async function decryptMessagePlaintext(
+  runtime: MailRuntime,
+  message: JmapEmailMessage,
+): Promise<string> {
+  const content = await decryptMessageContent(runtime, message, false);
+  return limitMailQuoteContent({ text: content.text, truncated: content.truncated }).text ?? "";
 }
 
 /** A failed draft read returns headers for the error state; the editor closes before seeding or autosaving. */
 export async function decryptDraftFields(
   runtime: MailRuntime,
   message: JmapEmailMessage,
-): Promise<{ fields: ComposeTextFields; error: string | null }> {
+  plainTextMode = false,
+): Promise<{ fields: ComposeFields; error: string | null }> {
   const headers = draftHeaders(message);
-  try {
-    return { fields: { ...headers, body: await decryptMessagePlaintext(runtime, message, true) }, error: null };
-  } catch (err) {
-    return {
-      fields: headers,
+  const read = async () => {
+    const content = await decryptMessageContent(runtime, message, true);
+    const sizeError = getMailDraftSizeError(content);
+    if (sizeError) throw new Error(sizeError);
+    return draftFields(headers, content, plainTextMode);
+  };
+  return read().then(
+    (fields) => ({ fields, error: null }),
+    (err: unknown) => ({
+      fields: { ...headers, htmlBody: "" },
       error: getErrorMessage(err, "Could not decrypt this draft."),
-    };
-  }
+    }),
+  );
 }

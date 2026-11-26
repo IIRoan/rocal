@@ -12,6 +12,7 @@ export * from "./mail-pagination";
 export * from "./mail-addresses";
 export * from "./mail-compose-format";
 export * from "./mail-quote";
+export * from "./mail-compose-html";
 export * from "./invite-list";
 export * from "./mail-sub-addressing";
 export * from "./mail-identity-badge";

@@ -18,6 +18,8 @@ type SheetProps = {
 };
 
 const mockDispatch = jest.fn();
+let mockRich = false;
+const mockEditor = { applySignature: jest.fn(), insertTemplate: jest.fn() };
 const mockPick = jest.fn();
 let mockSettings: MailComposeSettings = DEFAULT_MAIL_COMPOSE_SETTINGS;
 let mockBody = "";
@@ -30,11 +32,19 @@ const mockIdentities = [
 ];
 
 jest.mock("react-native", () => ({ ActivityIndicator: () => null, Text: () => null, TextInput: () => null, View: ({ children }: { children?: React.ReactNode }) => <>{children}</>, StyleSheet: { create: (styles: object) => styles, hairlineWidth: 1 } }));
+jest.mock("react-native-reanimated", () => ({
+  __esModule: true,
+  default: { View: ({ children }: { children?: React.ReactNode }) => <>{children}</> },
+  Easing: { bezier: () => () => 0, out: () => () => 0, cubic: () => 0 },
+  useAnimatedStyle: () => ({}),
+  useSharedValue: (value: unknown) => ({ get: () => value, set: () => undefined }),
+  withTiming: (value: unknown) => value,
+}));
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 0, left: 0, right: 0, bottom: 0 }) }));
 jest.mock("@workspace/native-core/components/BottomSheet", () => ({ BottomSheet: ({ children }: { children: React.ReactNode }) => <>{children}</>, BottomSheetHeader: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 jest.mock("@workspace/native-core/providers/ThemeProvider", () => ({ useTheme: () => ({ theme: jest.requireActual<typeof import("@workspace/design-tokens")>("@workspace/design-tokens").nativeMailLightTheme }) }));
 jest.mock("@workspace/native-core/components/mail/mail-ui", () => ({ useMailSkin: () => ({ body: { fontSize: 14 }, meta: {}, borderTertiary: "synthetic", textTertiary: "synthetic" }) }));
-jest.mock("@workspace/native-core/hooks/use-keyboard-inset", () => ({ useKeyboardInset: () => 0 }));
+jest.mock("../../hooks/use-compose-keyboard", () => ({ useComposeKeyboard: () => ({ open: mockKeyboardOpen, height: { get: () => 0, set: () => undefined }, settledInset: 0 }) }));
 jest.mock("../../lib/mail/use-mail", () => ({ useMailAccount: () => ({ data: { provisioned: true } }), useMailRuntime: () => ({ data: undefined, isLoading: false }), useMailMessage: () => ({ data: null }) }));
 jest.mock("../../hooks/use-mail-settings", () => ({ useMailComposeSettings: () => ({ settings: mockSettings, isLoaded: true }) }));
 jest.mock("../../hooks/use-compose-identity", () => ({ useComposeIdentity: () => ({ identities: mockIdentities, selectedIdentity: mockIdentities[0], selectedIdentityId: "id-1", composeContext: null, pickerOpen: false, setPickerOpen: jest.fn(), pick: mockPick }) }));
@@ -46,14 +56,30 @@ jest.mock("../../hooks/use-compose-leave", () => ({ useComposeLeave: () => ({ ca
 jest.mock("expo-document-picker", () => ({ getDocumentAsync: jest.fn() }));
 jest.mock("expo-file-system/legacy", () => ({ EncodingType: { Base64: "base64" } }));
 jest.mock("../../lib/mail/strip-image-metadata", () => ({ stripPickedImageMetadata: jest.fn() }));
-jest.mock("./ComposeRecipientFields", () => ({ ComposeRecipientFields: () => null }));
-jest.mock("./ComposeBodyEditor", () => ({ ComposeBodyEditor: () => null }));
+jest.mock("./ComposeFields", () => ({ ComposeFields: () => null }));
+jest.mock("./ComposeBodyEditor", () => {
+  const { forwardRef, useImperativeHandle } = jest.requireActual<typeof React>("react");
+  return {
+    get RICH_COMPOSE_AVAILABLE() {
+      return mockRich;
+    },
+    ComposeBodyEditor: forwardRef(function MockEditor(props: { onFocusChange?: (focused: boolean) => void }, ref) {
+      useImperativeHandle(ref, () => mockEditor);
+      mockFocusBody = props.onFocusChange;
+      return null;
+    }),
+  };
+});
 jest.mock("./ComposeHeader", () => ({ ComposeHeader: () => null }));
 jest.mock("./ComposeFormatBar", () => ({ ComposeFormatBar: () => null }));
-jest.mock("./ComposeAttachmentList", () => ({ ComposeAttachmentList: () => null }));
+let mockDockVisible: boolean | null = null;
+let mockKeyboardOpen = false;
+let mockFocusBody: ((focused: boolean) => void) | undefined;
+jest.mock("./ComposeFormatDock", () => ({ ComposeFormatDock: ({ visible }: { visible: boolean }) => { mockDockVisible = visible; return null; } }));
 jest.mock("./ComposeIdentitySheet", () => ({ ComposeIdentitySheet: ({ onSelect }: { onSelect: (id: string) => void }) => { mockSelectIdentity = onSelect; return null; } }));
 jest.mock("./ComposeScheduleSheet", () => ({ ComposeScheduleSheet: () => null }));
 jest.mock("./ComposeTemplatesSheet", () => ({ ComposeTemplatesSheet: () => null }));
+jest.mock("./ComposeLinkSheet", () => ({ ComposeLinkSheet: () => null }));
 jest.mock("./ComposeSignatureSheet", () => ({ ComposeSignatureSheet: (props: SheetProps) => { mockSheet = props; return null; } }));
 
 const sealedSettings: MailComposeSettings = {
@@ -82,10 +108,27 @@ function lastBodyUpdate(): BodyUpdate["update"] {
 }
 
 beforeEach(() => {
+  mockRich = false;
+  mockEditor.applySignature.mockClear();
   mockDispatch.mockClear();
   mockPick.mockClear();
   mockSettings = sealedSettings;
   mockBody = "";
+});
+
+it("keeps the formatting bar away until the body is being edited or a keyboard is open", async () => {
+  mockKeyboardOpen = false;
+  await renderSheet({ mode: undefined });
+  expect(mockDockVisible).toBe(false);
+  await act(async () => mockFocusBody?.(true));
+  expect(mockDockVisible).toBe(true);
+  await act(async () => mockFocusBody?.(false));
+  expect(mockDockVisible).toBe(false);
+
+  mockKeyboardOpen = true;
+  await renderSheet({ mode: undefined });
+  expect(mockDockVisible).toBe(true);
+  mockKeyboardOpen = false;
 });
 
 it("opens a new message with the sender's sealed new-message default, not the server signature", async () => {
@@ -143,4 +186,43 @@ it("keeps the server signature until a signature is saved", async () => {
   await act(async () => mockSheet?.onSelect(undefined));
   expect(lastBodyUpdate()("Hi")).toBe("Hi\n\n-- \nServer signature");
   await act(async () => root.unmount());
+});
+
+describe("in the rich editor", () => {
+  it("swaps or inserts a picked signature through the editor's marked block", async () => {
+    mockRich = true;
+    const root = await renderSheet({});
+    await act(async () => mockSheet?.onSelect("s-short"));
+    expect(mockEditor.applySignature).toHaveBeenLastCalledWith({
+      candidates: expect.arrayContaining([expect.objectContaining({ textSignature: "Alex" })]),
+      next: { id: "s-short", textSignature: "Alex" },
+      separator: true,
+      aboveQuote: false,
+      insert: true,
+    });
+    expect(mockDispatch.mock.calls.some(([action]) => (action as BodyUpdate).type === "editBody")).toBe(false);
+    await act(async () => mockSheet?.onSelect(null));
+    expect(mockEditor.applySignature).toHaveBeenLastCalledWith(expect.objectContaining({ next: null, insert: true }));
+    await act(async () => root.unmount());
+  });
+
+  it("only swaps an unchanged signature when the sender changes", async () => {
+    mockRich = true;
+    const root = await renderSheet({});
+    await act(async () => mockSelectIdentity?.("id-2"));
+    expect(mockEditor.applySignature).toHaveBeenLastCalledWith(
+      expect.objectContaining({ next: { id: "s-short", textSignature: "Alex" }, insert: false }),
+    );
+    expect(mockPick).toHaveBeenCalledWith("id-2");
+    await act(async () => root.unmount());
+  });
+
+  it("puts a reply's signature above the quote when the setting says so", async () => {
+    mockRich = true;
+    mockSettings = { ...sealedSettings, replySignaturePosition: "above_quote" };
+    const root = await renderSheet({ mode: "reply", messageId: "m1" });
+    await act(async () => mockSheet?.onSelect(undefined));
+    expect(mockEditor.applySignature).toHaveBeenLastCalledWith(expect.objectContaining({ aboveQuote: true, insert: true }));
+    await act(async () => root.unmount());
+  });
 });

@@ -1,5 +1,4 @@
 import { useEffect, useEffectEvent, useReducer } from "react";
-import type { ComposeTextFields } from "@workspace/calendar-core";
 import { getMailDraftSizeError } from "@workspace/calendar-core/mail-mime-limits";
 import { classifyMessageEncryption, extractMessageBodies } from "../lib/mail/message-security";
 import { useToast } from "@workspace/native-core/providers/ToastProvider";
@@ -8,6 +7,7 @@ import { useUserTimezone } from "@workspace/native-core/hooks/use-user-timezone"
 import {
   composeFormReducer,
   INITIAL_COMPOSE_FORM,
+  type ComposeFields,
 } from "../lib/mail/compose-form";
 import {
   decryptDraftFields,
@@ -44,7 +44,7 @@ export function useComposeForm({ onClose, ...seedInput }: ComposeFormInput) {
   if (seedPlan) dispatch({ type: "seed", plan: seedPlan });
 
   const finishDraftDecrypt = useEffectEvent(
-    (fields: ComposeTextFields, decryptError: string | null) => {
+    (fields: ComposeFields, decryptError: string | null) => {
       dispatch({ type: "decrypted", fields: decryptError ? null : fields });
       // An editor without the body would autosave over the encrypted draft, so it closes and leaves it intact.
       if (decryptError) {
@@ -65,11 +65,12 @@ export function useComposeForm({ onClose, ...seedInput }: ComposeFormInput) {
   });
 
   const isDraft = seedInput.params.mode === "draft";
+  const { plainTextMode } = seedInput;
   useEffect(() => {
     if (!form.decrypting || !runtime || !sourceMessage) return;
     let cancelled = false;
     if (isDraft) {
-      void decryptDraftFields(runtime, sourceMessage)
+      void decryptDraftFields(runtime, sourceMessage, plainTextMode)
         .then(({ fields, error: decryptError }) => {
           if (!cancelled) finishDraftDecrypt(fields, decryptError);
         })
@@ -85,7 +86,7 @@ export function useComposeForm({ onClose, ...seedInput }: ComposeFormInput) {
     return () => {
       cancelled = true;
     };
-  }, [form.decrypting, isDraft, runtime, sourceMessage]);
+  }, [form.decrypting, isDraft, plainTextMode, runtime, sourceMessage]);
 
   return [form, dispatch] as const;
 }

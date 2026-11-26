@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useEffectEvent, type Dispatch, type SetStateAction } from "react";
 import { createLogger } from "@workspace/logger";
 import type { StalwartJmapClient } from "@/lib/mail/jmap-client";
 import type { JmapSession } from "@/lib/mail/types";
+import { dropInlineImagePlaceholders } from "@workspace/calendar-core";
 import {
   replaceInlineImagePlaceholders,
   type QuotedInlineAttachment,
@@ -51,7 +52,7 @@ async function loadQuotedInlineImage(
     });
     return dataUrl;
   } catch {
-    // Inline preview is best-effort; send still carries the original blob.
+    // A quoted image that cannot be loaded is dropped from the quote rather than blocking the send.
     return null;
   }
 }
@@ -67,6 +68,10 @@ export function useComposeQuotedInlineImages({
   quotedAttachments: QuotedInlineAttachment[];
   activeMailbox: ActiveMailbox | null;
 }) {
+  // The setter is rebuilt each render; an event keeps the downloads from restarting on every keystroke.
+  const applyLoadedImages = useEffectEvent((updates: Map<string, string>, failed: Set<string>) =>
+    setHtmlBody((current) => dropInlineImagePlaceholders(replaceInlineImagePlaceholders(current, updates), failed)),
+  );
   useEffect(() => {
     if (!enabled || !activeMailbox) return;
     if (quotedAttachments.length === 0) return;
@@ -94,6 +99,7 @@ export function useComposeQuotedInlineImages({
     beginQuotedInlineImageHydration();
     void (async () => {
       const updates = new Map<string, string>();
+      const failed = new Set<string>();
       for (const attachment of inlineAttachments) {
         const existing = getComposeInlineImages().find(
           (entry) => entry.cid === attachment.cid,
@@ -108,12 +114,12 @@ export function useComposeQuotedInlineImages({
         if (cancelled) return;
         if (dataUrl) {
           updates.set(attachment.cid, dataUrl);
+        } else {
+          failed.add(attachment.cid);
         }
       }
-      if (updates.size === 0) return;
-      setHtmlBody((current) =>
-        replaceInlineImagePlaceholders(current, updates),
-      );
+      if (updates.size === 0 && failed.size === 0) return;
+      applyLoadedImages(updates, failed);
     })()
       .finally(finishHydration)
       .catch((error) => {
@@ -124,5 +130,5 @@ export function useComposeQuotedInlineImages({
       cancelled = true;
       finishHydration();
     };
-  }, [enabled, activeMailbox, quotedAttachments, setHtmlBody]);
+  }, [enabled, activeMailbox, quotedAttachments]);
 }

@@ -9,6 +9,8 @@ import {
   Maximize2,
   Loader2,
   Check,
+  ChevronDown,
+  ChevronUp,
   AlertCircle,
   AlignLeft,
   Clock,
@@ -92,6 +94,9 @@ import { ComposeSignaturePopover } from "./compose-signature-popover";
 
 export interface ComposeDialogProps {
   identities: JmapIdentity[];
+  /** Desktop compose folds to its title bar; the form stays mounted so nothing is lost. */
+  minimized?: boolean;
+  onMinimizedChange?: (minimized: boolean) => void;
   fallbackFromEmail: string;
   onClose: () => void;
   onSend: (options?: { skipAttachmentCheck?: boolean; sendAt?: string }) => Promise<void>;
@@ -261,6 +266,8 @@ export function ComposeForm({
   activeMailbox = null,
   scheduling = null,
   autoFocus = false,
+  minimized = false,
+  onMinimizedChange,
 }: ComposeDialogProps & { autoFocus?: boolean }) {
   const {
     composeTo,
@@ -289,9 +296,10 @@ export function ComposeForm({
     composeReplySource,
     quotedAttachments,
     requestComposeClose,
+    plainTextMode,
+    setPlainTextMode,
   } = useMailCompose();
-  const { settings: composeSettings, updateSettings } = useMailComposeSettings();
-  const plainTextMode = composeSettings.plainTextMode;
+  const { settings: composeSettings } = useMailComposeSettings();
   const [attachmentWarning, setAttachmentWarning] = useState<{
     open: boolean;
     keyword: string;
@@ -312,7 +320,6 @@ export function ComposeForm({
     setOpen: setFormatOpen,
   } = useFormatBar();
   const bodyRef = useRef<HTMLTextAreaElement>(null);
-  const prevPlainTextModeRef = useRef(plainTextMode);
   const [ccBccVisible, setCcBccVisible] = useState({
     cc: !!composeCc,
     bcc: !!composeBcc,
@@ -384,30 +391,6 @@ export function ComposeForm({
   useEffect(() => {
     if (autoFocus) focusComposeStart();
   }, [autoFocus]);
-
-  useEffect(() => {
-    const previousMode = prevPlainTextModeRef.current;
-    prevPlainTextModeRef.current = plainTextMode;
-    if (previousMode === plainTextMode) return;
-
-    if (plainTextMode) {
-      const plain = htmlToPlainText(composeHtmlBody);
-      if (plain) {
-        setComposeBody(plain);
-      }
-      return;
-    }
-
-    if (!composeHtmlBody.trim() && composeBody.trim()) {
-      setComposeHtmlBody(plainTextToComposerBody(composeBody));
-    }
-  }, [
-    composeBody,
-    composeHtmlBody,
-    plainTextMode,
-    setComposeBody,
-    setComposeHtmlBody,
-  ]);
 
   const fromEmail = selectedIdentity?.email ?? fallbackFromEmail;
   const fromLabel = selectedIdentity
@@ -710,15 +693,40 @@ export function ComposeForm({
         >
           <ArrowLeft className="size-4 text-muted-foreground" />
         </button>
-        <span className="text-sm font-medium flex-1">
-          {composeDraftId ? "Draft" : "New mail"}
-        </span>
+        {minimized ? (
+          <button
+            type="button"
+            onClick={() => onMinimizedChange?.(false)}
+            className="min-w-0 flex-1 cursor-pointer truncate rounded text-left text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {composeSubject.trim() || (composeDraftId ? "Draft" : "New mail")}
+          </button>
+        ) : (
+          <span className="text-sm font-medium flex-1">
+            {composeDraftId ? "Draft" : "New mail"}
+          </span>
+        )}
         <DraftSaveIndicator status={draftSaveStatus} />
-        <ClearComposeButton
-          isMobile={isMobile}
-          hasAttachments={composeAttachments.length > 0}
-          onClear={clearMessage}
-        />
+        {minimized ? null : (
+          <ClearComposeButton
+            isMobile={isMobile}
+            hasAttachments={composeAttachments.length > 0}
+            onClear={clearMessage}
+          />
+        )}
+        {onMinimizedChange ? (
+          <SimpleTooltip content={minimized ? "Restore" : "Minimize"}>
+            <button
+              type="button"
+              onClick={() => onMinimizedChange(!minimized)}
+              aria-label={minimized ? "Restore" : "Minimize"}
+              aria-expanded={!minimized}
+              className="p-1 rounded hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+            >
+              {minimized ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+            </button>
+          </SimpleTooltip>
+        ) : null}
         {onExpand && (
           <SimpleTooltip content="Open full editor">
             <button
@@ -736,6 +744,7 @@ export function ComposeForm({
           className={cn(
             "aria-disabled:opacity-50",
             isMobile ? "h-7 px-2.5 text-xs" : "h-7 text-xs",
+            minimized && "hidden",
           )}
           onClick={() => void requestSend()}
           aria-disabled={isBusy || undefined}
@@ -751,6 +760,7 @@ export function ComposeForm({
         </Button>
       </div>
 
+      <div className={cn("flex min-h-0 flex-1 flex-col", minimized && "hidden")}>
       <div
         className={`flex items-center border-b border-border/50 shrink-0 ${
           isMobile ? "h-9 gap-2 px-3" : "h-10 gap-3 px-4"
@@ -1024,6 +1034,7 @@ export function ComposeForm({
         <RichTextEditorToolbar
           editor={formatEditor}
           disabled={isBusy}
+          onImageUpload={onImageUpload}
           onClose={() => setFormatOpen(false)}
         />
       ) : null}
@@ -1097,17 +1108,15 @@ export function ComposeForm({
               onClear={() => setScheduledSendAt(null)}
             />
           ) : null}
-          <SimpleTooltip content={composeSettings.plainTextMode ? "Rich text compose" : "Plain text compose"}>
+          <SimpleTooltip content={plainTextMode ? "Write this message as rich text" : "Write this message as plain text"}>
             <button
               type="button"
-              onClick={() =>
-                updateSettings({ plainTextMode: !composeSettings.plainTextMode })
-              }
+              onClick={() => setPlainTextMode(!plainTextMode)}
               disabled={isBusy}
-              aria-pressed={composeSettings.plainTextMode}
+              aria-pressed={plainTextMode}
               className={cn(
                 "inline-flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors disabled:opacity-40",
-                composeSettings.plainTextMode
+                plainTextMode
                   ? "bg-accent/15 text-accent"
                   : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
               )}
@@ -1130,6 +1139,8 @@ export function ComposeForm({
             </span>
           )}
         </div>
+      </div>
+
       </div>
 
       <Dialog
@@ -1186,7 +1197,7 @@ export function ComposeDialog({
   activeMailbox,
   scheduling,
 }: ComposeDialogProps) {
-  const { isComposeOpen } = useMailComposeChrome();
+  const { isComposeOpen, isComposeMinimized: minimized, setIsComposeMinimized } = useMailComposeChrome();
   const { requestComposeClose } = useMailCompose();
   const isMobile = useIsMobile();
   const open = isComposeOpen;
@@ -1252,7 +1263,10 @@ export function ComposeDialog({
         showClose={false}
         showOverlay={false}
         aria-describedby={undefined}
-        className="left-auto right-2 bottom-2 translate-x-0 overflow-hidden p-0 flex flex-col min-h-[500px] w-[min(50vw,800px)] min-w-[min(100%,680px)] max-h-[min(920px,calc(100dvh-16px))] rounded-[20px] bg-[var(--bg-l2-solid)] border-[var(--border-secondary)] shadow-[var(--shadow-l3)]"
+        className={cn(
+          "left-auto right-2 bottom-2 translate-x-0 overflow-hidden p-0 flex flex-col max-h-[min(920px,calc(100dvh-16px))] rounded-[20px] bg-[var(--bg-l2-solid)] border-[var(--border-secondary)] shadow-[var(--shadow-l3)]",
+          minimized ? "w-[min(100%,360px)]" : "min-h-[500px] w-[min(50vw,800px)] min-w-[min(100%,680px)]",
+        )}
         // ComposeForm focuses To, or the body when replying, instead of the first header button.
         onOpenAutoFocus={(event) => event.preventDefault()}
         onPointerDownOutside={(event) => event.preventDefault()}
@@ -1262,7 +1276,12 @@ export function ComposeDialog({
         <VisuallyHidden>
           <DialogTitle>New mail</DialogTitle>
         </VisuallyHidden>
-        <ComposeForm {...formProps} autoFocus />
+        <ComposeForm
+          {...formProps}
+          autoFocus
+          minimized={minimized}
+          onMinimizedChange={setIsComposeMinimized}
+        />
       </DialogContent>
     </Dialog>
   );

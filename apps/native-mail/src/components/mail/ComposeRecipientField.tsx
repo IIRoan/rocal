@@ -324,9 +324,8 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       minHeight: rowHeight,
       paddingLeft: theme.spacing["4"],
       paddingRight: theme.spacing["2"],
-      backgroundColor: theme.colors.card,
       borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: skin.borderTertiary,
+      borderBottomColor: skin.borderPrimary,
     },
     lineSlot: {
       height: rowHeight,

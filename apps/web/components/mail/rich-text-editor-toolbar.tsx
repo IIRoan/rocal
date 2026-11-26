@@ -2,14 +2,22 @@
 
 import {
   useEffect,
+  useId,
   useReducer,
+  useRef,
   useState,
+  type ChangeEvent,
+  type FormEvent,
   type KeyboardEvent,
   type ReactNode,
 } from "react";
 import type { Editor } from "@tiptap/react";
+import { setMailEditorLink } from "@workspace/mail-editor";
 import { DROPDOWN_PANEL_ROW_CLASS, DropdownPanel } from "@workspace/ui/solace";
+import { Button } from "@workspace/ui/components/ui/button";
+import { Input } from "@workspace/ui/components/ui/input";
 import { cn } from "@workspace/ui/lib/utils";
+import type { InlineImageUpload } from "./rich-text-editor";
 import {
   Bold,
   Italic,
@@ -35,6 +43,7 @@ import {
   X,
   ZoomIn,
   ZoomOut,
+  ImagePlus,
 } from "lucide-react";
 import { TableSizePicker } from "./rich-text-editor-table-picker";
 import { SimpleTooltip, Tooltip, TooltipTrigger, TooltipContent } from "@workspace/ui/components/ui/tooltip";
@@ -251,18 +260,105 @@ function TableMenu({
   );
 }
 
+function LinkMenu({
+  editor,
+  disabled,
+  open,
+  onOpenChange,
+}: {
+  editor: Editor;
+  disabled: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const fieldId = useId();
+  const [href, setHref] = useState("");
+  const active = editor.isActive("link");
+  const changeOpen = (next: boolean) => {
+    if (next) setHref((editor.getAttributes("link").href as string | undefined) ?? "");
+    onOpenChange(next);
+  };
+  const apply = (next: string | null) => {
+    setMailEditorLink(editor, next);
+    onOpenChange(false);
+  };
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    apply(href.trim() || null);
+  };
+  return (
+    <Tooltip>
+      <DropdownPanel
+        open={open}
+        onOpenChange={changeOpen}
+        align="start"
+        width={288}
+        className="z-[100] p-3"
+        trigger={
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              aria-label="Link"
+              aria-pressed={active}
+              tabIndex={-1}
+              disabled={disabled}
+              className={cn(
+                "inline-flex size-[30px] shrink-0 cursor-pointer items-center justify-center rounded-md text-[var(--icon-secondary)] hover:bg-[var(--bg-overlay-secondary)] disabled:opacity-40",
+                active && "bg-[var(--bg-overlay-secondary)] text-[var(--icon-primary)]",
+              )}
+            >
+              <LinkIcon className="size-3.5" strokeWidth={2.25} />
+            </button>
+          </TooltipTrigger>
+        }
+      >
+        <form onSubmit={submit} className="flex flex-col gap-2">
+          <label htmlFor={fieldId} className="text-xs font-medium text-muted-foreground">
+            Link address
+          </label>
+          <Input
+            id={fieldId}
+            value={href}
+            onChange={(event) => setHref(event.target.value)}
+            placeholder="https://"
+            inputMode="url"
+            autoComplete="off"
+            spellCheck={false}
+            className="h-8 text-sm"
+          />
+          <div className="flex justify-end gap-2">
+            {active ? (
+              <Button type="button" variant="ghost" size="sm" onClick={() => apply(null)}>
+                Remove link
+              </Button>
+            ) : null}
+            <Button type="submit" size="sm" disabled={!href.trim()}>
+              Apply
+            </Button>
+          </div>
+        </form>
+      </DropdownPanel>
+      <TooltipContent>Link</TooltipContent>
+    </Tooltip>
+  );
+}
+
 type RichTextEditorToolbarProps = {
   editor: Editor;
   disabled: boolean;
+  onImageUpload?: (file: File) => Promise<InlineImageUpload | null>;
   onClose: () => void;
 };
 
 export function RichTextEditorToolbar({
   editor,
   disabled,
+  onImageUpload,
   onClose,
 }: RichTextEditorToolbarProps) {
   const [tableMenuOpen, setTableMenuOpen] = useState(false);
+  const [linkMenuOpen, setLinkMenuOpen] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const [, refreshMarks] = useReducer((version: number) => version + 1, 0);
 
   useEffect(() => {
@@ -282,18 +378,22 @@ export function RichTextEditorToolbar({
     else chain.toggleHeading({ level }).run();
   };
 
-  const addLink = () => {
-    const { from, to } = editor.state.selection;
-    if (from === to) return;
-    const previousUrl = editor.getAttributes("link").href as string | undefined;
-    const url = window.prompt("URL", previousUrl ?? "");
-    if (url === null) return;
-    const trimmed = url.trim();
-    if (!trimmed) {
-      editor.chain().focus().extendMarkRange("link").unsetLink().run();
-      return;
+  const insertImages = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []).filter((file) => file.type.startsWith("image/"));
+    event.target.value = "";
+    for (const file of files) {
+      // onImageUpload (handleComposeImageUpload) reports failures itself and returns null.
+      onImageUpload?.(file)
+        .then((result) => {
+          if (!result || editor.isDestroyed) return;
+          editor
+            .chain()
+            .focus()
+            .insertContent({ type: "image", attrs: { src: result.src, alt: file.name, cid: result.cid } })
+            .run();
+        })
+        .catch(() => undefined);
     }
-    editor.chain().focus().setLink({ href: trimmed }).run();
   };
 
   return (
@@ -422,14 +522,34 @@ export function RichTextEditorToolbar({
 
       <ToolbarSeparator />
 
-      <ToolbarButton
-        title="Link"
+      <LinkMenu
+        editor={editor}
         disabled={disabled}
-        active={editor.isActive("link")}
-        onClick={addLink}
-      >
-        <LinkIcon className="size-3.5" strokeWidth={2.25} />
-      </ToolbarButton>
+        open={linkMenuOpen}
+        onOpenChange={setLinkMenuOpen}
+      />
+
+      {onImageUpload ? (
+        <>
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            tabIndex={-1}
+            aria-hidden
+            onChange={insertImages}
+          />
+          <ToolbarButton
+            title="Insert image"
+            disabled={disabled}
+            onClick={() => imageInputRef.current?.click()}
+          >
+            <ImagePlus className="size-3.5" strokeWidth={2.25} />
+          </ToolbarButton>
+        </>
+      ) : null}
 
       <TableMenu
         editor={editor}

@@ -35,25 +35,14 @@ import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { useMailComposeSettings } from "../../../hooks/use-mail-settings";
 import { useMailAccount, useMailRuntime } from "../../../lib/mail/use-mail";
 import type { JmapIdentity } from "../../../lib/mail/types";
+import { EDIT_SIGNATURE_PREFIX, NEW_SIGNATURE_PAGE, SIGNATURE_DEFAULTS_PREFIX } from "../../../lib/mail/mail-settings-pages";
 
-const NEW_SIGNATURE_PAGE = "signature-new";
-const EDIT_SIGNATURE_PREFIX = "signature-edit:";
-const SIGNATURE_DEFAULTS_PREFIX = "signature-defaults:";
 const NO_IDENTITIES: JmapIdentity[] = [];
 
 const DEFAULT_KINDS: { kind: MailSignatureKind; label: string }[] = [
   { kind: "newMessage", label: "New messages" },
   { kind: "replyForward", label: "Replies and forwards" },
 ];
-
-/** True for the in-drawer signature pages, which the account drawer hosts as custom pages. */
-export function isMailSignaturePage(page: string): boolean {
-  return (
-    page === NEW_SIGNATURE_PAGE ||
-    page.startsWith(EDIT_SIGNATURE_PREFIX) ||
-    page.startsWith(SIGNATURE_DEFAULTS_PREFIX)
-  );
-}
 
 function useSignatureIdentities(): JmapIdentity[] {
   const provisioned = useMailAccount().data?.provisioned ?? false;

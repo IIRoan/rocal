@@ -3,6 +3,7 @@
 import React, { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { ComposeHeader } from "./ComposeHeader";
+import type { DraftSaveStatus } from "../../hooks/use-compose-draft-autosave";
 
 jest.mock("react-native", () => ({
   ActivityIndicator: () => null,
@@ -21,13 +22,14 @@ jest.mock("react-native", () => ({
   ),
   StyleSheet: { create: (styles: object) => styles },
   Text: ({ children }: { children?: ReactNode }) => <span>{children}</span>,
-  View: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  View: ({ children, testID, accessibilityLabel }: { children?: ReactNode; testID?: string; accessibilityLabel?: string }) => (
+    <div data-testid={testID} aria-label={accessibilityLabel}>{children}</div>
+  ),
 }));
 jest.mock("@expo/vector-icons", () => ({ Feather: () => null }));
 jest.mock("@workspace/native-core/providers/ThemeProvider", () => ({
   useTheme: () => ({ theme: jest.requireActual<typeof import("@workspace/design-tokens")>("@workspace/design-tokens").nativeMailLightTheme }),
 }));
-jest.mock("@workspace/native-core/lib/app-layout", () => ({ LAYOUT_ICON: { close: 20, action: 20 } }));
 jest.mock("@workspace/native-core/components/mail/mail-ui", () => ({
   MAIL_LAYOUT: { hitSize: 44 },
   useMailSkin: () => ({ title: {} }),
@@ -44,7 +46,13 @@ beforeEach(() => {
 
 afterEach(() => act(() => root.unmount()));
 
-function render(props: { scheduledLabel?: string | null; onSend?: () => void; onClearSchedule?: () => void }) {
+function render(props: {
+  scheduledLabel?: string | null;
+  onSend?: () => void;
+  onClearSchedule?: () => void;
+  signed?: boolean;
+  draftSaveStatus?: DraftSaveStatus;
+}) {
   act(() =>
     root.render(
       <ComposeHeader
@@ -52,11 +60,11 @@ function render(props: { scheduledLabel?: string | null; onSend?: () => void; on
         canSend
         sending={false}
         onClose={jest.fn()}
-        onAttach={jest.fn()}
         onSend={props.onSend ?? jest.fn()}
-        onSchedule={jest.fn()}
         scheduledLabel={props.scheduledLabel}
         onClearSchedule={props.onClearSchedule}
+        draftSaveStatus={props.draftSaveStatus ?? "idle"}
+        signed={props.signed ?? false}
       />,
     ),
   );
@@ -78,4 +86,29 @@ it("says Send until a time is armed, then Schedule with the time and a way to cl
   expect(onSend).toHaveBeenCalledTimes(1);
   act(() => byLabel("Don't schedule")?.click());
   expect(onClearSchedule).toHaveBeenCalledTimes(1);
+});
+
+it("says in the top bar that the message will be signed, for screen readers too, only while signing is on", () => {
+  render({ signed: true });
+  const indicator = container.querySelector('[data-testid="compose-signed"]');
+  expect(indicator?.textContent).toBe("Signed");
+  expect(indicator?.getAttribute("aria-label")).toBe(
+    "Signed with your key. Mail to people outside Solace carries a PGP signature and your public key. Mail to Solace accounts is always signed inside its encryption.",
+  );
+  render({ signed: false });
+  expect(container.querySelector('[data-testid="compose-signed"]')).toBeNull();
+});
+
+it("joins the signed note and the draft save status in one capsule", () => {
+  render({ signed: true, draftSaveStatus: "saving" });
+  expect(container.querySelector('[data-testid="compose-signed"]')?.textContent).toBe("Signed · Saving…");
+  render({ draftSaveStatus: "error" });
+  expect(container.textContent).toContain("Save failed");
+  render({});
+  expect(container.textContent).not.toMatch(/Signed|Sav/);
+});
+
+it("announces the compose title as the drawer's heading", () => {
+  render({});
+  expect(container.textContent).toContain("New message");
 });

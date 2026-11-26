@@ -30,14 +30,8 @@ import {
 } from "@workspace/native-core/components/sheet/SheetSections";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { useMailComposeSettings } from "../../../hooks/use-mail-settings";
+import { EDIT_TEMPLATE_PREFIX, NEW_TEMPLATE_PAGE } from "../../../lib/mail/mail-settings-pages";
 
-const NEW_TEMPLATE_PAGE = "template-new";
-const EDIT_TEMPLATE_PREFIX = "template-edit:";
-
-/** True for the in-drawer template editor pages, which the account drawer hosts as custom pages. */
-export function isMailTemplatePage(page: string): boolean {
-  return page === NEW_TEMPLATE_PAGE || page.startsWith(EDIT_TEMPLATE_PREFIX);
-}
 
 export function MailTemplatePage({ pageId }: { pageId: string }) {
   const templateId = pageId.startsWith(EDIT_TEMPLATE_PREFIX)

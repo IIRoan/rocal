@@ -1,0 +1,39 @@
+{
+  "name": "@workspace/mail-editor",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "jest -c jest.config.cjs",
+    "test:coverage": "jest -c jest.config.cjs --coverage --runInBand",
+    "build:webview": "bun run scripts/build-webview-script.ts",
+    "check:webview": "bun run scripts/build-webview-script.ts --check"
+  },
+  "dependencies": {
+    "@tiptap/core": "3.32.2",
+    "@tiptap/extension-color": "3.32.2",
+    "@tiptap/extension-heading": "3.32.2",
+    "@tiptap/extension-link": "3.32.2",
+    "@tiptap/extension-paragraph": "3.32.2",
+    "@tiptap/extension-placeholder": "3.32.2",
+    "@tiptap/extension-table": "3.32.2",
+    "@tiptap/extension-table-cell": "3.32.2",
+    "@tiptap/extension-table-header": "3.32.2",
+    "@tiptap/extension-table-row": "3.32.2",
+    "@tiptap/extension-text-align": "3.32.2",
+    "@tiptap/extension-text-style": "3.32.2",
+    "@tiptap/extension-underline": "3.32.2",
+    "@tiptap/pm": "3.32.2",
+    "@tiptap/starter-kit": "3.32.2",
+    "@workspace/calendar-core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./protocol": "./src/protocol.ts",
+    "./webview-script": "./src/generated/webview-script.ts"
+  }
+}

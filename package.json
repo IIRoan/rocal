@@ -23,7 +23,7 @@
     "dev:mobile": "bun run ./scripts/dev-mobile.ts",
     "cloudflared": "bun run ./scripts/cloudflared.ts",
     "dev:notifications": "cargo xtask dev notifications",
-    "lint": "bun run check:rules && bun run notices --check && cd apps/web && bun run lint && cd ../native-calendar && bun run lint && cd ../native-mail && bun run lint && cd ../../packages/native-core && bun run lint",
+    "lint": "bun run check:rules && bun run notices --check && bun run --cwd packages/mail-editor check:webview && cd apps/web && bun run lint && cd ../native-calendar && bun run lint && cd ../native-mail && bun run lint && cd ../../packages/native-core && bun run lint",
     "check:rules": "bun run scripts/check-repo-rules.ts",
     "notices": "bun run scripts/third-party-notices.ts",
     "lint:react-doctor": "bun run --cwd apps/web lint:react-doctor && bun run --cwd packages/ui lint:react-doctor",

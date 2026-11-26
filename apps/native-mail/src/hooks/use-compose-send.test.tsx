@@ -99,14 +99,20 @@ function Composer({
   attachments = [],
   recipient = "peer@solace.test",
   body = "My reply",
+  htmlBody = "",
   settings = DEFAULT_MAIL_COMPOSE_SETTINGS,
+  flushBody,
+  finalizeQuotedImages,
 }: {
   runtime: MailRuntime;
   mode: ComposeMode | undefined;
   attachments?: PendingComposeAttachment[];
   recipient?: string;
   body?: string;
+  htmlBody?: string;
   settings?: MailComposeSettings;
+  flushBody?: () => Promise<string | null>;
+  finalizeQuotedImages?: (html: string) => Promise<string>;
 }) {
   const compose = useComposeSend({
     sendScope: "compose:test-session",
@@ -119,6 +125,7 @@ function Composer({
       attachments,
       subject: "Re: Plans",
       body,
+      htmlBody,
     },
     identityId: "self",
     composeContext: resolveComposeContext(runtime),
@@ -127,6 +134,8 @@ function Composer({
     setError: mockSetError,
     onSent: mockOnSent,
     onRestore: mockOnRestore,
+    flushBody,
+    finalizeQuotedImages,
   });
   return (
     <button type="button" onClick={() => compose.send()}>
@@ -182,7 +191,10 @@ describe("native reply send headers", () => {
       expectSend?: boolean;
       maxDelayedSendSeconds?: number;
       body?: string;
+      htmlBody?: string;
       settings?: MailComposeSettings;
+      flushBody?: () => Promise<string | null>;
+      finalizeQuotedImages?: (html: string) => Promise<string>;
     } = {},
   ) {
     const base = await buildMailRuntime();
@@ -203,7 +215,10 @@ describe("native reply send headers", () => {
             attachments={options.attachments}
             recipient={options.recipient}
             body={options.body}
+            htmlBody={options.htmlBody}
             settings={options.settings}
+            flushBody={options.flushBody}
+            finalizeQuotedImages={options.finalizeQuotedImages}
           />
         </QueryClientProvider>,
       ),
@@ -373,7 +388,7 @@ describe("native reply send headers", () => {
       mode: "reply",
       messageId: "original",
       restore: {
-        fields: { to: "peer@solace.test", cc: "", bcc: "", subject: "Re: Plans", body: "My reply" },
+        fields: { to: "peer@solace.test", cc: "", bcc: "", subject: "Re: Plans", body: "My reply", htmlBody: "" },
         attachments: [attachment],
         draftId: "reply",
       },
@@ -426,5 +441,87 @@ describe("native reply send headers", () => {
   it("sends at once without a hold when the server can't delay mail", async () => {
     const submitted = await send(undefined);
     expect(submitted?.hold).toBeUndefined();
+  });
+
+  const IMAGE = "data:image/png;base64,iVBORw0KGgo=";
+  const plaintextBody = {
+    kind: "plaintext" as const,
+    textBody: "external",
+    encrypted: false as const,
+    contentFingerprint: "c".repeat(64),
+    isCurrent: () => true,
+    sentCopyCiphertext: { blobId: "self-copy", size: 100 },
+  };
+
+  it("sends the editor's latest HTML with a text alternative, after waiting for quoted images", async () => {
+    const flushBody = jest.fn(async () => "<p>Thanks, <strong>Sam</strong></p><ul><li>Friday</li></ul><p>stale-quote</p>");
+    const finalizeQuotedImages = jest.fn(async (html: string) => html.replace("<p>stale-quote</p>", ""));
+    await send("reply", { htmlBody: "<p>Thanks</p>", body: "Thanks", flushBody, finalizeQuotedImages });
+    expect(flushBody).toHaveBeenCalledTimes(1);
+    expect(resolveOutgoingMessageBody).toHaveBeenCalledWith(
+      expect.objectContaining({
+        plaintext: "Thanks, Sam\n\n- Friday",
+        html: "<p>Thanks, <strong>Sam</strong></p><ul><li>Friday</li></ul>",
+      }),
+    );
+  });
+
+  it("sends no HTML and skips the editor in plain-text compose", async () => {
+    const flushBody = jest.fn(async () => "<p>Rich</p>");
+    await send(undefined, {
+      htmlBody: "<p>Rich</p>",
+      body: "Plain **as typed**",
+      flushBody,
+      settings: { ...DEFAULT_MAIL_COMPOSE_SETTINGS, plainTextMode: true },
+    });
+    expect(flushBody).not.toHaveBeenCalled();
+    expect(resolveOutgoingMessageBody).toHaveBeenCalledWith(
+      expect.objectContaining({ plaintext: "Plain **as typed**", html: undefined }),
+    );
+  });
+
+  it("uploads an inserted image beside the HTML that cites it for an outside recipient", async () => {
+    jest.mocked(resolveOutgoingMessageBody).mockResolvedValue(plaintextBody);
+    const submitted = await send(undefined, {
+      recipient: "peer@example.com",
+      htmlBody: `<p>Look <img src="${IMAGE}" alt="chart.png"></p>`,
+      body: "Look",
+    });
+    const sealedInput = jest.mocked(resolveOutgoingMessageBody).mock.calls[0]?.[0];
+    const cid = /src="cid:([^"]+)"/.exec(sealedInput?.html ?? "")?.[1];
+    expect(cid).toMatch(/^[0-9a-f]{32}@solace$/);
+    expect(sealedInput?.html).not.toContain("data:image");
+    expect(sealedInput?.mimeAttachments).toEqual([
+      expect.objectContaining({ filename: "chart.png", contentType: "image/png", cid, disposition: "inline" }),
+    ]);
+    expect(mockUploadBlob).toHaveBeenCalledWith(expect.anything(), expect.any(Uint8Array), "image/png", expect.any(Function));
+    expect(submitted?.htmlBody).toBe(sealedInput?.html);
+    expect(submitted?.attachments).toEqual([
+      { blobId: "plain-blob", name: "chart.png", type: "image/png", size: 8, disposition: "inline", cid },
+    ]);
+    // The self-sealed Sent copy keeps the image embedded, because the reader drops cid parts of decrypted mail.
+    expect(sealedInput?.sentCopyContent).toEqual(
+      expect.objectContaining({ html: `<p>Look <img src="${IMAGE}" alt="chart.png"></p>`, attachments: [] }),
+    );
+  });
+
+  it("refuses encrypted mail whose embedded images pass what the reader can show", async () => {
+    const big = `data:image/png;base64,${"A".repeat(8 * 1024 * 1024)}`;
+    await send(undefined, { htmlBody: `<p><img src="${big}" alt="huge.png"></p>`, body: "", expectSend: false });
+    expect(resolveOutgoingMessageBody).not.toHaveBeenCalled();
+    expect(mockSetError).toHaveBeenLastCalledWith(expect.stringContaining("too large to send encrypted"));
+  });
+
+  it("sends the seeded HTML when the editor answers before it has loaded", async () => {
+    await send("reply", { htmlBody: "<p>Seeded</p>", body: "Seeded", flushBody: jest.fn(async () => "") });
+    expect(resolveOutgoingMessageBody).toHaveBeenCalledWith(expect.objectContaining({ html: "<p>Seeded</p>" }));
+  });
+
+  it("keeps inserted images inside encrypted mail as data URLs", async () => {
+    await send(undefined, { htmlBody: `<p><img src="${IMAGE}" alt="chart.png"></p>`, body: "" });
+    const sealedInput = jest.mocked(resolveOutgoingMessageBody).mock.calls[0]?.[0];
+    expect(sealedInput?.html).toContain(IMAGE);
+    expect(sealedInput?.mimeAttachments).toEqual([]);
+    expect(mockUploadBlob).not.toHaveBeenCalled();
   });
 });

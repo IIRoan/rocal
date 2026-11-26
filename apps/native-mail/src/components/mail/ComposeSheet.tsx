@@ -3,11 +3,9 @@ import {
   ActivityIndicator,
   StyleSheet,
   Text,
-  TextInput,
   View,
   type TextStyle,
   type ViewStyle,
-  type TextInputInstance,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -15,7 +13,6 @@ import {
   BottomSheetHeader,
   type BottomSheetHandle,
 } from "@workspace/native-core/components/BottomSheet";
-import { LAYOUT_METRICS } from "@workspace/native-core/lib/app-layout";
 import type { ComposeRequest } from "../../lib/mail/compose-request";
 import type { JmapIdentity } from "../../lib/mail/types";
 import {
@@ -26,7 +23,6 @@ import {
   composeSignatureCandidates,
   composeSignatureKind,
   getErrorMessage,
-  getOutgoingAttachmentSizeError,
   getPlainTextSignature,
   hasComposeUserContent,
   insertPlainTextSignature,
@@ -47,35 +43,33 @@ import {
   useMailRuntime,
 } from "../../lib/mail/use-mail";
 import {
-  createPendingComposeAttachment,
-  type PendingComposeAttachment,
-} from "../../lib/mail/compose-attachments";
-import { decodeBase64ToBytes } from "../../lib/mail/binary-utils";
-import {
-  stripPickedImageMetadata,
-  type StrippedImageFile,
-} from "../../lib/mail/strip-image-metadata";
-import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system/legacy";
+  EMPTY_MAIL_EDITOR_FORMAT_STATE,
+  type MailEditorFormatState,
+} from "@workspace/mail-editor/protocol";
+import { pickComposeAttachments, pickComposePhoto } from "../../lib/mail/compose-pickers";
 import { useMailComposeSettings } from "../../hooks/use-mail-settings";
 import {
   useComposeDraftAutosave,
   type DraftSaveStatus,
 } from "../../hooks/use-compose-draft-autosave";
 import { useComposeForm } from "../../hooks/use-compose-form";
+import { hasComposeHtmlEdits } from "../../lib/mail/compose-form";
 import { useComposeIdentity } from "../../hooks/use-compose-identity";
 import { useComposeLeave } from "../../hooks/use-compose-leave";
 import { useComposeSend } from "../../hooks/use-compose-send";
 import { useComposeSchedule } from "../../hooks/use-compose-schedule";
-import { ComposeRecipientFields } from "./ComposeRecipientFields";
+import { useComposeQuotedImages } from "../../hooks/use-compose-quoted-images";
+import { ComposeFields } from "./ComposeFields";
 import {
   ComposeBodyEditor,
+  RICH_COMPOSE_AVAILABLE,
   type ComposeBodyEditorHandle,
 } from "./ComposeBodyEditor";
-import { useKeyboardInset } from "@workspace/native-core/hooks/use-keyboard-inset";
+import { ComposeLinkSheet } from "./ComposeLinkSheet";
+import { useComposeKeyboard } from "../../hooks/use-compose-keyboard";
+import { ComposeFormatDock } from "./ComposeFormatDock";
 import { ComposeHeader } from "./ComposeHeader";
 import { ComposeFormatBar } from "./ComposeFormatBar";
-import { ComposeAttachmentList } from "./ComposeAttachmentList";
 import { ComposeIdentitySheet } from "./ComposeIdentitySheet";
 import { ComposeScheduleSheet } from "./ComposeScheduleSheet";
 import { ComposeTemplatesSheet } from "./ComposeTemplatesSheet";
@@ -84,7 +78,7 @@ import {
   useMailSkin,
   type MailSkin,
 } from "@workspace/native-core/components/mail/mail-ui";
-import { composeTitle } from "../../lib/mail/compose-display";
+import { COMPOSE_FORMAT_BAR_GAP, COMPOSE_FORMAT_BAR_HEIGHT, composeTitle, isThreadReply } from "../../lib/mail/compose-display";
 
 interface ComposeSheetProps {
   visible: boolean;
@@ -131,7 +125,7 @@ function ComposeSession({
 }: Omit<ComposeSheetProps, "request"> & { params: ComposeRequest }) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  const keyboardHeight = useKeyboardInset();
+  const keyboard = useComposeKeyboard();
   const sheetRef = useRef<BottomSheetHandle>(null);
   const skin = useMailSkin();
   const styles = createStyles(theme, skin);
@@ -148,12 +142,11 @@ function ComposeSession({
     useState<DraftSaveStatus>("idle");
   const [bodyFocused, setBodyFocused] = useState(false);
   const schedule = useComposeSchedule();
-  const subjectInputRef = useRef<TextInputInstance>(null);
-  const focusSubject = () => subjectInputRef.current?.focus();
   const bodyEditorRef = useRef<ComposeBodyEditorHandle>(null);
 
   const { settings: composeSettings, isLoaded: composeSettingsLoaded } =
     useMailComposeSettings();
+  const richBody = !composeSettings.plainTextMode && RICH_COMPOSE_AVAILABLE;
   const identity = useComposeIdentity({
     runtime,
     sourceMessage,
@@ -181,14 +174,22 @@ function ComposeSession({
       runtime?.session.username ??
       null,
     runtime,
+    plainTextMode: !richBody,
     onClose,
   });
   const { to, cc, bcc, subject, body, attachments } = form;
+  const htmlBody = richBody ? form.htmlBody : "";
+  const quotedImages = useComposeQuotedImages({
+    runtime,
+    sourceMessage,
+    htmlBody,
+    dispatch,
+    onLoaded: (images) => bodyEditorRef.current?.updateImages(images.loaded, images.failed),
+  });
 
-  const hasUserContent = hasComposeUserContent(
-    { to, cc, bcc, subject, body },
-    form.seed ?? EMPTY_COMPOSE_FIELDS,
-  );
+  const hasUserContent =
+    hasComposeUserContent({ to, cc, bcc, subject, body }, form.seed ?? EMPTY_COMPOSE_FIELDS) ||
+    hasComposeHtmlEdits(form);
 
   const { saveDraft, settleDraftSave } = useComposeDraftAutosave({
     runtime,
@@ -198,23 +199,17 @@ function ComposeSession({
     bcc,
     subject,
     body,
+    htmlBody,
     identityId: selectedIdentityId,
     draftId: form.draftId,
     setDraftId: (draftId) => dispatch({ type: "draftId", draftId }),
     setDraftSaveStatus,
   });
 
-  const currentDraftIdRef = useRef(form.draftId);
-  useEffect(() => { currentDraftIdRef.current = form.draftId; }, [form.draftId]);
-  const [sendSessionId, setSendSessionId] = useState(createMailSendSessionId);
-  const [sendLifetime] = useState(createMailSendScopeLifetime);
-  useEffect(() => sendLifetime.activate(() => `compose:${sendSessionId}`, () => visible ? currentDraftIdRef.current ?? (params.mode === "draft" ? params.messageId ?? null : null) : null), [sendLifetime, sendSessionId, visible, params.mode, params.messageId]);
-  const closeSendSession = () => {
-    discardMailSendAttempt(`compose:${sendSessionId}`);
-    onClose();
-  };
+  const sendSession = useComposeSendSession({ visible, params, draftId: form.draftId, onClose });
+  const { closeSendSession } = sendSession;
   const { send, sending, canSend } = useComposeSend({
-    sendScope: `compose:${sendSessionId}`,
+    sendScope: sendSession.scope,
     runtime,
     mode: params.mode,
     sourceMessage,
@@ -225,11 +220,9 @@ function ComposeSession({
     settleDraftSave,
     setError,
     onRestore,
-    onSent: () => {
-      if (!isMailSendScopeOpen(`compose:${sendSessionId}`)) return;
-      closeSendSession();
-      setSendSessionId(createMailSendSessionId());
-    },
+    flushBody: () => bodyEditorRef.current?.flush() ?? Promise.resolve(null),
+    finalizeQuotedImages: quotedImages.finalize,
+    onSent: sendSession.onSent,
   });
 
   const { cancel, dismiss } = useComposeLeave({
@@ -245,22 +238,20 @@ function ComposeSession({
     onClose: closeSendSession,
   });
 
-  const signaturePicker = useComposeSignatureActions({ dispatch, identity, settings: composeSettings, signatureChoice });
+  const signaturePicker = useComposeSignatureActions({ dispatch, identity, settings: composeSettings, signatureChoice, richBody, bodyEditorRef });
 
   const templatePicker = useComposeTemplatePicker(dispatch, subject, bodyEditorRef);
 
-  const handleAttach = async () => {
-    await pickComposeAttachment(
-      runtime?.mailServerPolicy.limits.maxOutgoingAttachmentBytes,
-      composeSettings.stripImageMetadata ? setError : null,
-    )
-      .then((attachment) => {
-        if (attachment) dispatch({ type: "attach", attachment });
-      })
-      .catch((err: unknown) => {
-        setError(getErrorMessage(err, "Failed to attach file."));
-      });
-  };
+  // The bar is for writing: it shows while the body is being edited or a keyboard is up, and stays out of the way otherwise.
+  const toolbarVisible = bodyFocused || keyboard.open;
+
+  const bodyTools = useComposeBodyTools({
+    bodyEditorRef,
+    dispatch,
+    maxAttachmentBytes: runtime?.mailServerPolicy.limits.maxOutgoingAttachmentBytes,
+    stripImageMetadata: composeSettings.stripImageMetadata,
+    setError,
+  });
 
   return (
     <>
@@ -275,87 +266,44 @@ function ComposeSession({
       >
         <BottomSheetHeader showClose={false} style={styles.sheetHeader}>
           <ComposeHeader
-            title={composeTitle(subject)}
+            title={composeTitle(params.mode)}
             canSend={canSend}
             sending={sending}
             onClose={cancel}
-            onAttach={() => {
-              void handleAttach();
-            }}
             onSend={() => send(schedule.sendAt ?? undefined)}
-            onSchedule={runtime?.mailServerPolicy.maxDelayedSendSeconds ? schedule.open : undefined}
             scheduledLabel={schedule.label}
             onClearSchedule={schedule.clear}
+            draftSaveStatus={draftSaveStatus}
+            signed={composeSettings.signOutgoingMail}
           />
         </BottomSheetHeader>
+        <View style={styles.composeArea}>
         <View
           style={[
             styles.composeShell,
-            { paddingBottom: keyboardHeight > 0 ? 0 : insets.bottom },
+            // The sheet stays put under the keyboard ("extend"), so the body leaves room for the keyboard and the docked bar.
+            { paddingBottom: (keyboard.settledInset || insets.bottom) + (toolbarVisible ? COMPOSE_FORMAT_BAR_HEIGHT + COMPOSE_FORMAT_BAR_GAP : 0) },
           ]}
         >
           <View style={styles.flex}>
-            <View style={styles.headerFields}>
-              {runtimeQuery.isLoading && !composeContext ? (
-                <View style={styles.fieldRow}>
-                  <ActivityIndicator size="small" color={skin.textTertiary} />
-                  <Text style={styles.noticeInline}>
-                    Preparing your mailbox…
-                  </Text>
-                </View>
-              ) : null}
-
-              {!runtimeQuery.isLoading && !composeContext ? (
-                <Text style={styles.noticeText}>
-                  Your mailbox cannot send messages right now.
-                </Text>
-              ) : null}
-
-              <ComposeRecipientFields
-                to={to}
-                cc={cc}
-                bcc={bcc}
-                showCcBcc={form.showCcBcc}
-                dispatch={dispatch}
-                mode={params.mode}
-                sourceMessage={sourceMessage}
-                identities={identities}
-                composeContext={composeContext}
-                onChooseIdentity={() => identity.setPickerOpen(true)}
-                onSelectIdentity={signaturePicker.selectIdentity}
-                onSubmitEmpty={focusSubject}
-              />
-
-              <View style={styles.fieldRow}>
-                <Text style={styles.fieldLabel}>Subject</Text>
-                <TextInput
-                  ref={subjectInputRef}
-                  style={styles.subjectInput}
-                  value={subject}
-                  onChangeText={(value) =>
-                    dispatch({ type: "edit", field: "subject", value })
-                  }
-                  onFocus={() => setBodyFocused(false)}
-                  placeholderTextColor={skin.textTertiary}
-                  selectionColor={theme.colors.primaryBase}
-                  cursorColor={theme.colors.primaryBase}
-                  autoCapitalize="sentences"
-                  autoCorrect
-                  autoFocus={false}
-                  accessibilityLabel="Subject"
-                  testID="compose-subject"
-                />
-              </View>
-
-              {attachments.length > 0 ? (
-                <ComposeAttachmentList
-                  attachments={attachments}
-                  onRemove={(id) => dispatch({ type: "detach", id })}
-                />
-              ) : null}
-
-              {error ? <Text style={styles.errorText}>{error}</Text> : null}
-            </View>
+            <ComposeFields
+              to={to}
+              cc={cc}
+              bcc={bcc}
+              showCcBcc={form.showCcBcc}
+              dispatch={dispatch}
+              mode={params.mode}
+              sourceMessage={sourceMessage}
+              identities={identities}
+              composeContext={composeContext}
+              onChooseIdentity={() => identity.setPickerOpen(true)}
+              onSelectIdentity={signaturePicker.selectIdentity}
+              subject={subject}
+              threadReply={isThreadReply(params.mode)}
+              mailboxLoading={runtimeQuery.isLoading}
+              attachments={attachments}
+              error={error}
+            />
 
             {form.decrypting ? (
               <View style={styles.bodyLoading}>
@@ -365,34 +313,43 @@ function ComposeSession({
             ) : (
               <ComposeBodyEditor
                 ref={bodyEditorRef}
-                value={body}
+                html={htmlBody}
+                text={body}
+                plainText={!richBody}
                 bodySourceVersion={form.bodySourceVersion}
+                onChangeHtml={(html) => dispatch({ type: "editHtml", html })}
+                onBaseline={(html) => dispatch({ type: "editorBaseline", html })}
                 onChangeText={(value) =>
                   dispatch({ type: "edit", field: "body", value })
                 }
+                onFormatState={bodyTools.setFormatState}
                 onFocusChange={setBodyFocused}
                 placeholder="Message"
               />
             )}
           </View>
 
-          {bodyFocused ? (
+        </View>
+          <ComposeFormatDock visible={toolbarVisible} keyboard={keyboard} bottomInset={insets.bottom}>
             <ComposeFormatBar
-              draftSaveStatus={draftSaveStatus}
-              plainTextMode={composeSettings.plainTextMode}
-              signed={composeSettings.signOutgoingMail}
-              onBold={() => bodyEditorRef.current?.applyBold()}
-              onItalic={() => bodyEditorRef.current?.applyItalic()}
-              onUnderline={() => bodyEditorRef.current?.applyUnderline()}
-              onList={() => bodyEditorRef.current?.applyList()}
+              active={toolbarVisible}
+              onSchedule={runtime?.mailServerPolicy.maxDelayedSendSeconds ? schedule.open : undefined}
+              plainTextMode={!richBody}
+              formatState={bodyTools.formatState}
+              onFormat={(format) => bodyEditorRef.current?.format(format)}
+              onLink={bodyTools.openLink}
+              onInsertPhoto={bodyTools.insertPhoto}
+              onAttach={bodyTools.attach}
               onChooseSignature={signaturePicker.open}
               onInsertTemplate={templatePicker.open}
             />
-          ) : null}
+          </ComposeFormatDock>
         </View>
       </BottomSheet>
 
       <ComposeTemplatesSheet templates={composeSettings.templates} {...templatePicker.sheet} />
+
+      <ComposeLinkSheet {...bodyTools.linkSheet} />
 
       <ComposeSignatureSheet {...signaturePicker.sheet} />
 
@@ -416,6 +373,39 @@ function ComposeSession({
   );
 }
 
+/** The send scope of one compose: discarded on close and renewed after a send, so a late result never reaches a newer compose. */
+function useComposeSendSession({
+  visible,
+  params,
+  draftId,
+  onClose,
+}: {
+  visible: boolean;
+  params: ComposeRequest;
+  draftId: string | null;
+  onClose: () => void;
+}) {
+  const currentDraftIdRef = useRef(draftId);
+  useEffect(() => { currentDraftIdRef.current = draftId; }, [draftId]);
+  const [sendSessionId, setSendSessionId] = useState(createMailSendSessionId);
+  const [sendLifetime] = useState(createMailSendScopeLifetime);
+  useEffect(() => sendLifetime.activate(() => `compose:${sendSessionId}`, () => visible ? currentDraftIdRef.current ?? (params.mode === "draft" ? params.messageId ?? null : null) : null), [sendLifetime, sendSessionId, visible, params.mode, params.messageId]);
+  const scope = `compose:${sendSessionId}`;
+  const closeSendSession = () => {
+    discardMailSendAttempt(scope);
+    onClose();
+  };
+  return {
+    scope,
+    closeSendSession,
+    onSent: () => {
+      if (!isMailSendScopeOpen(scope)) return;
+      closeSendSession();
+      setSendSessionId(createMailSendSessionId());
+    },
+  };
+}
+
 /** The signature compose uses: the choice made in its picker, else the sender's default; null is none. */
 function useComposeSignatureChoice(
   settings: MailComposeSettings,
@@ -435,11 +425,15 @@ function useComposeSignatureActions({
   identity,
   settings,
   signatureChoice,
+  richBody,
+  bodyEditorRef,
 }: {
   dispatch: ReturnType<typeof useComposeForm>[1];
   identity: ReturnType<typeof useComposeIdentity>;
   settings: MailComposeSettings;
   signatureChoice: ReturnType<typeof useComposeSignatureChoice>;
+  richBody: boolean;
+  bodyEditorRef: RefObject<ComposeBodyEditorHandle | null>;
 }) {
   const { kind, choice, setChoice, signature } = signatureChoice;
   const [visible, setVisible] = useState(false);
@@ -454,24 +448,31 @@ function useComposeSignatureActions({
     aboveQuote: kind === "replyForward" && settings.replySignaturePosition === "above_quote",
   };
 
+  // The rich editor swaps the marked signature block itself; plain text swaps the signature's lines.
+  const applySignature = (next: SignatureSource | null, insert: boolean) => {
+    if (richBody) {
+      bodyEditorRef.current?.applySignature({ candidates, next, ...placement, insert });
+      return;
+    }
+    dispatch({
+      type: "editBody",
+      update: insert
+        ? (current) =>
+            replaceComposePlainTextSignature(current, candidates, next, options) ??
+            insertPlainTextSignature(current, next, placement)
+        : replaceIn(next),
+    });
+  };
+
   // A signature the body lacks goes where a new compose puts it.
   const onSelect = (nextChoice: string | null | undefined) => {
     setVisible(false);
     setChoice(nextChoice);
-    const next = resolveComposeSignature(settings, identities, selectedIdentityId, kind, nextChoice);
-    dispatch({
-      type: "editBody",
-      update: (current) =>
-        replaceComposePlainTextSignature(current, candidates, next, options) ??
-        insertPlainTextSignature(current, next, placement),
-    });
+    applySignature(resolveComposeSignature(settings, identities, selectedIdentityId, kind, nextChoice), true);
   };
 
   const selectIdentity = (id: string) => {
-    dispatch({
-      type: "editBody",
-      update: replaceIn(resolveComposeSignature(settings, identities, id, kind)),
-    });
+    applySignature(resolveComposeSignature(settings, identities, id, kind), false);
     setChoice(undefined);
     identity.pick(id);
   };
@@ -489,6 +490,56 @@ function useComposeSignatureActions({
   };
 }
 
+/** Formatting state, the link drawer, photo insertion and attaching files for the body. */
+function useComposeBodyTools({
+  bodyEditorRef,
+  dispatch,
+  maxAttachmentBytes,
+  stripImageMetadata,
+  setError,
+}: {
+  bodyEditorRef: RefObject<ComposeBodyEditorHandle | null>;
+  dispatch: ReturnType<typeof useComposeForm>[1];
+  maxAttachmentBytes: number | undefined;
+  stripImageMetadata: boolean;
+  setError: (message: string | null) => void;
+}) {
+  const [formatState, setFormatState] = useState<MailEditorFormatState>(EMPTY_MAIL_EDITOR_FORMAT_STATE);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const stripNotice = stripImageMetadata ? setError : null;
+  const setLink = (href: string | null) => {
+    setLinkOpen(false);
+    bodyEditorRef.current?.setLink(href);
+  };
+  return {
+    formatState,
+    setFormatState,
+    openLink: () => setLinkOpen(true),
+    linkSheet: {
+      visible: linkOpen,
+      currentLink: formatState.link,
+      onApply: (href: string) => setLink(href),
+      onRemove: () => setLink(null),
+      onDismiss: () => setLinkOpen(false),
+    },
+    attach: () => {
+      void pickComposeAttachments(
+        maxAttachmentBytes,
+        stripNotice,
+        (attachment) => dispatch({ type: "attach", attachment }),
+        setError,
+      ).catch((err: unknown) => setError(getErrorMessage(err, "Failed to attach file.")));
+    },
+    insertPhoto: () => {
+      void pickComposePhoto(maxAttachmentBytes, stripNotice)
+        .then((photo) => {
+          if (photo) bodyEditorRef.current?.insertImage(photo.src, photo.alt);
+        })
+        .catch((err: unknown) => setError(getErrorMessage(err, "Failed to insert photo.")));
+    },
+  };
+}
+
 /** Template picker state; a template fills an empty subject and goes in at the body's caret. */
 function useComposeTemplatePicker(
   dispatch: ReturnType<typeof useComposeForm>[1],
@@ -502,54 +553,12 @@ function useComposeTemplatePicker(
     if (nextSubject !== subject) {
       dispatch({ type: "edit", field: "subject", value: nextSubject });
     }
-    bodyEditorRef.current?.insertText(template.body);
+    bodyEditorRef.current?.insertTemplate(template.body);
   };
   return {
     open: () => setVisible(true),
     sheet: { visible, onSelect, onDismiss: () => setVisible(false) },
   };
-}
-
-/** Picks one file; the picker's cache copy is plaintext, so it is deleted once read or refused; photos are re-encoded unless `reportStripNotice` is null. */
-async function pickComposeAttachment(
-  maxBytes: number | undefined,
-  reportStripNotice: ((notice: string) => void) | null,
-): Promise<PendingComposeAttachment | null> {
-  const result = await DocumentPicker.getDocumentAsync({
-    type: "*/*",
-    copyToCacheDirectory: true,
-    multiple: false,
-  });
-  if (result.canceled) return null;
-  const asset = result.assets[0];
-  if (!asset?.uri) return null;
-  const readAsset = async () => {
-    const sizeError = getOutgoingAttachmentSizeError(
-      asset.name ?? "attachment",
-      asset.size ?? 0,
-      maxBytes,
-    );
-    if (sizeError) throw new Error(sizeError);
-    const base64 = await FileSystem.readAsStringAsync(asset.uri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-    const file: StrippedImageFile = {
-      name: asset.name ?? "attachment",
-      type: asset.mimeType,
-      bytes: decodeBase64ToBytes(base64),
-    };
-    return reportStripNotice ? stripPickedImageMetadata(asset.uri, file) : file;
-  };
-  const { notice, ...file } = await readAsset().finally(() =>
-    FileSystem.deleteAsync(asset.uri, { idempotent: true }).catch(
-      () => undefined,
-    ),
-  );
-  if (notice) reportStripNotice?.(notice);
-  // Re-encoding can grow a photo, so the limit is checked again on what is sent.
-  const sizeError = getOutgoingAttachmentSizeError(file.name, file.bytes.length, maxBytes);
-  if (sizeError) throw new Error(sizeError);
-  return createPendingComposeAttachment(file);
 }
 
 const EMPTY_COMPOSE_FIELDS: ComposeTextFields = {
@@ -566,6 +575,10 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       flex: 1,
       minHeight: 0,
     },
+    composeArea: {
+      flex: 1,
+      minHeight: 0,
+    },
     composeShell: {
       flex: 1,
       minHeight: 0,
@@ -577,18 +590,6 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       paddingVertical: 0,
       borderBottomWidth: 0,
     },
-    headerFields: {
-      flexShrink: 0,
-    },
-    fieldRow: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: theme.spacing["3"],
-      minHeight: LAYOUT_METRICS.hitSize + theme.spacing["2"],
-      paddingHorizontal: theme.spacing["4"],
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: skin.borderTertiary,
-    },
     bodyLoading: {
       flex: 1,
       alignItems: "center" as const,
@@ -598,33 +599,8 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
   } satisfies Record<string, ViewStyle>;
 
   const text = {
-    fieldLabel: {
-      ...skin.body,
-      fontWeight: "500" as TextStyle["fontWeight"],
-      color: skin.textTertiary,
-    },
-    subjectInput: {
-      flex: 1,
-      minWidth: 0,
-      minHeight: LAYOUT_METRICS.hitSize,
-      paddingVertical: theme.spacing["2"],
-      fontSize: skin.body.fontSize,
-      color: theme.colors.foreground,
-    },
     noticeInline: {
       ...skin.meta,
-    },
-    noticeText: {
-      ...skin.meta,
-      paddingHorizontal: theme.spacing["4"],
-      paddingVertical: theme.spacing["2"],
-    },
-    errorText: {
-      paddingHorizontal: theme.spacing["4"],
-      paddingVertical: theme.spacing["2"],
-      fontSize: 13,
-      lineHeight: 17,
-      color: theme.colors.destructive,
     },
   } satisfies Record<string, TextStyle>;
 

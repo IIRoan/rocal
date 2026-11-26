@@ -5,18 +5,22 @@ import {
   getCurrentMailComposeDraftId,
   buildReplyContext,
   canSendCompose,
-  composeTextToPlain,
+  extractComposeInlineImages,
+  getEmbeddedImagesSizeError,
   getErrorMessage,
   getOutgoingAttachmentsTotalSizeError,
-  resolveComposeSendBodies,
+  resolveOutgoingComposeBodies,
   runTasksWithConcurrencyLimit,
+  selfCopyWithEmbeddedImages,
   uploadPlaintextMailAttachments,
   shouldWarnAboutMissingAttachment,
   validateComposeRecipients,
   resolveEncryptionInternalDomain,
   resolveMailSendHold,
   shouldEncryptOutgoingMail,
+  type JmapAttachmentInput,
   type MailComposeSettings,
+  type OutgoingMimeAttachment,
 } from "@workspace/calendar-core";
 import { useHeldSendToast } from "./use-held-send-toast";
 import { useToast } from "@workspace/native-core/providers/ToastProvider";
@@ -48,7 +52,21 @@ type ComposeSendInput = {
   onSent: () => void;
   /** Reopens compose after an undone send. */
   onRestore: (request: ComposeRequest) => void;
+  /** The rich editor's latest HTML, including keystrokes it has not posted yet. */
+  flushBody?: () => Promise<string | null>;
+  /** Waits for quoted images and drops any that never loaded. */
+  finalizeQuotedImages?: (html: string) => Promise<string>;
 };
+
+/** A content id for an image inserted while composing. */
+function createInlineCid(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return `${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}@solace`;
+}
+
+function countInlineImages(html: string): number {
+  return html.match(/<img\b/gi)?.length ?? 0;
+}
 
 export function useComposeSend({
   sendScope,
@@ -63,6 +81,8 @@ export function useComposeSend({
   setError,
   onSent,
   onRestore,
+  flushBody,
+  finalizeQuotedImages,
 }: ComposeSendInput) {
   const { toast } = useToast();
   const { recordUsage } = useRecentContacts();
@@ -71,6 +91,7 @@ export function useComposeSend({
   const preparingRef = useRef(false);
   const [preparing, setPreparing] = useState(false);
   const { to, cc, bcc, subject, body, attachments } = form;
+  const htmlBody = settings.plainTextMode ? "" : form.htmlBody;
   const replyContext =
     sourceMessage && (mode === "reply" || mode === "reply-all")
       ? buildReplyContext(sourceMessage)
@@ -83,15 +104,15 @@ export function useComposeSend({
     setPreparing(true);
     const send = async () => {
       const validation = validateComposeInput({ to, cc, bcc, subject });
+      // An editor that has not loaded yet answers with an empty body, which must not replace the seeded one.
+      const editedHtml = htmlBody.trim() ? ((await flushBody?.()) || htmlBody) : "";
+      const sentHtml = editedHtml && finalizeQuotedImages ? await finalizeQuotedImages(editedHtml) : editedHtml;
 
       // The signature is ordinary body text by now, so the message goes out exactly as written.
-      const { plaintext, htmlBody: formattedHtml } = resolveComposeSendBodies({
+      const { textBody: plaintext, htmlBody: outgoingHtml } = resolveOutgoingComposeBodies({
         body,
-        encrypted: false,
+        htmlBody: sentHtml,
       });
-      const unencryptedHtml = settings.plainTextMode
-        ? undefined
-        : formattedHtml;
       const allRecipients = [
         ...validation.to,
         ...validation.cc,
@@ -101,23 +122,47 @@ export function useComposeSend({
       if (!runtime) {
         throw new Error("Your mailbox is not ready to send messages yet.");
       }
+      const willEncrypt = shouldEncryptOutgoingMail(
+        allRecipients,
+        resolveEncryptionInternalDomain(runtime.config.defaultDomain),
+      );
       const { hold, error: holdError } = resolveMailSendHold({
         sendAt,
         undoSendSeconds: settings.undoSendSeconds,
         policy: runtime.mailServerPolicy,
-        hasExternalRecipients: !shouldEncryptOutgoingMail(
-          allRecipients,
-          resolveEncryptionInternalDomain(runtime.config.defaultDomain),
-        ),
+        hasExternalRecipients: !willEncrypt,
         now: Date.now(),
       });
       if (holdError) throw new Error(holdError);
       const snapshot = {
-        fields: { to, cc, bcc, subject, body },
+        fields: { to, cc, bcc, subject, body, htmlBody: sentHtml },
         attachments,
       };
+      // Solace's reader drops cid parts of decrypted mail, so encrypted mail keeps its images inline as data URLs.
+      const inline =
+        outgoingHtml && !willEncrypt
+          ? extractComposeInlineImages(outgoingHtml, createInlineCid)
+          : { html: outgoingHtml, images: [] };
+      const inlineParts: OutgoingMimeAttachment[] = inline.images.map((image) => ({
+        filename: image.filename,
+        contentType: image.contentType,
+        content: image.content,
+        cid: image.cid,
+        disposition: "inline",
+      }));
+      const embeddedImagesError = willEncrypt ? getEmbeddedImagesSizeError(outgoingHtml) : null;
+      if (embeddedImagesError) throw new Error(embeddedImagesError);
+      const fileParts: OutgoingMimeAttachment[] = attachments.map((pending) => ({
+        filename: pending.name,
+        contentType: pending.type,
+        content: pending.bytes,
+      }));
+      const selfCopy = selfCopyWithEmbeddedImages({ text: plaintext, html: inline.html, attachments: fileParts }, outgoingHtml);
       const sizeError = getOutgoingAttachmentsTotalSizeError(
-        attachments.map((pending) => pending.size),
+        [
+          ...attachments.map((pending) => pending.size),
+          ...inline.images.map((image) => image.content.byteLength),
+        ],
         runtime.mailServerPolicy.limits.maxOutgoingAttachmentBytes,
       );
       if (sizeError) throw new Error(sizeError);
@@ -127,12 +172,10 @@ export function useComposeSend({
         runtime,
         recipients: allRecipients,
         plaintext,
-        html: unencryptedHtml,
-        mimeAttachments: attachments.map((pending) => ({
-          filename: pending.name,
-          contentType: pending.type,
-          content: pending.bytes,
-        })),
+        html: inline.html,
+        mimeAttachments: [...inlineParts, ...fileParts],
+        // The Sent copy keeps its images embedded, since the reader drops cid parts of decrypted mail.
+        sentCopyContent: selfCopy.html === inline.html ? undefined : selfCopy,
         sign: settings.signOutgoingMail,
       });
       const {
@@ -146,27 +189,42 @@ export function useComposeSend({
         isCurrent: isVaultCurrent,
       } = outgoing;
       const isCurrent = () => isMailSendScopeOpen(sendScope) && isVaultCurrent();
-      const htmlBody = encrypted || signedMimeMessage ? undefined : unencryptedHtml;
+      const sentHtmlBody = encrypted || signedMimeMessage ? undefined : inline.html;
 
       // Encrypted mail carries its attachments inside the ciphertext, so only plaintext sends upload them.
       const uploadedAttachments =
         outgoing.kind !== "plaintext"
           ? []
           : await uploadPlaintextMailAttachments(outgoing, () =>
-              runTasksWithConcurrencyLimit(
-                attachments.map((pending) => async () => {
-                  const uploaded = await uploadPlaintextMailAttachments(
-                    outgoing,
-                    () =>
-                      runtime.client.uploadBlob(
-                        runtime.session,
-                        pending.bytes,
-                        pending.type,
-                        isCurrent,
-                      ),
-                  );
-                  return toJmapAttachmentInput(pending, uploaded.blobId);
-                }),
+              runTasksWithConcurrencyLimit<JmapAttachmentInput>(
+                [
+                  ...inline.images.map((image) => async () => {
+                    const uploaded = await uploadPlaintextMailAttachments(outgoing, () =>
+                      runtime.client.uploadBlob(runtime.session, image.content, image.contentType, isCurrent),
+                    );
+                    return {
+                      blobId: uploaded.blobId,
+                      name: image.filename,
+                      type: image.contentType,
+                      size: image.content.byteLength,
+                      disposition: "inline" as const,
+                      cid: image.cid,
+                    };
+                  }),
+                  ...attachments.map((pending) => async () => {
+                    const uploaded = await uploadPlaintextMailAttachments(
+                      outgoing,
+                      () =>
+                        runtime.client.uploadBlob(
+                          runtime.session,
+                          pending.bytes,
+                          pending.type,
+                          isCurrent,
+                        ),
+                    );
+                    return toJmapAttachmentInput(pending, uploaded.blobId);
+                  }),
+                ],
                 runtime.mailServerPolicy.maxConcurrentUploads,
               ),
             );
@@ -183,7 +241,7 @@ export function useComposeSend({
           bcc: validation.bcc,
           subject: subject.trim(),
           textBody,
-          htmlBody,
+          htmlBody: sentHtmlBody,
           identityId,
           previousDraftId,
           attachments:
@@ -258,7 +316,7 @@ export function useComposeSend({
       enabled: settings.attachmentReminderEnabled,
       attachmentCount: attachments.length,
       subject,
-      bodyText: composeTextToPlain(body),
+      bodyText: body,
       keywords: settings.attachmentReminderKeywords,
     });
     if (missingAttachmentKeyword) {
@@ -285,8 +343,8 @@ export function useComposeSend({
       cc,
       bcc,
       subject,
-      bodyText: composeTextToPlain(body),
-      attachmentCount: attachments.length,
+      bodyText: body,
+      attachmentCount: attachments.length + countInlineImages(htmlBody),
     });
 
   return {

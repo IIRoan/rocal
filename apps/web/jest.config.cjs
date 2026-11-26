@@ -46,6 +46,7 @@ module.exports = {
       "<rootDir>/../../packages/calendar-client/src/index.ts",
     "^@workspace/calendar-client/(.*)$":
       "<rootDir>/../../packages/calendar-client/src/$1",
+    "^@workspace/mail-editor$": "<rootDir>/../../packages/mail-editor/src/index.ts",
     "^@workspace/runtime$": "<rootDir>/../../packages/runtime/src/index.ts",
     "^@workspace/runtime/(.*)$": "<rootDir>/../../packages/runtime/src/$1",
     "^@workspace/ui$": "<rootDir>/../../packages/ui/src/index.ts",

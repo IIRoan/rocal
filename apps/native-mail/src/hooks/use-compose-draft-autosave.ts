@@ -1,8 +1,7 @@
 import { useEffect, useEffectEvent, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  composeTextToHtml,
-  hasComposeFormatting,
+  resolveOutgoingComposeBodies,
   sealMailForSelf,
   splitRecipientList,
 } from "@workspace/calendar-core";
@@ -31,22 +30,26 @@ type ComposeDraftAutosaveInput = {
   bcc: string;
   subject: string;
   body: string;
+  /** The rich body; empty while composing plain text. */
+  htmlBody: string;
   identityId: string | null;
   draftId: string | null;
   setDraftId: (id: string | null) => void;
   setDraftSaveStatus: (status: DraftSaveStatus) => void;
 };
 
-/** Whether the text fields hold anything a draft can store; drafts never keep attachments. */
+/** Whether the fields hold anything a draft can store, text or an inserted photo; drafts never keep attachments. */
 export function hasDraftContent(
-  fields: Pick<ComposeDraftAutosaveInput, "to" | "cc" | "bcc" | "subject" | "body">,
+  fields: Pick<ComposeDraftAutosaveInput, "to" | "cc" | "bcc" | "subject" | "body"> & { htmlBody?: string },
 ): boolean {
   return (
     [fields.to, fields.cc, fields.bcc].some(
       (raw) => splitRecipientList(raw).length > 0,
     ) ||
     Boolean(fields.subject.trim()) ||
-    Boolean(fields.body.trim())
+    Boolean(fields.body.trim()) ||
+    // An inserted photo is content even in a body without text.
+    /<img\b/i.test(fields.htmlBody ?? "")
   );
 }
 
@@ -66,7 +69,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     const toAddresses = splitRecipientList(input.to);
     const ccAddresses = splitRecipientList(input.cc);
     const bccAddresses = splitRecipientList(input.bcc);
-    const plainBody = input.body.trim();
+    const bodies = resolveOutgoingComposeBodies({ body: input.body, htmlBody: input.htmlBody });
     // A save queued behind an autosave runs with its render's draftId, which that autosave already replaced.
     const previousDraftId = lastSavedDraftIdRef.current ?? input.draftId;
 
@@ -75,7 +78,8 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
       cc: ccAddresses,
       bcc: bccAddresses,
       subject: input.subject,
-      body: plainBody,
+      body: bodies.textBody,
+      html: bodies.htmlBody ?? null,
       identityId: input.identityId,
     });
 
@@ -101,12 +105,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     const { runtime } = input;
     const persistDraft = async (): Promise<DraftSaveResult> => {
       const ciphertext = await sealMailForSelf(
-        {
-          text: plainBody,
-          html: hasComposeFormatting(plainBody)
-            ? composeTextToHtml(plainBody)
-            : undefined,
-        },
+        { text: bodies.textBody, html: bodies.htmlBody },
         await createMailSealer(runtime),
       );
       const savedDraftId = await runtime.client.saveDraft(
@@ -207,6 +206,7 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     input.body,
     input.cc,
     input.enabled,
+    input.htmlBody,
     input.identityId,
     input.runtime,
     input.subject,

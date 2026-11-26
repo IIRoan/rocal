@@ -91,7 +91,45 @@ describe("buildSendMessageMethodCalls", () => {
     });
   });
 
-  it("builds html, file and inline attachments with CRLF bodies for plaintext sends", () => {
+  it("builds html and file attachments with CRLF bodies for plaintext sends", () => {
+    const draft = createdEmails(
+      buildSendMessageMethodCalls({
+        ...base,
+        textBody: "Line 1\nLine 2",
+        htmlBody: "<p>Hi</p>",
+        attachments: [
+          {
+            blobId: "blob-1",
+            name: "a.pdf",
+            type: "application/pdf",
+            size: 10,
+          },
+        ],
+      }),
+    ).draft1;
+
+    expect(draft).toEqual(
+      expect.objectContaining({
+        textBody: [{ partId: "text", type: "text/plain" }],
+        htmlBody: [{ partId: "html", type: "text/html" }],
+        bodyValues: {
+          text: { value: "Line 1\r\nLine 2" },
+          html: { value: "<p>Hi</p>" },
+        },
+        attachments: [
+          {
+            blobId: "blob-1",
+            name: "a.pdf",
+            type: "application/pdf",
+            disposition: "attachment",
+          },
+        ],
+      }),
+    );
+    expect(draft).not.toHaveProperty("bodyStructure");
+  });
+
+  it("puts inline images in multipart/related beside the html and files after it", () => {
     const draft = createdEmails(
       buildSendMessageMethodCalls({
         ...base,
@@ -118,30 +156,45 @@ describe("buildSendMessageMethodCalls", () => {
 
     expect(draft).toEqual(
       expect.objectContaining({
-        textBody: [{ partId: "text", type: "text/plain" }],
-        htmlBody: [{ partId: "html", type: "text/html" }],
         bodyValues: {
           text: { value: "Line 1\r\nLine 2" },
           html: { value: '<p>Hi <img src="cid:img@solace"></p>' },
         },
-        attachments: [
-          {
-            blobId: "blob-1",
-            name: "a.pdf",
-            type: "application/pdf",
-            disposition: "attachment",
-          },
-          {
-            blobId: "blob-img",
-            name: "inline.png",
-            type: "image/png",
-            disposition: "inline",
-            cid: "img@solace",
-          },
-        ],
+        bodyStructure: {
+          type: "multipart/mixed",
+          subParts: [
+            {
+              type: "multipart/alternative",
+              subParts: [
+                { partId: "text", type: "text/plain" },
+                {
+                  type: "multipart/related",
+                  subParts: [
+                    { partId: "html", type: "text/html" },
+                    {
+                      blobId: "blob-img",
+                      name: "inline.png",
+                      type: "image/png",
+                      disposition: "inline",
+                      cid: "img@solace",
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              blobId: "blob-1",
+              name: "a.pdf",
+              type: "application/pdf",
+              disposition: "attachment",
+            },
+          ],
+        },
       }),
     );
-    expect(draft).not.toHaveProperty("bodyStructure");
+    expect(draft).not.toHaveProperty("textBody");
+    expect(draft).not.toHaveProperty("htmlBody");
+    expect(draft).not.toHaveProperty("attachments");
   });
 
   it("sends internal mail as PGP/MIME and moves the encrypted submission to Sent", () => {

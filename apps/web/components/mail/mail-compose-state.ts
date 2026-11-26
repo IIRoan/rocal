@@ -1,3 +1,4 @@
+import { htmlToPlainText } from "@workspace/calendar-core";
 import type { QuotedInlineAttachment } from "@/lib/mail/compose-editor-utils";
 import type { ComposeMode, DraftSaveStatus, MailReplyContext } from "./mail-compose-types";
 
@@ -8,6 +9,7 @@ export type MailComposeState = {
   composeSubject: string;
   composeBody: string;
   composeHtmlBody: string;
+  plainTextMode: boolean;
   composeAttachments: File[];
   composeMode: ComposeMode;
   quotedAttachments: QuotedInlineAttachment[];
@@ -19,6 +21,7 @@ export type MailComposeState = {
   draftSaveStatus: DraftSaveStatus;
   isComposeOpen: boolean;
   isFullCompose: boolean;
+  isComposeMinimized: boolean;
   composeSessionId: number;
 };
 
@@ -29,6 +32,7 @@ export const initialMailComposeState: MailComposeState = {
   composeSubject: "",
   composeBody: "",
   composeHtmlBody: "",
+  plainTextMode: false,
   composeAttachments: [],
   composeMode: "new",
   quotedAttachments: [],
@@ -38,6 +42,7 @@ export const initialMailComposeState: MailComposeState = {
   draftSaveStatus: "idle",
   isComposeOpen: false,
   isFullCompose: false,
+  isComposeMinimized: false,
   composeSessionId: 0,
 };
 
@@ -47,8 +52,9 @@ export type MailComposeAction =
       type: "updateAttachments";
       updater: (current: File[]) => File[];
     }
-  | { type: "resetDraft"; selectedIdentityId: string | null }
-  | { type: "clearComposeFields"; selectedIdentityId: string | null }
+  | { type: "updateHtmlBody"; updater: (current: string) => string }
+  | { type: "resetDraft"; selectedIdentityId: string | null; plainTextMode: boolean }
+  | { type: "clearComposeFields"; selectedIdentityId: string | null; plainTextMode: boolean }
   | { type: "incrementSession" };
 
 export function mailComposeReducer(
@@ -63,10 +69,16 @@ export function mailComposeReducer(
         ...state,
         composeAttachments: action.updater(state.composeAttachments),
       };
+    case "updateHtmlBody": {
+      const composeHtmlBody = action.updater(state.composeHtmlBody);
+      if (composeHtmlBody === state.composeHtmlBody) return state;
+      return { ...state, composeHtmlBody, composeBody: htmlToPlainText(composeHtmlBody) };
+    }
     case "resetDraft":
       return {
         ...initialMailComposeState,
         selectedIdentityId: action.selectedIdentityId,
+        plainTextMode: action.plainTextMode,
         composeSessionId: state.composeSessionId,
       };
     case "clearComposeFields":
@@ -78,6 +90,7 @@ export function mailComposeReducer(
         composeSubject: "",
         composeBody: "",
         composeHtmlBody: "",
+        plainTextMode: action.plainTextMode,
         composeAttachments: [],
         composeReplyContext: null,
         composeMode: "new",

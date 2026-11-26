@@ -264,6 +264,8 @@ export async function sealOutgoingMessageBody(input: {
   senderEmail: string;
   internalDomain: string | null | undefined;
   content: OutgoingMailContent;
+  /** What the self-sealed Sent copy of mail to outside recipients stores, when it differs from what is submitted. */
+  sentCopyContent?: OutgoingMailContent;
   sealer: MailSealer;
   getRecipientPublicKey: (email: string) => Promise<string>;
   /** Sign mail to outside recipients as PGP/MIME; encrypted mail is always signed inside its ciphertext. */
@@ -279,7 +281,7 @@ export async function sealOutgoingMessageBody(input: {
   const internalDomain = resolveEncryptionInternalDomain(input.internalDomain);
   if (!shouldEncryptOutgoingMail(recipients, internalDomain)) {
     const signedMimeMessage = input.sign ? await signOutgoingMailContent(content, input.sealer) : null;
-    const sentCopyCiphertext = await sealMailForSelf(content, input.sealer);
+    const sentCopyCiphertext = await sealMailForSelf(input.sentCopyContent ?? content, input.sealer);
     assertCurrent(isCurrent);
     if (signedMimeMessage)
       return { ...base, kind: "signed", textBody: "", encrypted: false, signedMimeMessage, sentCopyCiphertext };

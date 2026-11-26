@@ -3,21 +3,6 @@ import { isSafeEmailUrl } from "@workspace/calendar-core/sanitize-email-html";
 
 /** Link mark storing href exactly as typed: no autolink, normalization, or protocol resolution, so relative hrefs survive round-trips. */
 export const LiteralLink = Link.extend({
-  addOptions() {
-    return {
-      ...this.parent?.(),
-      autolink: false,
-      linkOnPaste: false,
-      defaultProtocol: null,
-      protocols: [],
-      // renderHTML passes no href for a link mark without one.
-      isAllowedUri: (url) => isSafeEmailUrl("a", "href", url ?? ""),
-      shouldAutoLink: () => false,
-      openOnClick: false,
-      HTMLAttributes: { rel: "noopener noreferrer nofollow" },
-    };
-  },
-
   addAttributes() {
     return {
       ...this.parent?.(),
@@ -52,4 +37,15 @@ export const LiteralLink = Link.extend({
             .run(),
     };
   },
+}).configure({
+  autolink: false,
+  linkOnPaste: false,
+  defaultProtocol: "",
+  protocols: [],
+  // renderHTML passes no href for a link mark without one.
+  isAllowedUri: (url) => isSafeEmailUrl("a", "href", url ?? ""),
+  shouldAutoLink: () => false,
+  openOnClick: false,
+  // Configure merges into TipTap's defaults, so its `target="_blank"` is cleared to keep links as written.
+  HTMLAttributes: { target: null, rel: "noopener noreferrer nofollow" },
 });

@@ -5,7 +5,7 @@ import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { encryptForRecipients } from "../lib/mail/mail-crypto";
 import type { MailRuntime } from "../lib/mail/mail-runtime";
-import { useComposeDraftAutosave, type DraftSaveResult } from "./use-compose-draft-autosave";
+import { hasDraftContent, useComposeDraftAutosave, type DraftSaveResult } from "./use-compose-draft-autosave";
 
 const ARMORED = "-----BEGIN PGP MESSAGE-----\nsealed\n-----END PGP MESSAGE-----";
 
@@ -50,6 +50,7 @@ it("saves a draft only as ciphertext sealed to the account's own key", async () 
       bcc: "",
       subject: "Plans",
       body: "Meet at the harbour",
+      htmlBody: "",
       identityId: "identity-1",
       draftId: "draft-1",
       setDraftId: () => undefined,
@@ -117,6 +118,7 @@ it("settles before a send without sealing a throwaway draft", async () => {
       bcc: "",
       subject: "Plans",
       body: "Typed just now",
+      htmlBody: "",
       identityId: "identity-1",
       draftId: "draft-1",
       setDraftId: () => undefined,
@@ -151,4 +153,57 @@ it("settles before a send without sealing a throwaway draft", async () => {
     act(() => root.unmount());
     jest.useRealTimers();
   }
+});
+
+it("seals a rich draft's HTML with its text alternative", async () => {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  jest.mocked(encryptForRecipients).mockClear();
+  const root = createRoot(document.createElement("div"));
+  let save: (() => Promise<DraftSaveResult>) | null = null;
+
+  function Probe() {
+    const autosave = useComposeDraftAutosave({
+      runtime,
+      enabled: false,
+      to: "ann@example.com",
+      cc: "",
+      bcc: "",
+      subject: "Plans",
+      body: "Meet at the harbour",
+      htmlBody: "<p>Meet at the <strong>harbour</strong></p><ul><li>Bring a coat</li></ul>",
+      identityId: "identity-1",
+      draftId: null,
+      setDraftId: () => undefined,
+      setDraftSaveStatus: () => undefined,
+    });
+    useEffect(() => {
+      save = autosave.saveDraft;
+    });
+    return null;
+  }
+
+  try {
+    await act(async () =>
+      root.render(
+        <QueryClientProvider client={new QueryClient()}>
+          <Probe />
+        </QueryClientProvider>,
+      ),
+    );
+    await act(async () => {
+      await save?.();
+    });
+    const sealed = jest.mocked(encryptForRecipients).mock.calls[0]?.[0].plaintext ?? "";
+    expect(sealed).toContain("multipart/alternative");
+    expect(sealed).toContain("Meet at the harbour\r\n\r\n- Bring a coat");
+    expect(sealed).toContain("<p>Meet at the <strong>harbour</strong></p><ul><li>Bring a coat</li></ul>");
+  } finally {
+    act(() => root.unmount());
+  }
+});
+
+it("treats an inserted photo as draft content even without text", () => {
+  const empty = { to: "", cc: "", bcc: "", subject: "", body: "" };
+  expect(hasDraftContent({ ...empty, htmlBody: "<p></p>" })).toBe(false);
+  expect(hasDraftContent({ ...empty, htmlBody: '<p><img src="data:image/png;base64,AA==" alt="photo.jpg"></p>' })).toBe(true);
 });

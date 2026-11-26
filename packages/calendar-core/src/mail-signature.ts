@@ -146,15 +146,3 @@ export function resolveComposePlainBody(input: {
   }
   return input.body.trim();
 }
-
-/** Resolve multipart/alternative bodies for draft save and send. */
-export function resolveOutgoingComposeBodies(input: {
-  body: string;
-  htmlBody: string;
-}): { textBody: string; htmlBody?: string } {
-  const trimmedHtml = input.htmlBody.trim();
-  return {
-    textBody: resolveComposePlainBody(input),
-    htmlBody: trimmedHtml || undefined,
-  };
-}

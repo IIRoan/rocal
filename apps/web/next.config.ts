@@ -14,6 +14,7 @@ const workspacePackages = [
   "@workspace/calendar-core",
   "@workspace/e2ee",
   "@workspace/logger",
+  "@workspace/mail-editor",
   "@workspace/runtime",
 ] as const;
 

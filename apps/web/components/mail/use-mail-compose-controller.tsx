@@ -16,6 +16,8 @@ import {
   discardMailSendAttempt,
   hasComposeUserContent,
   parseMailtoLink,
+  composeHtmlToPlainText,
+  plainTextToComposeHtml,
   type ComposeTextFields,
   type MailServerLimits,
   type MailtoDraft,
@@ -23,7 +25,8 @@ import {
 } from "@workspace/calendar-core";
 import type { JmapEmailMessage, JmapIdentity } from "@/lib/mail/types";
 import { htmlToPlainText } from "@/lib/mail/signature-utils";
-import { resetComposeInlineImages } from "@/lib/mail/compose-inline-images";
+import { readMailComposeSettings } from "@/lib/mail/compose-settings";
+import { hasInsertedComposeImage, resetComposeInlineImages } from "@/lib/mail/compose-inline-images";
 import { resolveMailLink, takeMailLinkFragment, type MailLink } from "@/lib/mail/mail-link-handoff";
 import type { QuotedInlineAttachment } from "@/lib/mail/compose-editor-utils";
 import {
@@ -76,7 +79,8 @@ function toComposeTextFields(draft: ComposeDraft): ComposeTextFields {
     cc: draft.cc,
     bcc: draft.bcc,
     subject: draft.subject,
-    body: draft.htmlBody ? htmlToPlainText(draft.htmlBody) : draft.body,
+    // A plain-text message keeps its last rich HTML only for switching back, so its text is the body.
+    body: !draft.plainTextMode && draft.htmlBody ? htmlToPlainText(draft.htmlBody) : draft.body,
   };
 }
 
@@ -117,6 +121,7 @@ export function useMailComposeController({
   const seedTextRef = useRef<ComposeTextFields | null>(null);
   const explicitCloseRef = useRef(false);
   const closingRef = useRef(false);
+  const plainSwitchTextRef = useRef<string | null>(null);
   const [sendLifetime] = useState(createMailSendScopeLifetime);
   useEffect(() => sendLifetime.activate(() => sendSessionIdRef.current ? `compose:${sendSessionIdRef.current}` : null), [sendLifetime]);
 
@@ -138,6 +143,7 @@ export function useMailComposeController({
       composeSubject: state.composeSubject,
       composeBody: state.composeBody,
       composeHtmlBody: state.composeHtmlBody,
+      plainTextMode: state.plainTextMode,
       composeAttachments: state.composeAttachments,
       composeMode: state.composeMode,
       quotedAttachments: state.quotedAttachments,
@@ -173,6 +179,8 @@ export function useMailComposeController({
   const hasUserContent = () => {
     const current = draftRef.current;
     const seed = seedTextRef.current;
+    // An inserted or pasted image is content even when the text matches the seed.
+    if (!current.plainTextMode && hasInsertedComposeImage(current.htmlBody)) return true;
     // A reopened draft already holds user content; only fresh composes compare against their seed.
     if (!seed || current.composeMode === "draft") {
       return hasSavableContent(current);
@@ -261,6 +269,11 @@ export function useMailComposeController({
     return false;
   };
 
+  // A message that opens as plain text but carries rich HTML (a draft) gets that HTML back on switching to rich, unless edited.
+  const rememberPlainSwitch = (draft: ComposeDraft) => {
+    plainSwitchTextRef.current = draft.plainTextMode && draft.htmlBody.trim() ? draft.body : null;
+  };
+
   const resetDraftRefs = () => {
     if (sendSessionIdRef.current) discardMailSendAttempt(`compose:${sendSessionIdRef.current}`);
     sendSessionIdRef.current = createMailSendSessionId();
@@ -268,6 +281,7 @@ export function useMailComposeController({
     baselineRef.current = null;
     seedTextRef.current = null;
     explicitCloseRef.current = false;
+    plainSwitchTextRef.current = null;
   };
 
   const applySeed = (seed: {
@@ -283,11 +297,13 @@ export function useMailComposeController({
     );
     // Baseline is the seeded state so an untouched reply/forward closes without saving a draft.
     baselineRef.current = buildComposeSnapshot(seededDraft);
+    rememberPlainSwitch(seededDraft);
     seedTextRef.current = toComposeTextFields(seededDraft);
     dispatch({
       type: "patch",
       patch: {
         signatureChoice: undefined,
+        isComposeMinimized: false,
         ...seed.patch,
         ...(seed.identityId !== undefined
           ? { selectedIdentityId: seed.identityId }
@@ -301,6 +317,7 @@ export function useMailComposeController({
     dispatch({
       type: "resetDraft",
       selectedIdentityId: identities[0]?.id ?? null,
+      plainTextMode: readMailComposeSettings().plainTextMode,
     });
   };
 
@@ -310,6 +327,7 @@ export function useMailComposeController({
     dispatch({
       type: "clearComposeFields",
       selectedIdentityId: identities[0]?.id ?? null,
+      plainTextMode: readMailComposeSettings().plainTextMode,
     });
   };
 
@@ -317,7 +335,7 @@ export function useMailComposeController({
     clearCompose();
     dispatch({
       type: "patch",
-      patch: { isComposeOpen: false, isFullCompose: false },
+      patch: { isComposeOpen: false, isFullCompose: false, isComposeMinimized: false },
     });
   };
 
@@ -338,6 +356,7 @@ export function useMailComposeController({
           composeSubject: "",
           composeBody: seeded.body,
           composeHtmlBody: seeded.htmlBody,
+          plainTextMode: seeded.plainTextMode,
           composeAttachments: [],
           composeMode: "new",
           quotedAttachments: [],
@@ -391,6 +410,7 @@ export function useMailComposeController({
 
   const restoreDraft = (snapshot: ComposeDraft, draftId: string | null) => {
     resetDraftRefs();
+    rememberPlainSwitch(snapshot);
     draftIdRef.current = draftId;
     dispatch({ type: "incrementSession" });
     dispatch({
@@ -402,6 +422,7 @@ export function useMailComposeController({
         composeSubject: snapshot.subject,
         composeBody: snapshot.body,
         composeHtmlBody: snapshot.htmlBody,
+        plainTextMode: snapshot.plainTextMode,
         composeAttachments: snapshot.attachments,
         composeReplyContext: snapshot.replyContext,
         composeMode: snapshot.composeMode,
@@ -409,6 +430,7 @@ export function useMailComposeController({
         selectedIdentityId: snapshot.identityId,
         draftId,
         isComposeOpen: true,
+        isComposeMinimized: false,
       },
     });
   };
@@ -465,6 +487,7 @@ export function useMailComposeController({
           composeSubject: seed.patch.composeSubject ?? "",
           composeBody: seed.patch.composeBody ?? "",
           composeHtmlBody: seed.patch.composeHtmlBody ?? "",
+          plainTextMode: seed.patch.plainTextMode ?? false,
           composeAttachments: [],
           composeMode: (seed.patch.composeMode ?? "draft") as ComposeMode,
           quotedAttachments:
@@ -555,14 +578,28 @@ export function useMailComposeController({
       dispatch({ type: "patch", patch: { composeBody: value } });
     },
     composeHtmlBody: state.composeHtmlBody,
-    setComposeHtmlBody: (value: string) => {
+    // An updater sees the latest body, so a late quoted-image load never overwrites typing that happened meanwhile.
+    setComposeHtmlBody: (value: SetStateAction<string>) => {
       markDirty();
+      dispatch({ type: "updateHtmlBody", updater: typeof value === "function" ? value : () => value });
+    },
+    plainTextMode: state.plainTextMode,
+    setPlainTextMode: (next: boolean) => {
+      if (next === state.plainTextMode) return;
+      if (next) {
+        const plain = composeHtmlToPlainText(state.composeHtmlBody);
+        plainSwitchTextRef.current = plain;
+        dispatch({ type: "patch", patch: { plainTextMode: true, composeBody: plain || state.composeBody } });
+        return;
+      }
+      // The rich body comes back as it was unless the plain text was edited, which then becomes the body.
+      const edited =
+        plainSwitchTextRef.current !== state.composeBody || !state.composeHtmlBody.trim();
+      plainSwitchTextRef.current = null;
+      const html = edited ? plainTextToComposeHtml(state.composeBody) : state.composeHtmlBody;
       dispatch({
         type: "patch",
-        patch: {
-          composeHtmlBody: value,
-          composeBody: htmlToPlainText(value),
-        },
+        patch: { plainTextMode: false, composeHtmlBody: html, composeBody: htmlToPlainText(html) },
       });
     },
     composeAttachments: state.composeAttachments,
@@ -605,6 +642,10 @@ export function useMailComposeController({
     isFullCompose: state.isFullCompose,
     setIsFullCompose: (open: boolean) => {
       dispatch({ type: "patch", patch: { isFullCompose: open } });
+    },
+    isComposeMinimized: state.isComposeMinimized,
+    setIsComposeMinimized: (minimized: boolean) => {
+      dispatch({ type: "patch", patch: { isComposeMinimized: minimized } });
     },
     dismissCompose,
   };

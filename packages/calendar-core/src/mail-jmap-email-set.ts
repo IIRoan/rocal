@@ -113,13 +113,44 @@ function buildEmailContentFields(input: {
   }
 
   const trimmedHtml = input.htmlBody?.trim();
+  const bodyValues = {
+    text: { value: normalizeJmapBodyValue(input.textBody) },
+    ...(trimmedHtml
+      ? { html: { value: normalizeJmapBodyValue(trimmedHtml) } }
+      : {}),
+  };
+  const inlineImages = trimmedHtml
+    ? (input.attachments ?? []).filter((attachment) => attachment.disposition === "inline" && attachment.cid)
+    : [];
+  if (inlineImages.length > 0) {
+    const toPart = (attachment: JmapAttachmentInput) => ({
+      blobId: attachment.blobId,
+      type: attachment.type,
+      name: attachment.name,
+      disposition: attachment.disposition ?? "attachment",
+      ...(attachment.cid ? { cid: attachment.cid } : {}),
+    });
+    const files = (input.attachments ?? []).filter((attachment) => !inlineImages.includes(attachment));
+    // The convenience properties would file inline images under multipart/mixed, where many readers list them as attachments.
+    const alternative = {
+      type: "multipart/alternative",
+      subParts: [
+        { partId: "text", type: "text/plain" },
+        {
+          type: "multipart/related",
+          subParts: [{ partId: "html", type: "text/html" }, ...inlineImages.map(toPart)],
+        },
+      ],
+    };
+    return {
+      bodyValues,
+      bodyStructure: files.length
+        ? { type: "multipart/mixed", subParts: [alternative, ...files.map(toPart)] }
+        : alternative,
+    };
+  }
   return {
-    bodyValues: {
-      text: { value: normalizeJmapBodyValue(input.textBody) },
-      ...(trimmedHtml
-        ? { html: { value: normalizeJmapBodyValue(trimmedHtml) } }
-        : {}),
-    },
+    bodyValues,
     textBody: [{ partId: "text", type: "text/plain" }],
     ...(trimmedHtml
       ? { htmlBody: [{ partId: "html", type: "text/html" }] }

@@ -47,6 +47,7 @@
     "@workspace/design-tokens": "workspace:*",
     "@workspace/e2ee": "workspace:*",
     "@workspace/logger": "0.10.0",
+    "@workspace/mail-editor": "workspace:*",
     "@workspace/runtime": "workspace:*",
     "better-auth": "^1.7.15",
     "better-call": "^2.0.2",

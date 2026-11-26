@@ -25,13 +25,12 @@ import { MailboxesSettingsContent } from "./settings/sections/MailboxesSettingsC
 import {
   MailSignaturePage,
   MailSignaturesSettingsContent,
-  isMailSignaturePage,
 } from "./settings/sections/MailSignaturesSettingsContent";
 import {
   MailTemplatePage,
   MailTemplatesSettingsContent,
-  isMailTemplatePage,
 } from "./settings/sections/MailTemplatesSettingsContent";
+import { isMailSignaturePage, isMailTemplatePage } from "../lib/mail/mail-settings-pages";
 import { VacationReplySettingsContent } from "./settings/sections/VacationReplySettingsContent";
 
 const MAIL_ACCOUNT_SHEET_CONFIG: AccountSheetConfig = {
