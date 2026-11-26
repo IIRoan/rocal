@@ -1044,6 +1044,7 @@ export function useMailApp() {
         assertMailVerificationContext(verificationContext);
         const decrypted = await mailCryptoWorkerClient.decryptMessage({
           armoredMessage,
+          senderEmail: selectedMessage.from?.[0]?.email ?? undefined,
           senderPublicKeyArmored: verification.senderPublicKeyArmored,
           expectedVaultFingerprint: verificationContext.fingerprint,
         });
@@ -1642,8 +1643,6 @@ export function useMailApp() {
       replyContext: composeReplyContext,
       identityId: composeIdentityId,
       draftId: composeDraftId,
-      composeMode,
-      signatureAlreadyEmbedded,
     } = draft;
     const composeSettings = readMailComposeSettings();
     const plainTextMode = composeSettings.plainTextMode;
@@ -1720,24 +1719,12 @@ export function useMailApp() {
 
       const fromEmail = identity.email;
       const fromName = identity.name ?? null;
-      const { textBody: bodyWithSignature, htmlBody: htmlWithSignature } =
-        plainTextMode
-          ? {
-              textBody: signatureAlreadyEmbedded
-                ? composeBody
-                : resolveOutgoingComposeBodies({
-                    body: composeBody,
-                    htmlBody: "",
-                    signature: identity,
-                  }).textBody,
-              htmlBody: undefined,
-            }
-          : resolveOutgoingComposeBodies({
-              body: composeBody,
-              htmlBody: composeHtmlBody,
-              signature: identity,
-              signatureAlreadyEmbedded,
-            });
+      // The signature is ordinary body text by now, so the message goes out exactly as written.
+      const { textBody: outgoingText, htmlBody: outgoingHtml } =
+        resolveOutgoingComposeBodies({
+          body: composeBody,
+          htmlBody: plainTextMode ? "" : composeHtmlBody,
+        });
       const internalDomain = resolveEncryptionInternalDomain(
         config?.defaultDomain,
       );
@@ -1770,12 +1757,12 @@ export function useMailApp() {
           typeof rewriteComposeInlineImages
         >["attachments"];
       } =
-        !plainTextMode && htmlWithSignature && !embedInlineImagesInEncryptedHtml
-          ? rewriteComposeInlineImages(htmlWithSignature)
-          : { html: htmlWithSignature, attachments: [] };
+        !plainTextMode && outgoingHtml && !embedInlineImagesInEncryptedHtml
+          ? rewriteComposeInlineImages(outgoingHtml)
+          : { html: outgoingHtml, attachments: [] };
       const htmlForSend = plainTextMode
         ? undefined
-        : (rewritten.html ?? htmlWithSignature);
+        : (rewritten.html ?? outgoingHtml);
       const inlineMimeAttachments: OutgoingMimeAttachment[] =
         embedInlineImagesInEncryptedHtml
           ? []
@@ -1805,25 +1792,27 @@ export function useMailApp() {
       const outgoing = await resolveOutgoingMessageBody({
         activeMailbox: mailbox,
         recipients: allRecipients,
-        plaintext: bodyWithSignature,
+        plaintext: outgoingText,
         html: htmlForSend,
         internalDomain,
         mimeAttachments:
           plainTextMode && fileMimeAttachments.length > 0
             ? fileMimeAttachments
             : mimeAttachments,
+        sign: composeSettings.signOutgoingMail,
       });
       const {
         textBody,
         encrypted,
         pgpMimeCiphertext,
         pgpMimeMessage,
+        signedMimeMessage,
         sentCopyCiphertext,
         contentFingerprint,
         isCurrent: isVaultCurrent,
       } = outgoing;
       const isCurrent = () => isMailSendScopeOpen(`compose:${composeSessionId}`) && isVaultCurrent();
-      const htmlBody = encrypted || plainTextMode ? undefined : htmlForSend;
+      const htmlBody = encrypted || signedMimeMessage || plainTextMode ? undefined : htmlForSend;
 
       if (!shouldEncryptOutgoingMail(allRecipients, internalDomain)) {
         await mailbox.client.ensureEncryptOnAppendDisabled(mailbox.session);
@@ -1924,6 +1913,7 @@ export function useMailApp() {
         attachments: uploadedAttachments,
         pgpMimeCiphertext,
         pgpMimeMessage,
+        signedMimeMessage,
         sentCopyCiphertext,
         inReplyTo: composeReplyContext?.inReplyTo,
         references: composeReplyContext?.references,
@@ -1931,7 +1921,7 @@ export function useMailApp() {
         hold,
       });
       completeMailSendAttempt(getPrimaryMailAccountId(mailbox.session), `compose:${composeSessionId}`);
-      const sentMessage = encrypted ? "Encrypted message sent." : "Message sent.";
+      const sentMessage = encrypted ? "Encrypted message sent." : signedMimeMessage ? "Signed message sent." : "Message sent.";
       const announceSent = () => {
         if (!hold || !sendResult.emailId) {
           toast(sentMessage);
@@ -1972,7 +1962,7 @@ export function useMailApp() {
             fromEmail: mailbox.email,
             to: recipients,
             subject: composeSubject.trim(),
-            textBody: bodyWithSignature,
+            textBody: outgoingText,
             sentMailboxId,
             threadId: effectiveThreadId,
             inReplyTo: composeReplyContext.inReplyTo,
@@ -2367,12 +2357,14 @@ export function useMailApp() {
         plaintext: `${replyText}${quotedBody}`,
         internalDomain,
         mimeAttachments,
+        sign: readMailComposeSettings().signOutgoingMail,
       });
       const {
         textBody,
         encrypted,
         pgpMimeCiphertext,
         pgpMimeMessage,
+        signedMimeMessage,
         sentCopyCiphertext,
         contentFingerprint,
         isCurrent: isVaultCurrent,
@@ -2426,6 +2418,7 @@ export function useMailApp() {
         attachments,
         pgpMimeCiphertext,
         pgpMimeMessage,
+        signedMimeMessage,
         sentCopyCiphertext,
         inReplyTo: replyContext.inReplyTo,
         references: replyContext.references,
@@ -3034,6 +3027,59 @@ export function useMailApp() {
     }
   };
 
+  const handleMarkMailboxAsRead = async () => {
+    const mailboxId = activeMailbox?.selectedMailboxId;
+    if (!activeMailbox || !mailboxId) return;
+    const unreadIds = new Set(
+      activeMailbox.messages
+        .filter((m) => !m.keywords?.["$seen"])
+        .map((m) => m.id),
+    );
+    if (unreadIds.size === 0) return;
+    const restoreUnread = (cur: ActiveMailboxState | null) =>
+      cur?.selectedMailboxId === mailboxId
+        ? {
+            ...cur,
+            messages: cur.messages.map((m) => {
+              if (!unreadIds.has(m.id)) return m;
+              const keywords = { ...(m.keywords ?? {}) };
+              delete keywords["$seen"];
+              return { ...m, keywords };
+            }),
+          }
+        : cur;
+    setActiveMailbox((cur) =>
+      cur?.selectedMailboxId === mailboxId
+        ? {
+            ...cur,
+            messages: cur.messages.map((m) =>
+              unreadIds.has(m.id)
+                ? { ...m, keywords: { ...(m.keywords ?? {}), $seen: true } }
+                : m,
+            ),
+          }
+        : cur,
+    );
+    try {
+      await keywordReconciliation.trackWrite(
+        [...unreadIds].map((messageId) => ({
+          messageId,
+          keyword: "$seen",
+          enabled: true,
+        })),
+        () =>
+          activeMailbox.client.markMailboxAsRead(
+            activeMailbox.session,
+            mailboxId,
+          ),
+      );
+    } catch (error) {
+      log.error("Failed to mark folder as read", error);
+      setActiveMailbox(restoreUnread);
+      toast.error(getErrorMessage(error, "Could not mark the folder as read."));
+    }
+  };
+
   const handleBulkReportSpam = async (
     messageIds: string[],
     options?: MailAdvanceOptions,
@@ -3487,6 +3533,7 @@ export function useMailApp() {
     internalDomain: resolveEncryptionInternalDomain(config?.defaultDomain),
     timezone: resolveTimezone(settings?.timezone),
     timeFormat,
+    weekStartsOn: ((settings?.weekStartDay ?? 1) % 7) as 0 | 1 | 2 | 3 | 4 | 5 | 6,
   };
 
   const user = session?.user
@@ -3588,6 +3635,7 @@ export function useMailApp() {
     handleBulkMove,
     handleBulkMarkAsUnread,
     handleBulkMarkAsRead,
+    handleMarkMailboxAsRead,
     handleToggleFlagged,
     handleSetMessageLabel,
     handleSimpleLoginAction,

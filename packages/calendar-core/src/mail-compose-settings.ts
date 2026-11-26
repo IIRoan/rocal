@@ -1,14 +1,26 @@
+import { normalizeMailTemplates, type MailTemplate } from "./mail-templates";
+import {
+  normalizeMailSignatureDefaults,
+  normalizeMailSignatures,
+  type MailSignature,
+  type MailSignatureDefault,
+} from "./mail-signatures";
+
 export type MailSignaturePosition = "above_quote" | "below_quote";
 
 export type MailComposeSettings = {
   plainTextMode: boolean;
   attachmentReminderEnabled: boolean;
   attachmentReminderKeywords: string[];
-  signaturePosition: MailSignaturePosition;
+  replySignaturePosition: MailSignaturePosition;
   signatureSeparatorEnabled: boolean;
   autoSelectReplyIdentity: boolean;
   stripImageMetadata: boolean;
+  signOutgoingMail: boolean;
   undoSendSeconds: UndoSendSeconds;
+  templates: MailTemplate[];
+  signatures: MailSignature[];
+  signatureDefaults: MailSignatureDefault[];
 };
 
 export const UNDO_SEND_SECONDS_OPTIONS = [
@@ -59,11 +71,15 @@ export const DEFAULT_MAIL_COMPOSE_SETTINGS: MailComposeSettings = {
   plainTextMode: false,
   attachmentReminderEnabled: true,
   attachmentReminderKeywords: [...DEFAULT_ATTACHMENT_REMINDER_KEYWORDS],
-  signaturePosition: "below_quote",
+  replySignaturePosition: "above_quote",
   signatureSeparatorEnabled: true,
   autoSelectReplyIdentity: false,
   stripImageMetadata: true,
+  signOutgoingMail: false,
   undoSendSeconds: 5,
+  templates: [],
+  signatures: [],
+  signatureDefaults: [],
 };
 
 function booleanOr(value: unknown, fallback: boolean): boolean {
@@ -88,11 +104,11 @@ export function normalizeMailComposeSettings(input: unknown): MailComposeSetting
           (keyword): keyword is string => typeof keyword === "string",
         )
       : DEFAULT_MAIL_COMPOSE_SETTINGS.attachmentReminderKeywords,
-    signaturePosition:
-      parsed.signaturePosition === "above_quote" ||
-      parsed.signaturePosition === "below_quote"
-        ? parsed.signaturePosition
-        : DEFAULT_MAIL_COMPOSE_SETTINGS.signaturePosition,
+    replySignaturePosition:
+      parsed.replySignaturePosition === "above_quote" ||
+      parsed.replySignaturePosition === "below_quote"
+        ? parsed.replySignaturePosition
+        : DEFAULT_MAIL_COMPOSE_SETTINGS.replySignaturePosition,
     signatureSeparatorEnabled: booleanOr(
       parsed.signatureSeparatorEnabled,
       DEFAULT_MAIL_COMPOSE_SETTINGS.signatureSeparatorEnabled,
@@ -105,7 +121,14 @@ export function normalizeMailComposeSettings(input: unknown): MailComposeSetting
       parsed.stripImageMetadata,
       DEFAULT_MAIL_COMPOSE_SETTINGS.stripImageMetadata,
     ),
+    signOutgoingMail: booleanOr(
+      parsed.signOutgoingMail,
+      DEFAULT_MAIL_COMPOSE_SETTINGS.signOutgoingMail,
+    ),
     undoSendSeconds: normalizeUndoSendSeconds(parsed.undoSendSeconds),
+    templates: normalizeMailTemplates(parsed.templates),
+    signatures: normalizeMailSignatures(parsed.signatures),
+    signatureDefaults: normalizeMailSignatureDefaults(parsed.signatureDefaults),
   };
 }
 

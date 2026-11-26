@@ -19,6 +19,7 @@ import {
   parseDecryptedMailContent,
   type ParsedMailContent,
 } from "@workspace/calendar-core/mail-mime-parser";
+import { resolveSignedMailContent } from "@workspace/calendar-core/mail-pgp-signature";
 import type { MailDecryptResult, MailVaultKdfParams } from "../lib/mail/types";
 
 import {
@@ -26,6 +27,7 @@ import {
   encryptForRecipients,
   getActiveMailPrivateKey,
   loadActiveMailVault,
+  signDetached,
 } from "../lib/mail/mail-encryption-engine";
 
 async function handleGenerateKeyPair(payload: {
@@ -81,6 +83,7 @@ function readDecryptedContent(plaintext: string, editable: boolean) {
 
 async function handleDecryptMessage(payload: {
   armoredMessage: string;
+  senderEmail?: string;
   senderPublicKeyArmored?: string;
   expectedVaultFingerprint?: string;
   editable?: boolean;
@@ -124,9 +127,17 @@ async function handleDecryptMessage(payload: {
       };
     },
   });
+  const signed = await resolveSignedMailContent<openpgp.Key, openpgp.Message<Uint8Array>, openpgp.Signature>(
+    {
+      ...result,
+      senderEmail: payload.senderEmail,
+      senderPublicKeyArmored: payload.senderPublicKeyArmored,
+    },
+    openpgp,
+  );
   if (getActiveMailPrivateKey() !== activePrivateKey)
     throw new Error("Mail encryption session changed.");
-  const { plaintext, ...verification } = result;
+  const { plaintext, ...verification } = { ...result, ...signed };
   return {
     ...verification,
     ...readDecryptedContent(plaintext, payload.editable === true),
@@ -175,6 +186,11 @@ type MailCryptoWorkerRequest =
       type: "ENCRYPT_FOR_RECIPIENTS";
       payload: Parameters<typeof encryptForRecipients>[0];
     }
+  | {
+      requestId: number;
+      type: "SIGN_DETACHED";
+      payload: Parameters<typeof signDetached>[0];
+    }
   | { requestId: number; type: "CLEAR_ACTIVE_VAULT" }
   | {
       requestId: number;
@@ -210,6 +226,9 @@ self.onmessage = async (event: MessageEvent<MailCryptoWorkerRequest>) => {
       }
       case "ENCRYPT_FOR_RECIPIENTS":
         result = await encryptForRecipients(request.payload);
+        break;
+      case "SIGN_DETACHED":
+        result = await signDetached(request.payload);
         break;
       case "CLEAR_ACTIVE_VAULT":
         result = clearActiveMailVault();

@@ -2,7 +2,7 @@
 
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { ComposeBodyEditor } from "./ComposeBodyEditor";
+import { ComposeBodyEditor, type ComposeBodyEditorHandle } from "./ComposeBodyEditor";
 
 type WebViewProps = {
   source: { html: string };
@@ -289,4 +289,115 @@ it("folds a reply's quoted message to its header until it is tapped", () => {
     "<p>Thanks</p><p>On Nov 16, Maestro wrote:<br>&gt; Hello</p>",
   );
   expect(page.window.document.querySelector(".quote")?.classList.contains("collapsed")).toBe(false);
+});
+
+it("inserts a template escaped, at the start before any caret and at the remembered caret after", () => {
+  const ref = React.createRef<ComposeBodyEditorHandle>();
+  act(() =>
+    root.render(
+      <ComposeBodyEditor
+        ref={ref}
+        value="Hello world"
+        bodySourceVersion={0}
+        onChangeText={jest.fn()}
+        placeholder="Message"
+      />,
+    ),
+  );
+  editorReady();
+  act(() => ref.current?.insertText("Hi <team>"));
+  const injected = mockInject.mock.calls.at(-1)?.[0];
+  expect(injected).toContain("window.insertHtmlAtCaret(");
+  expect(injected).toContain("Hi &lt;team&gt;");
+  expect(injected).not.toContain("<team>");
+
+  type PageWindow = Window & {
+    Event: typeof Event;
+    ReactNativeWebView: { postMessage: (data: string) => void };
+    insertHtmlAtCaret: (html: string) => void;
+  };
+  const { JSDOM } = jest.requireActual<{
+    JSDOM: new (
+      html: string,
+      options: { runScripts: "dangerously"; beforeParse: (window: PageWindow) => void },
+    ) => { window: PageWindow };
+  }>("jsdom");
+  const posted: string[] = [];
+  const page = new JSDOM(mockPages.at(-1) ?? "", {
+    runScripts: "dangerously",
+    beforeParse: (window) => {
+      window.ReactNativeWebView = { postMessage: (data) => posted.push(data) };
+      // jsdom has no editing commands, so insertHTML is emulated at the current selection.
+      window.document.execCommand = (_command, _ui, html) => {
+        const range = window.getSelection()?.getRangeAt(0);
+        range?.insertNode(range.createContextualFragment(String(html)));
+        return true;
+      };
+    },
+  });
+  const { document: pageDocument } = page.window;
+  const editor = pageDocument.getElementById("ed");
+  if (!editor) throw new Error("editor missing");
+
+  page.window.insertHtmlAtCaret("<b>A</b>");
+  expect(editor.textContent).toBe("AHello world");
+
+  const text = editor.querySelector("p")?.firstChild;
+  if (!text) throw new Error("body text missing");
+  const selection = page.window.getSelection();
+  const caret = pageDocument.createRange();
+  caret.setStart(text, 5);
+  caret.collapse(true);
+  selection?.removeAllRanges();
+  selection?.addRange(caret);
+  pageDocument.dispatchEvent(new page.window.Event("selectionchange"));
+  selection?.removeAllRanges();
+  pageDocument.dispatchEvent(new page.window.Event("selectionchange"));
+
+  page.window.insertHtmlAtCaret("<i>B</i>");
+  expect(editor.textContent).toBe("AHelloB world");
+  expect(JSON.parse(posted.at(-1) ?? "{}")).toEqual({ type: "change", html: editor.innerHTML });
+});
+
+it("starts writing at the top when an untouched body is tapped below its signature", () => {
+  render("\n\n-- \nAlex");
+  type PageWindow = Window & {
+    Event: typeof Event;
+    MouseEvent: typeof MouseEvent;
+    ReactNativeWebView: { postMessage: (data: string) => void };
+  };
+  const { JSDOM } = jest.requireActual<{
+    JSDOM: new (
+      html: string,
+      options: { runScripts: "dangerously"; beforeParse: (window: PageWindow) => void },
+    ) => { window: PageWindow };
+  }>("jsdom");
+  const page = new JSDOM(mockPages.at(-1) ?? "", {
+    runScripts: "dangerously",
+    beforeParse: (window) => {
+      window.ReactNativeWebView = { postMessage: () => undefined };
+    },
+  });
+  const pageDocument = page.window.document;
+  const editor = pageDocument.getElementById("ed");
+  const signature = editor?.lastElementChild;
+  if (!editor || !signature) throw new Error("editor missing");
+  const selection = page.window.getSelection();
+  const placeCaretAtEnd = () => {
+    const end = pageDocument.createRange();
+    end.selectNodeContents(signature);
+    end.collapse(false);
+    selection?.removeAllRanges();
+    selection?.addRange(end);
+  };
+
+  placeCaretAtEnd();
+  editor.dispatchEvent(new page.window.MouseEvent("click", { bubbles: true }));
+  expect(selection?.anchorNode).toBe(editor.firstChild);
+  expect(selection?.anchorOffset).toBe(0);
+
+  editor.dispatchEvent(new page.window.Event("input", { bubbles: true }));
+  placeCaretAtEnd();
+  editor.dispatchEvent(new page.window.MouseEvent("click", { bubbles: true }));
+  expect(selection?.anchorNode).toBe(signature);
 });

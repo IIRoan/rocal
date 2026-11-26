@@ -16,9 +16,11 @@ export function EventSheetHeader({
   title,
   canExport,
   exporting,
+  canDuplicate,
   onCancel,
   onSave,
   onExport,
+  onDuplicate,
 }: {
   styles: EventSheetStyles;
   editing: boolean;
@@ -27,9 +29,11 @@ export function EventSheetHeader({
   title: string;
   canExport: boolean;
   exporting: boolean;
+  canDuplicate: boolean;
   onCancel: () => void;
   onSave: () => void;
   onExport: () => void;
+  onDuplicate: () => void;
 }) {
   const { theme } = useTheme();
 
@@ -73,6 +77,22 @@ export function EventSheetHeader({
         <BottomSheetTitle style={styles.viewHeaderTitle}>
           {title}
         </BottomSheetTitle>
+        {canDuplicate ? (
+          <Pressable
+            onPress={onDuplicate}
+            disabled={isPending}
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.headerIconButton,
+              (pressed || isPending) && styles.headerIconButtonPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Duplicate event"
+            accessibilityState={{ disabled: isPending }}
+          >
+            <Feather name="copy" size={18} color={theme.colors.foreground} />
+          </Pressable>
+        ) : null}
         {canExport ? (
           <Pressable
             onPress={onExport}

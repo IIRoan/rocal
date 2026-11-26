@@ -59,8 +59,7 @@ describe("mail compose formatting", () => {
 
   it("sends HTML only when the body is formatted and not encrypted", () => {
     const formatted = resolveComposeSendBodies({
-      body: "Hello **world**",
-      bodyWithSignature: "Hello **world**\n\n-- \nRoan",
+      body: "Hello **world**\n\n-- \nRoan",
       encrypted: false,
     });
     expect(formatted.plaintext).toBe("Hello world\n\n-- \nRoan");
@@ -70,16 +69,14 @@ describe("mail compose formatting", () => {
 
     expect(
       resolveComposeSendBodies({
-        body: "Hello **world**",
-        bodyWithSignature: "Hello **world**\n\n-- \nRoan",
+        body: "Hello **world**\n\n-- \nRoan",
         encrypted: true,
       }).htmlBody,
     ).toBeUndefined();
 
     expect(
       resolveComposeSendBodies({
-        body: "Just text",
-        bodyWithSignature: "Just text\n\n-- \nRoan",
+        body: "Just text\n\n-- \nRoan",
         encrypted: false,
       }),
     ).toEqual({

@@ -270,6 +270,12 @@ export function createMailSealer(
       assertMailVerificationContext(context);
       return result;
     },
+    sign: async (input) => {
+      assertMailVerificationContext(context);
+      const result = await mailCryptoWorkerClient.signDetached(input);
+      assertMailVerificationContext(context);
+      return result;
+    },
     upload: async (armoredMessage) => {
       assertMailVerificationContext(context);
       const result = await mailbox.client.uploadTextBlob(mailbox.session, armoredMessage, "text/plain");
@@ -287,9 +293,11 @@ export function resolveOutgoingMessageBody(input: {
   html?: string;
   internalDomain: string | null;
   mimeAttachments?: OutgoingMimeAttachment[];
+  sign?: boolean;
 }): Promise<OutgoingMessageBody> {
   const verificationContext = captureMailVerificationContext();
   return sealOutgoingMessageBody({
+    sign: input.sign,
     recipients: input.recipients,
     senderEmail: input.activeMailbox.email,
     internalDomain: input.internalDomain,

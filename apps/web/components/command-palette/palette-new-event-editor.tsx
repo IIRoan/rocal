@@ -19,7 +19,11 @@ export function PaletteNewEventEditor({
   ...editorProps
 }: PaletteNewEventEditorProps) {
   const [draft] = useState(() =>
-    createDraftCalendarEvent({ defaultCalendarId, fallbackCalendarId }),
+    createDraftCalendarEvent({
+      defaultCalendarId,
+      fallbackCalendarId,
+      durationMinutes: editorProps.localSettings.defaultEventDuration,
+    }),
   );
   return <EventEditor {...editorProps} eventToEdit={draft} />;
 }

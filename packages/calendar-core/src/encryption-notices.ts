@@ -7,6 +7,7 @@ import {
 import { isImportedExternalInvitationEvent } from "./invitation-encryption";
 import type { MessageEncryptionState } from "./mail-types";
 import { getMailReadLimitNotice } from "./mail-mime-limits";
+import type { PgpSignatureVerificationState } from "./mail-pgp-layers";
 
 export interface EncryptableCalendarItem {
   encryptionState?: string | null;
@@ -37,6 +38,10 @@ export const MAIL_READABLE_METADATA =
   "Sender, recipients, subject, date and routing headers remain readable.";
 export const MAIL_ENCRYPTION_HINT =
   "Solace encrypts ordinary incoming mail after receipt. Drafts and Sent copies, including their attachments, are encrypted on your device before storage. Mail sent only to Solace accounts is encrypted before delivery. Sender, recipients, subject and routing headers remain readable.";
+/** Compose shows this while "Sign messages with my key" is on. */
+export const COMPOSE_SIGNED_LABEL = "Signed with your key";
+export const COMPOSE_SIGNED_DESCRIPTION =
+  "Mail to people outside Solace carries a PGP signature and your public key. Mail to Solace accounts is always signed inside its encryption.";
 
 export function resolveEncryptionState(
   item: EncryptableCalendarItem,
@@ -136,8 +141,7 @@ export function resolveMailMessageContext(
 export type MailSecurityNoticeInput = {
   messageState: MessageEncryptionState;
   accountEncryptedAtRest: boolean;
-  signatureVerificationState?:
-    "not_signed" | "verified" | "unverified" | "failed";
+  signatureVerificationState?: PgpSignatureVerificationState;
   readState: MailReadState;
   messageContext?: MailMessageContext;
   senderKeyTrustState?: MailSenderKeyTrustState;
@@ -220,6 +224,14 @@ export function getMailSecurityNotice(input: MailSecurityNoticeInput): {
         description:
           `${protection} This device could not verify the sender signature. ${storage}`.trim(),
         tone: "warning",
+      };
+    }
+    if (input.signatureVerificationState === "attached_key") {
+      return {
+        label: "PGP encrypted, signed with an unconfirmed key",
+        description:
+          `${protection} The signature matches a key attached to this message for the sender's address. That proves the sender holds that key, not who owns it. ${storage}`.trim(),
+        tone: "plain",
       };
     }
     const verified = input.signatureVerificationState === "verified";

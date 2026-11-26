@@ -38,6 +38,9 @@ interface MailboxDrawerSheetProps {
   onSelectMailbox: (mailboxId: string) => void;
   onEmptyMailbox: (mailbox: JmapMailbox) => void;
   emptyingMailboxId: string | null;
+  markReadMailbox: JmapMailbox | null;
+  onMarkMailboxRead: () => void;
+  markingMailboxRead: boolean;
 }
 
 /** Mail drawer: mailbox list, with mailbox management in-sheet. */
@@ -101,6 +104,9 @@ function MailboxList({
   onSelectMailbox,
   onEmptyMailbox,
   emptyingMailboxId,
+  markReadMailbox,
+  onMarkMailboxRead,
+  markingMailboxRead,
 }: Omit<MailboxDrawerSheetProps, "visible"> & { onManage: () => void; onOpenScheduled: () => void }) {
   const scheduledCount = useScheduledMailSends().sends.length;
   const emptyableMailboxes = mailboxes.filter(
@@ -154,6 +160,19 @@ function MailboxList({
             onPress={onManage}
             accessibilityLabel="Manage mailboxes"
           />
+          {markReadMailbox ? (
+            <SheetItem
+              label={`Mark ${getMailboxDisplayName(markReadMailbox)} as read`}
+              icon="check-circle"
+              pending={markingMailboxRead}
+              disabled={markingMailboxRead}
+              onPress={() => {
+                onMarkMailboxRead();
+                onDismiss();
+              }}
+              accessibilityLabel={`Mark every message in ${getMailboxDisplayName(markReadMailbox)} as read`}
+            />
+          ) : null}
           {emptyableMailboxes.map((mailbox) => (
             <SheetItem
               key={mailbox.id}

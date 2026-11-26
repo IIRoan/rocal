@@ -64,6 +64,7 @@ export async function decryptMessageForCompose(
 
   const decrypted = await mailCryptoWorkerClient.decryptMessage({
     armoredMessage,
+    senderEmail: input.message.from?.[0]?.email ?? undefined,
     senderPublicKeyArmored: verification.senderPublicKeyArmored,
     expectedVaultFingerprint: verificationContext.fingerprint,
     editable: input.editable,

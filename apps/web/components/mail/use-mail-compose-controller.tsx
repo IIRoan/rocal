@@ -141,7 +141,7 @@ export function useMailComposeController({
       composeAttachments: state.composeAttachments,
       composeMode: state.composeMode,
       quotedAttachments: state.quotedAttachments,
-      signatureAlreadyEmbedded: state.signatureAlreadyEmbedded,
+      signatureChoice: state.signatureChoice,
       composeReplyContext: state.composeReplyContext,
     },
     resolvedIdentityId,
@@ -287,6 +287,7 @@ export function useMailComposeController({
     dispatch({
       type: "patch",
       patch: {
+        signatureChoice: undefined,
         ...seed.patch,
         ...(seed.identityId !== undefined
           ? { selectedIdentityId: seed.identityId }
@@ -340,7 +341,6 @@ export function useMailComposeController({
           composeAttachments: [],
           composeMode: "new",
           quotedAttachments: [],
-          signatureAlreadyEmbedded: seeded.signatureAlreadyEmbedded,
           composeReplyContext: null,
         },
         resolvedIdentityId,
@@ -405,7 +405,7 @@ export function useMailComposeController({
         composeAttachments: snapshot.attachments,
         composeReplyContext: snapshot.replyContext,
         composeMode: snapshot.composeMode,
-        signatureAlreadyEmbedded: snapshot.signatureAlreadyEmbedded,
+        signatureChoice: snapshot.signatureChoice,
         selectedIdentityId: snapshot.identityId,
         draftId,
         isComposeOpen: true,
@@ -469,8 +469,6 @@ export function useMailComposeController({
           composeMode: (seed.patch.composeMode ?? "draft") as ComposeMode,
           quotedAttachments:
             (seed.patch.quotedAttachments as QuotedInlineAttachment[]) ?? [],
-          signatureAlreadyEmbedded:
-            seed.patch.signatureAlreadyEmbedded ?? false,
           composeReplyContext: seed.patch.composeReplyContext ?? null,
         },
         seed.identityId ?? null,
@@ -576,7 +574,14 @@ export function useMailComposeController({
     selectedIdentityId: resolvedIdentityId,
     setSelectedIdentityId: (id: string | null) => {
       markDirty();
-      dispatch({ type: "patch", patch: { selectedIdentityId: id } });
+      dispatch({
+        type: "patch",
+        patch: { selectedIdentityId: id, signatureChoice: undefined },
+      });
+    },
+    signatureChoice: state.signatureChoice,
+    setSignatureChoice: (choice: string | null | undefined) => {
+      dispatch({ type: "patch", patch: { signatureChoice: choice } });
     },
     draftSaveStatus: state.draftSaveStatus,
     setDraftSaveStatus: (status: DraftSaveStatus) => {

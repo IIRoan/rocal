@@ -19,8 +19,19 @@ import { ContactsSettingsContent } from "./settings/sections/ContactsSettingsCon
 import { LabelsSettingsContent } from "./settings/sections/LabelsSettingsContent";
 import { MailDisplaySettingsContent } from "./settings/sections/MailDisplaySettingsContent";
 import { MailListSettingsContent } from "./settings/sections/MailListSettingsContent";
+import { MailSecuritySettingsContent } from "./settings/sections/MailSecuritySettingsContent";
 import { MailSettingsContent } from "./settings/sections/MailSettingsContent";
 import { MailboxesSettingsContent } from "./settings/sections/MailboxesSettingsContent";
+import {
+  MailSignaturePage,
+  MailSignaturesSettingsContent,
+  isMailSignaturePage,
+} from "./settings/sections/MailSignaturesSettingsContent";
+import {
+  MailTemplatePage,
+  MailTemplatesSettingsContent,
+  isMailTemplatePage,
+} from "./settings/sections/MailTemplatesSettingsContent";
 import { VacationReplySettingsContent } from "./settings/sections/VacationReplySettingsContent";
 
 const MAIL_ACCOUNT_SHEET_CONFIG: AccountSheetConfig = {
@@ -43,9 +54,21 @@ const MAIL_ACCOUNT_SHEET_CONFIG: AccountSheetConfig = {
     "mail-display": MailDisplaySettingsContent,
     "mail-list": MailListSettingsContent,
     mailboxes: MailboxesSettingsContent,
+    security: MailSecuritySettingsContent,
+    templates: MailTemplatesSettingsContent,
+    signatures: MailSignaturesSettingsContent,
     "auto-reply": VacationReplySettingsContent,
   },
   icons: { ...SETTINGS_HUB_ICONS, ...SETTINGS_MAIL_ICONS },
+  customPages: {
+    isPage: (pageId) => isMailTemplatePage(pageId) || isMailSignaturePage(pageId),
+    render: (pageId) =>
+      isMailSignaturePage(pageId) ? (
+        <MailSignaturePage pageId={pageId} />
+      ) : (
+        <MailTemplatePage pageId={pageId} />
+      ),
+  },
 };
 
 export function MailAccountSheet({

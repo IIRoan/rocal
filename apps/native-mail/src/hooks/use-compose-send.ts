@@ -3,13 +3,11 @@ import { Alert } from "react-native";
 import {
   isMailSendScopeOpen,
   getCurrentMailComposeDraftId,
-  appendPlainTextSignature,
   buildReplyContext,
   canSendCompose,
   composeTextToPlain,
   getErrorMessage,
   getOutgoingAttachmentsTotalSizeError,
-  hasPlainTextSignatureBlock,
   resolveComposeSendBodies,
   runTasksWithConcurrencyLimit,
   uploadPlaintextMailAttachments,
@@ -29,7 +27,7 @@ import type { ComposeFormState } from "../lib/mail/compose-form";
 import { validateComposeInput } from "../lib/mail/mail-helpers";
 import type { MailRuntime } from "../lib/mail/mail-runtime";
 import { resolveOutgoingMessageBody } from "../lib/mail/outgoing-message-crypto";
-import type { JmapEmailMessage, JmapIdentity } from "../lib/mail/types";
+import type { JmapEmailMessage } from "../lib/mail/types";
 import type { ComposeMode, ComposeRequest } from "../lib/mail/compose-request";
 import {
   useSendMessage,
@@ -42,11 +40,9 @@ type ComposeSendInput = {
   mode: ComposeMode | undefined;
   sourceMessage: JmapEmailMessage | null;
   form: ComposeFormState;
-  identity: JmapIdentity | null;
   identityId: string | null;
   composeContext: ReturnType<typeof resolveComposeContext>;
   settings: MailComposeSettings;
-  signatureOptions: { separator: boolean };
   settleDraftSave: () => Promise<string | null>;
   setError: (message: string | null) => void;
   onSent: () => void;
@@ -60,11 +56,9 @@ export function useComposeSend({
   mode,
   sourceMessage,
   form,
-  identity,
   identityId,
   composeContext,
   settings,
-  signatureOptions,
   settleDraftSave,
   setError,
   onSent,
@@ -90,13 +84,9 @@ export function useComposeSend({
     const send = async () => {
       const validation = validateComposeInput({ to, cc, bcc, subject });
 
-      // A signature seeded above the quote already sits mid-body, so only append when it is missing.
-      const bodyWithSignature = hasPlainTextSignatureBlock(body, identity)
-        ? body
-        : appendPlainTextSignature(body, identity, signatureOptions);
+      // The signature is ordinary body text by now, so the message goes out exactly as written.
       const { plaintext, htmlBody: formattedHtml } = resolveComposeSendBodies({
         body,
-        bodyWithSignature,
         encrypted: false,
       });
       const unencryptedHtml = settings.plainTextMode
@@ -143,18 +133,20 @@ export function useComposeSend({
           contentType: pending.type,
           content: pending.bytes,
         })),
+        sign: settings.signOutgoingMail,
       });
       const {
         textBody,
         encrypted,
         pgpMimeCiphertext,
         pgpMimeMessage,
+        signedMimeMessage,
         sentCopyCiphertext,
         contentFingerprint,
         isCurrent: isVaultCurrent,
       } = outgoing;
       const isCurrent = () => isMailSendScopeOpen(sendScope) && isVaultCurrent();
-      const htmlBody = encrypted ? undefined : unencryptedHtml;
+      const htmlBody = encrypted || signedMimeMessage ? undefined : unencryptedHtml;
 
       // Encrypted mail carries its attachments inside the ciphertext, so only plaintext sends upload them.
       const uploadedAttachments =
@@ -198,6 +190,7 @@ export function useComposeSend({
             uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
           pgpMimeCiphertext,
           pgpMimeMessage,
+          signedMimeMessage,
           sentCopyCiphertext,
           inReplyTo: replyContext?.inReplyTo,
           references: replyContext?.references,
@@ -224,7 +217,7 @@ export function useComposeSend({
           if (entries.length > 0) {
             recordUsage(entries, "mail");
           }
-          const sentMessage = encrypted ? "Encrypted message sent" : "Message sent";
+          const sentMessage = encrypted ? "Encrypted message sent" : signedMimeMessage ? "Signed message sent" : "Message sent";
           if (hold && receipt.emailId) {
             announceHeldSend({
               hold,

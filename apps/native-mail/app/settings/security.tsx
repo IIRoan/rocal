@@ -1,5 +1,5 @@
-import { SecuritySettingsContent } from "@workspace/native-core/components/settings/sections/SecuritySettingsContent";
+import { MailSecuritySettingsContent } from "../../src/components/settings/sections/MailSecuritySettingsContent";
 
 export default function SecuritySettingsScreen() {
-  return <SecuritySettingsContent />;
+  return <MailSecuritySettingsContent />;
 }

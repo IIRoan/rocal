@@ -55,40 +55,41 @@ export function looksLikeMimeMessage(content: string): boolean {
   return /^Content-Type:\s*\S+/im.test(content.trimStart());
 }
 
+/** Base64 keeps signed text 7-bit, so relays that rewrap lines or strip trailing spaces cannot break the signature. */
+function textPartLines(type: "plain" | "html", value: string, base64: boolean): string[] {
+  const lines = toMimeLines(value);
+  const encoded = base64 ? encodeBase64Lines(new TextEncoder().encode(lines)) : [];
+  return [
+    `Content-Type: text/${type}; charset=utf-8`,
+    `Content-Transfer-Encoding: ${base64 ? "base64" : "7bit"}`,
+    "",
+    ...(encoded.length ? encoded : [lines]),
+  ];
+}
+
 function buildAlternativeBodyParts(input: {
   text: string;
   html?: string;
+  base64Text?: boolean;
 }): string[] {
-  const normalizedText = toMimeLines(input.text);
+  const base64 = input.base64Text === true;
   const trimmedHtml = input.html?.trim();
 
   if (!trimmedHtml) {
-    return [
-      "Content-Type: text/plain; charset=utf-8",
-      "Content-Transfer-Encoding: 7bit",
-      "",
-      normalizedText,
-    ];
+    return textPartLines("plain", input.text, base64);
   }
 
   const boundary = createMimeBoundary("solace_alt");
-  const normalizedHtml = toMimeLines(trimmedHtml);
 
   return [
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
     "MIME-Version: 1.0",
     "",
     `--${boundary}`,
-    "Content-Type: text/plain; charset=utf-8",
-    "Content-Transfer-Encoding: 7bit",
-    "",
-    normalizedText,
+    ...textPartLines("plain", input.text, base64),
     "",
     `--${boundary}`,
-    "Content-Type: text/html; charset=utf-8",
-    "Content-Transfer-Encoding: 7bit",
-    "",
-    normalizedHtml,
+    ...textPartLines("html", trimmedHtml, base64),
     "",
     `--${boundary}--`,
   ];
@@ -99,6 +100,7 @@ export function buildOutgoingMimeMessage(input: {
   text: string;
   html?: string;
   attachments?: OutgoingMimeAttachment[];
+  base64Text?: boolean;
 }): string {
   const attachments = input.attachments ?? [];
   const bodyPart = buildAlternativeBodyParts(input);

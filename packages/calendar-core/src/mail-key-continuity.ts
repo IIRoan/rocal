@@ -4,6 +4,7 @@ import {
   normalizeEmailAddress,
   parseRecipientString,
 } from "./mail-addresses";
+import type { PgpSignatureVerificationState } from "./mail-pgp-layers";
 
 export const MAIL_KEY_CONTINUITY_ENABLED = false;
 export const MAIL_TRUST_MAX_RECORDS = 256;
@@ -294,7 +295,7 @@ export function getMailSenderTrustNotice(
   }
 }
 export function getMailSignatureVerificationLabel(
-  signature: "not_signed" | "verified" | "unverified" | "failed",
+  signature: PgpSignatureVerificationState,
   trust: MailSenderKeyTrustState | undefined,
 ): string | null {
   if (signature === "failed")
@@ -302,6 +303,7 @@ export function getMailSignatureVerificationLabel(
       ? "Signature does not match saved key"
       : "Signature verification failed";
   if (signature === "unverified") return "Signature not verified";
+  if (signature === "attached_key") return "Signed with a key attached to the message";
   if (signature !== "verified") return null;
   if (trust?.kind === "self") return "Signed with your local key";
   if (trust?.kind === "key_changed")

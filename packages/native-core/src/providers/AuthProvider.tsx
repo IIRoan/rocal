@@ -13,6 +13,7 @@ import { AppState, Platform } from "react-native";
 import {
   AUTH_SESSION_LIFETIME_SECONDS,
   AUTH_SESSION_REFRESH_INTERVAL_SECONDS,
+  getSignInErrorMessage,
 } from "@workspace/calendar-core";
 import { authClient, clearAuthSessionCache, readAuthSessionCache } from "../lib/auth-client";
 import { parseCachedAuthSession } from "../lib/cached-auth-session";
@@ -576,7 +577,7 @@ export function AuthProvider({
 
       if (result?.error) {
         resetAuthMethodHints();
-        throw new Error(result.error.message ?? "Sign-in failed. Please try again.");
+        throw new Error(getSignInErrorMessage(result.error));
       }
       if (result) authData = result.data;
 

@@ -10,6 +10,7 @@ import {
   type JmapPgpMimeCiphertext,
   type ScopedOutgoingJmapMessage,
 } from "./mail-jmap-email-set";
+import { createMimeBoundary } from "./mail-pgp-mime";
 import {
   buildOutgoingMimeMessage,
   type OutgoingMimeAttachment,
@@ -28,6 +29,8 @@ export type MailSealer = {
     plaintext: string;
     recipientPublicKeysArmored: string[];
   }) => Promise<{ armoredMessage: string }>;
+  /** A detached signature with the vault key over exactly `data`, and the RFC 3156 micalg of its digest. */
+  sign?: (input: { data: string }) => Promise<{ armoredSignature: string; micalg: string }>;
   upload: (armoredMessage: string) => Promise<JmapPgpMimeCiphertext>;
 };
 
@@ -42,23 +45,80 @@ export type PlaintextOutgoingBody = OutgoingBodyBase & {
   kind: "plaintext";
   encrypted: false;
   pgpMimeMessage?: never;
+  signedMimeMessage?: never;
   sentCopyCiphertext: JmapPgpMimeCiphertext;
 };
 
 export type OutgoingMessageBody =
   | PlaintextOutgoingBody
   | (OutgoingBodyBase & {
+      kind: "signed";
+      encrypted: false;
+      pgpMimeMessage?: never;
+      signedMimeMessage: string;
+      sentCopyCiphertext: JmapPgpMimeCiphertext;
+    })
+  | (OutgoingBodyBase & {
       kind: "inline";
       encrypted: true;
       pgpMimeMessage?: never;
+      signedMimeMessage?: never;
       sentCopyCiphertext: null;
     })
   | (OutgoingBodyBase & {
       kind: "import";
       encrypted: true;
       pgpMimeMessage: string;
+      signedMimeMessage?: never;
       sentCopyCiphertext: null;
     });
+
+export const SIGNED_MAIL_KEY_FILENAME = "OpenPGP_public_key.asc";
+
+/** RFC 3156 entity: the body with the sender's public key, then a detached signature over exactly those CRLF bytes. */
+export async function signOutgoingMailContent(
+  content: OutgoingMailContent,
+  sealer: MailSealer,
+): Promise<string> {
+  if (!sealer.sign) throw new Error("Signing is unavailable on this device.");
+  const signedPart = buildOutgoingMimeMessage({
+    text: content.text,
+    html: content.html,
+    base64Text: true,
+    attachments: [
+      ...(content.attachments ?? []),
+      {
+        filename: SIGNED_MAIL_KEY_FILENAME,
+        contentType: "application/pgp-keys",
+        content: new TextEncoder().encode(sealer.selfPublicKeyArmored.trim().replace(/\r?\n/g, "\r\n")),
+      },
+    ],
+  }).replace(/\r?\n/g, "\r\n");
+  assertMailMimeLimits(signedPart);
+  assertCurrent(sealer.isCurrent);
+  const { armoredSignature, micalg } = await sealer.sign({ data: signedPart });
+  assertCurrent(sealer.isCurrent);
+  if (!/^pgp-sha(?:256|384|512)$/.test(micalg)) throw new Error("Mail signature uses an unsupported digest.");
+  const armor = armoredSignature.trim().replace(/\r?\n/g, "\r\n");
+  if (!armor.startsWith("-----BEGIN PGP SIGNATURE-----\r\n") || !armor.endsWith("\r\n-----END PGP SIGNATURE-----") || /[^\x09\x0a\x0d\x20-\x7e]/.test(armor))
+    throw new Error("Mail signature is not complete armored data.");
+  const boundary = createMimeBoundary("solace_signed_");
+  return [
+    `Content-Type: multipart/signed; micalg=${micalg}; protocol="application/pgp-signature"; boundary="${boundary}"`,
+    "",
+    `--${boundary}`,
+    signedPart,
+    `--${boundary}`,
+    'Content-Type: application/pgp-signature; name="OpenPGP_signature.asc"',
+    "Content-Description: OpenPGP digital signature",
+    'Content-Disposition: attachment; filename="OpenPGP_signature.asc"',
+    "",
+    armor,
+    "",
+    `--${boundary}--`,
+    "",
+  ].join("\r\n");
+}
 
 function assertCurrent(isCurrent: () => boolean): void {
   if (!isCurrent())
@@ -206,6 +266,8 @@ export async function sealOutgoingMessageBody(input: {
   content: OutgoingMailContent;
   sealer: MailSealer;
   getRecipientPublicKey: (email: string) => Promise<string>;
+  /** Sign mail to outside recipients as PGP/MIME; encrypted mail is always signed inside its ciphertext. */
+  sign?: boolean;
 }): Promise<OutgoingMessageBody> {
   const isCurrent = input.sealer.isCurrent;
   assertCurrent(isCurrent);
@@ -216,8 +278,11 @@ export async function sealOutgoingMessageBody(input: {
   const base = { contentFingerprint, isCurrent };
   const internalDomain = resolveEncryptionInternalDomain(input.internalDomain);
   if (!shouldEncryptOutgoingMail(recipients, internalDomain)) {
+    const signedMimeMessage = input.sign ? await signOutgoingMailContent(content, input.sealer) : null;
     const sentCopyCiphertext = await sealMailForSelf(content, input.sealer);
     assertCurrent(isCurrent);
+    if (signedMimeMessage)
+      return { ...base, kind: "signed", textBody: "", encrypted: false, signedMimeMessage, sentCopyCiphertext };
     return {
       ...base,
       kind: "plaintext",

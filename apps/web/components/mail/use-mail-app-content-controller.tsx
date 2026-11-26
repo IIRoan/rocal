@@ -131,6 +131,7 @@ export function useMailAppContentController(
     handleBulkMove: bulkMove,
     handleBulkMarkAsUnread,
     handleBulkMarkAsRead,
+    handleMarkMailboxAsRead,
     handleToggleFlagged,
     handleSetMessageLabel,
     handleSimpleLoginAction,
@@ -536,6 +537,10 @@ export function useMailAppContentController(
   const emptyFolderLabel = selectedMailbox?.role?.toLowerCase() === "trash"
     ? "Empty trash"
     : "Empty spam";
+  // A label view lists only part of the folder, so marking the whole folder from it would surprise.
+  const canMarkFolderRead =
+    !activeLabelId &&
+    Boolean(activeMailbox?.messages.some((m) => !m.keywords?.["$seen"]));
 
   const showMobileDetailPane =
     isMobile &&
@@ -724,6 +729,7 @@ export function useMailAppContentController(
     selectedMailboxName,
     canEmptyFolder,
     emptyFolderLabel,
+    canMarkFolderRead,
     hasPrev,
     hasNext,
     handleArchive,
@@ -772,6 +778,7 @@ export function useMailAppContentController(
     handleBulkMove,
     handleBulkMarkAsUnread,
     handleBulkMarkAsRead,
+    handleMarkMailboxAsRead,
     handleBulkReportSpam,
     loadMoreMessages,
     hasMoreMessages,

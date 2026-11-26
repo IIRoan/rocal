@@ -11,7 +11,8 @@ export type MailComposeState = {
   composeAttachments: File[];
   composeMode: ComposeMode;
   quotedAttachments: QuotedInlineAttachment[];
-  signatureAlreadyEmbedded: boolean;
+  /** A signature picked in compose; undefined follows the identity's default and null is none. */
+  signatureChoice?: string | null;
   composeReplyContext: MailReplyContext | null;
   selectedIdentityId: string | null;
   draftId: string | null;
@@ -31,7 +32,6 @@ export const initialMailComposeState: MailComposeState = {
   composeAttachments: [],
   composeMode: "new",
   quotedAttachments: [],
-  signatureAlreadyEmbedded: false,
   composeReplyContext: null,
   selectedIdentityId: null,
   draftId: null,
@@ -82,7 +82,7 @@ export function mailComposeReducer(
         composeReplyContext: null,
         composeMode: "new",
         quotedAttachments: [],
-        signatureAlreadyEmbedded: false,
+        signatureChoice: undefined,
         draftId: null,
         draftSaveStatus: "idle",
         selectedIdentityId: action.selectedIdentityId,

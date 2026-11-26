@@ -414,6 +414,8 @@ export interface UserSettings {
   browserNotifications: boolean;
   reminderSound: boolean;
   defaultEventDuration: number;
+  /** Absent means 15 minutes; 0 means new events start without a reminder. */
+  defaultReminderMinutes?: number;
   defaultCalendarId?: string | null;
   compactView: boolean;
   showWeekNumbers: boolean;

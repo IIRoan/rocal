@@ -1,5 +1,5 @@
 import { z } from "./zod";
-import { buildPgpMimeMessage, createMailMessageId } from "./mail-pgp-mime";
+import { buildPgpMimeMessage, buildSignedMailMessage, createMailMessageId } from "./mail-pgp-mime";
 import {
   getEmailDomain,
   parseRecipientString,
@@ -156,6 +156,8 @@ export type OutgoingJmapMessage = OutgoingEmailHeaders & {
   attachments?: JmapAttachmentInput[];
   pgpMimeCiphertext?: JmapPgpMimeCiphertext;
   pgpMimeMessage?: string;
+  /** RFC 3156 multipart/signed entity for outside recipients, imported as bytes beside its sealed Sent copy. */
+  signedMimeMessage?: string;
   contentFingerprint?: string;
   messageId?: string;
   submissionToken?: string;
@@ -212,7 +214,7 @@ export function buildSendMessageMethodCalls(
   imported?: JmapPgpMimeCiphertext,
 ): JmapMethodCallLike[] {
   assertEncryptedMessageParts(input);
-  if (input.pgpMimeMessage && !imported) {
+  if ((input.pgpMimeMessage || input.signedMimeMessage) && !imported) {
     throw new Error("Encrypted attachment mail must use the import transport.");
   }
   if (input.submissionToken && !/^[a-f0-9]{32}$/.test(input.submissionToken)) throw new Error("Invalid submission reference.");
@@ -307,6 +309,10 @@ export function buildSendMessageMethodCalls(
           "c1",
         ]
       : ["Email/set", { create }, "c1"],
+    // An imported signed message keeps its sealed Sent copy in the same request.
+    ...(imported && create[SENT_COPY_CREATION_ID]
+      ? [["Email/set", { create: { [SENT_COPY_CREATION_ID]: create[SENT_COPY_CREATION_ID] } }, "c3"] satisfies JmapMethodCallLike]
+      : []),
     ["EmailSubmission/set", submissionParams, "c2"],
   ];
 }
@@ -382,6 +388,17 @@ function assertEncryptedMessageParts(message: OutgoingJmapMessage): void {
     (message.pgpMimeCiphertext || message.sentCopyCiphertext)
   ) {
     throw new Error("Encrypted mail has conflicting storage formats.");
+  }
+  if (
+    message.signedMimeMessage &&
+    (message.textBody.length > 0 ||
+      message.htmlBody?.trim() ||
+      message.attachments?.length ||
+      message.pgpMimeMessage ||
+      message.pgpMimeCiphertext ||
+      !message.sentCopyCiphertext)
+  ) {
+    throw new Error("Signed mail has conflicting body parts.");
   }
 }
 
@@ -631,7 +648,7 @@ async function sendFingerprint(message: OutgoingJmapMessage): Promise<string> {
         JSON.stringify(left).localeCompare(JSON.stringify(right)),
       );
   if (
-    (message.pgpMimeMessage || message.contentFingerprint !== undefined) &&
+    (message.pgpMimeMessage || message.signedMimeMessage || message.contentFingerprint !== undefined) &&
     !/^[a-f0-9]{64}$/.test(message.contentFingerprint ?? "")
   ) {
     throw new Error(
@@ -832,13 +849,13 @@ async function performSend(
   attempt.fingerprint = fingerprint;
   const using = SUBMISSION_CAPABILITIES;
   let imported: JmapPgpMimeCiphertext | undefined;
-  if (message.pgpMimeMessage) {
+  if (message.pgpMimeMessage || message.signedMimeMessage) {
     if (!context.uploadMessage)
       throw new Error("Encrypted attachment import is unavailable.");
-    const wire = buildPgpMimeMessage(
-      { ...message, messageId: attempt.messageId },
-      message.pgpMimeMessage,
-    );
+    const wireHeaders = { ...message, messageId: attempt.messageId };
+    const wire = message.signedMimeMessage
+      ? buildSignedMailMessage(wireHeaders, message.signedMimeMessage)
+      : buildPgpMimeMessage(wireHeaders, message.pgpMimeMessage ?? "");
     const wireSize = new TextEncoder().encode(wire).byteLength;
     const sizeError = validateOutgoingMessageSize(
       wireSize,
@@ -893,16 +910,11 @@ async function performSend(
   const importedResult = importResultSchema.safeParse(
     resultOf(envelope, "Email/import"),
   );
-  const emails = sendEmailSetResultSchema.safeParse(
-    imported
-      ? {
-          created: importedResult.success
-            ? importedResult.data.created
-            : undefined,
-        }
-      : resultOf(envelope, "Email/set"),
-  );
-  const created = emails.success ? emails.data.created : null;
+  const emails = sendEmailSetResultSchema.safeParse(resultOf(envelope, "Email/set"));
+  const setCreated = emails.success ? emails.data.created : null;
+  const created = imported
+    ? { ...setCreated, ...(importedResult.success ? importedResult.data.created : null) }
+    : setCreated;
   const failure = findJmapResponseError(envelope, "Send message");
   const submission = sendSubmissionResultSchema.safeParse(
     resultOf(envelope, "EmailSubmission/set"),
@@ -1196,26 +1208,79 @@ export function collectMailboxRestores(
   return restores;
 }
 
-/** Destroys a mailbox's messages page by page; stops when a batch makes no progress so a refusing server cannot loop forever. */
-export async function destroyMailboxMessagesInBatches(input: {
-  listIds: (limit: number) => Promise<string[]>;
-  destroy: (ids: string[]) => Promise<void>;
-  batchSize?: number;
-}): Promise<number> {
-  const batchSize = input.batchSize ?? EMPTY_MAILBOX_BATCH_SIZE;
-  let destroyed = 0;
+/** Applies a change to a mailbox's first page until it is drained; stops when a batch makes no progress so a refusing server cannot loop forever. */
+async function drainMailboxInBatches(
+  listIds: (limit: number) => Promise<string[]>,
+  apply: (ids: string[]) => Promise<void>,
+  batchSize: number,
+): Promise<number> {
+  let applied = 0;
   let previousBatchKey: string | null = null;
 
   while (true) {
-    const ids = await input.listIds(batchSize);
+    const ids = await listIds(batchSize);
     if (ids.length === 0) break;
     const batchKey = ids.join("\n");
     if (batchKey === previousBatchKey) break;
     previousBatchKey = batchKey;
-    await input.destroy(ids);
-    destroyed += ids.length;
+    await apply(ids);
+    applied += ids.length;
     if (ids.length < batchSize) break;
   }
 
-  return destroyed;
+  return applied;
+}
+
+/** Destroys a mailbox's messages page by page. */
+export function destroyMailboxMessagesInBatches(input: {
+  listIds: (limit: number) => Promise<string[]>;
+  destroy: (ids: string[]) => Promise<void>;
+  batchSize?: number;
+}): Promise<number> {
+  return drainMailboxInBatches(
+    input.listIds,
+    input.destroy,
+    input.batchSize ?? EMPTY_MAILBOX_BATCH_SIZE,
+  );
+}
+
+/** First page of a mailbox's unread messages; marking them read drops them from the query, so the next page is again at 0. */
+export function buildUnreadMailboxQueryMethodCall(
+  accountId: string,
+  mailboxId: string,
+  limit: number,
+): ["Email/query", Record<string, unknown>, string] {
+  return [
+    "Email/query",
+    {
+      accountId,
+      filter: { inMailbox: mailboxId, notKeyword: "$seen" },
+      position: 0,
+      limit,
+    },
+    "q1",
+  ];
+}
+
+export function buildEmailMarkReadMethodCall(
+  accountId: string,
+  messageIds: readonly string[],
+): JmapEmailSetMethodCall {
+  const update = Object.fromEntries(
+    messageIds.map((id) => [id, { "keywords/$seen": true }]),
+  );
+  return ["Email/set", { accountId, update }, "c1"];
+}
+
+/** Marks every unread message in a mailbox read page by page; returns how many were marked. */
+export function markMailboxMessagesReadInBatches(input: {
+  listUnreadIds: (limit: number) => Promise<string[]>;
+  markRead: (ids: string[]) => Promise<void>;
+  batchSize?: number;
+}): Promise<number> {
+  return drainMailboxInBatches(
+    input.listUnreadIds,
+    input.markRead,
+    input.batchSize ?? EMPTY_MAILBOX_BATCH_SIZE,
+  );
 }

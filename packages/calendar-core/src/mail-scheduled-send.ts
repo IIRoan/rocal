@@ -1,6 +1,7 @@
 import type { MailServerPolicy } from "./mail-server-policy";
-import { formatDateTimeLabel, type TimeFormat } from "./time-format";
+import { formatClockTime, formatDateTimeLabel, type TimeFormat } from "./time-format";
 import {
+  formatInUserTimezone,
   utcToPickerDate,
   wallClockFromCalendarDayKey,
   wallClockToUtc,
@@ -83,6 +84,12 @@ export function parseScheduledSendInput(day: string, time: string, timezone: str
 
 export function formatScheduledSendTime(sendAt: string, timezone: string, timeFormat: TimeFormat): string {
   return formatDateTimeLabel(new Date(sendAt), timezone, timeFormat);
+}
+
+/** Presets are at most a week out, so the year only costs room beside their labels. */
+export function formatScheduledSendShortTime(sendAt: string, timezone: string, timeFormat: TimeFormat): string {
+  const at = new Date(sendAt);
+  return `${formatInUserTimezone(at, timezone, "MMM d")}, ${formatClockTime(at, timezone, timeFormat)}`;
 }
 
 export function resolveMailSendHold(input: {

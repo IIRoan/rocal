@@ -22,7 +22,7 @@ export type ComposeDraft = {
   identityId: string | null;
   draftId: string | null;
   composeMode: ComposeMode;
-  signatureAlreadyEmbedded: boolean;
+  signatureChoice?: string | null;
 };
 
 export type DraftSaveStatus = "idle" | "saving" | "saved" | "error";

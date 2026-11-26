@@ -2,6 +2,7 @@ import React from "react";
 import {
   getSettingsMailItems,
   settingsSectionPath,
+  type SettingsMailId,
 } from "@workspace/calendar-core";
 import {
   SettingsPage,
@@ -17,13 +18,20 @@ import {
 import { useRecentContacts } from "@workspace/native-core/hooks/use-recent-contacts";
 import { SETTINGS_MAIL_ICONS } from "@workspace/native-core/lib/settings-nav-icons";
 
+const DRAWER_ONLY_MAIL_PAGES: ReadonlySet<SettingsMailId> = new Set([
+  "mailboxes",
+  "templates",
+  "signatures",
+  "auto-reply",
+]);
+
 export function MailSettingsContent() {
   const navigate = useSettingsNavigator();
   const inSheet = useInSettingsSheet();
   const { contacts } = useRecentContacts();
-  // Mailboxes and auto-reply only exist as drawer pages, so the standalone settings stack cannot open them.
+  // Mailboxes, templates, signatures and auto-reply only exist as drawer pages, so the standalone settings stack cannot open them.
   const items = getSettingsMailItems("native").filter(
-    (item) => inSheet || (item.id !== "mailboxes" && item.id !== "auto-reply"),
+    (item) => inSheet || !DRAWER_ONLY_MAIL_PAGES.has(item.id),
   );
   const contactsCount = contacts.length;
 

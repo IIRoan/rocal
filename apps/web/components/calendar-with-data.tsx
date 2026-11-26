@@ -35,6 +35,7 @@ export function CalendarWithData({ className }: CalendarWithDataProps) {
   const { openNewEventEditor } = useDashboardUserActions({
     defaultCalendarId: settings?.defaultCalendarId,
     fallbackCalendarId: calendarData.calendars?.[0]?.id,
+    defaultEventDuration: settings?.defaultEventDuration,
     openEventEditor,
   });
   const workspace = useCalendarWorkspaceReady();

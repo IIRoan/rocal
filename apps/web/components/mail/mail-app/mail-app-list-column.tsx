@@ -33,6 +33,93 @@ function MailSearchState({ loading, query, mailbox }: { loading: boolean; query:
   );
 }
 
+function MailAppListHeader({
+  controller,
+  title,
+  unreadCount,
+}: {
+  controller: MailAppContentController;
+  title: string;
+  unreadCount: number;
+}) {
+  const {
+    canEmptyFolder,
+    emptyFolderLabel,
+    canMarkFolderRead,
+    handleMarkMailboxAsRead,
+    isBusy,
+    isRefreshing,
+    patchListChrome,
+    mailListSearch,
+    advancedFilters,
+    filterPanelExpanded,
+    searchBarOpen,
+    listViewFilter,
+    isSearching,
+    isSearchDebouncing,
+    searchInputRef,
+    clearListSearch,
+    handleSearchInputChange,
+    handleSearchInputKeyDown,
+    handleManualRefresh,
+  } = controller;
+
+  return (
+    <MailMailboxHeader
+      title={title}
+      unreadCount={unreadCount}
+      filter={{
+        value: listViewFilter,
+        onChange: (value) => patchListChrome({ listViewFilter: value }),
+      }}
+      searchInputRef={searchInputRef}
+      search={{
+        open: searchBarOpen,
+        value: mailListSearch,
+        busy: Boolean(
+          (isSearching || isSearchDebouncing) && mailListSearch.trim(),
+        ),
+        onOpenChange: (open) => patchListChrome({ searchBarOpen: open }),
+        onChange: handleSearchInputChange,
+        onKeyDown: handleSearchInputKeyDown,
+        onClear: clearListSearch,
+      }}
+      advanced={{
+        filters: advancedFilters,
+        expanded: filterPanelExpanded,
+        onFiltersChange: (filters) =>
+          patchListChrome({ advancedFilters: filters }),
+        onExpandedChange: (expanded) =>
+          patchListChrome({ filterPanelExpanded: expanded }),
+      }}
+      refresh={{
+        spinning: isRefreshing,
+        disabled: isRefreshing || isBusy,
+        onClick: () =>
+          void handleManualRefresh().catch((error) =>
+            toast.error(getErrorMessage(error, "Could not refresh mail. Check your connection and try again.")),
+          ),
+      }}
+      emptyFolder={
+        canEmptyFolder
+          ? {
+              label: emptyFolderLabel,
+              onClick: () => patchListChrome({ emptyFolderOpen: true }),
+            }
+          : undefined
+      }
+      onMarkAllRead={
+        canMarkFolderRead
+          ? () =>
+              void handleMarkMailboxAsRead().catch((error) =>
+                log.error("Failed to mark folder as read", error),
+              )
+          : undefined
+      }
+    />
+  );
+}
+
 export function MailAppListColumn({
   controller,
 }: {
@@ -43,28 +130,13 @@ export function MailAppListColumn({
     showMobileDetailPane,
     desktopDetailPaneActive,
     selectedMailboxName,
-    canEmptyFolder,
-    emptyFolderLabel,
-    isBusy,
-    isRefreshing,
-    patchListChrome,
     mailListSearch,
-    advancedFilters,
-    filterPanelExpanded,
-    searchBarOpen,
     listViewFilter,
     activeLabelId,
-    isSearching,
-    isSearchDebouncing,
     searchActive,
     searchCoverageText,
     searchIssues,
     showSearchLoadingState,
-    searchInputRef,
-    clearListSearch,
-    handleSearchInputChange,
-    handleSearchInputKeyDown,
-    handleManualRefresh,
     activeMailbox,
     filteredListMessages,
     listThreadRelatedMessages,
@@ -163,49 +235,10 @@ export function MailAppListColumn({
           </p>
         ) : null}
         {!isMobile && (
-          <MailMailboxHeader
+          <MailAppListHeader
+            controller={controller}
             title={listTitle}
             unreadCount={unreadCount}
-            filter={{
-              value: listViewFilter,
-              onChange: (value) => patchListChrome({ listViewFilter: value }),
-            }}
-            searchInputRef={searchInputRef}
-            search={{
-              open: searchBarOpen,
-              value: mailListSearch,
-              busy: Boolean(
-                (isSearching || isSearchDebouncing) && mailListSearch.trim(),
-              ),
-              onOpenChange: (open) => patchListChrome({ searchBarOpen: open }),
-              onChange: handleSearchInputChange,
-              onKeyDown: handleSearchInputKeyDown,
-              onClear: clearListSearch,
-            }}
-            advanced={{
-              filters: advancedFilters,
-              expanded: filterPanelExpanded,
-              onFiltersChange: (filters) =>
-                patchListChrome({ advancedFilters: filters }),
-              onExpandedChange: (expanded) =>
-                patchListChrome({ filterPanelExpanded: expanded }),
-            }}
-            refresh={{
-              spinning: isRefreshing,
-              disabled: isRefreshing || isBusy,
-              onClick: () =>
-                void handleManualRefresh().catch((error) =>
-                  toast.error(getErrorMessage(error, "Could not refresh mail. Check your connection and try again.")),
-                ),
-            }}
-            emptyFolder={
-              canEmptyFolder
-                ? {
-                    label: emptyFolderLabel,
-                    onClick: () => patchListChrome({ emptyFolderOpen: true }),
-                  }
-                : undefined
-            }
           />
         )}
         <p role="status" className="px-3 py-1 text-xs text-destructive empty:hidden">

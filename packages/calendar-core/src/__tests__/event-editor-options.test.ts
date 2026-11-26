@@ -1,11 +1,52 @@
 import {
   REMINDER_MINUTE_OPTIONS,
+  eventDurationOptions,
   findRepeatPreset,
   formatReminderShort,
+  getDefaultReminderMinutes,
   getReminderMinutes,
   getRepeatPresets,
   normalizeReminderMinutes,
 } from "../event-editor-options";
+import {
+  readUserSettingsPreferences,
+  splitUserSettingsUpdate,
+} from "../user-settings-preferences";
+
+describe("default reminder", () => {
+  it("keeps 15 minutes until the account picks another lead or none", () => {
+    expect(getDefaultReminderMinutes(undefined)).toEqual([15]);
+    expect(getDefaultReminderMinutes(60)).toEqual([60]);
+    expect(getDefaultReminderMinutes(0)).toEqual([]);
+  });
+
+  it("seals only a lead from the reminder list or none", () => {
+    expect(
+      splitUserSettingsUpdate({ defaultReminderMinutes: 0 }).preferences,
+    ).toEqual({ defaultReminderMinutes: 0 });
+    expect(() =>
+      splitUserSettingsUpdate({ defaultReminderMinutes: 7 }),
+    ).toThrow();
+    expect(
+      readUserSettingsPreferences({
+        defaultReminderMinutes: 1440,
+        defaultEventDuration: 30,
+      }),
+    ).toEqual({ defaultReminderMinutes: 1440, defaultEventDuration: 30 });
+    expect(readUserSettingsPreferences({ defaultReminderMinutes: 7 })).toEqual(
+      {},
+    );
+  });
+
+  it("offers event lengths in order and keeps a stored length off the list", () => {
+    expect(eventDurationOptions(60).map((option) => option.value)).toEqual([
+      15, 30, 45, 60, 90, 120,
+    ]);
+    expect(eventDurationOptions(50).map((option) => option.label)).toContain(
+      "50 min",
+    );
+  });
+});
 
 describe("reminder minutes", () => {
   it("dedupes, drops non-positive values and sorts ascending", () => {

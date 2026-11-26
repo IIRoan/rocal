@@ -1,9 +1,11 @@
-import type { JmapEmailMessage, JmapIdentity } from "@/lib/mail/types";
 import {
-  appendPlainTextSignature,
-  buildEmbeddedSignatureHtml,
-  resolveComposeSignatureIdentity,
-} from "@/lib/mail/signature-utils";
+  insertPlainTextSignature,
+  resolveComposeSignature,
+  type MailSignatureKind,
+  type SignatureSource,
+} from "@workspace/calendar-core";
+import type { JmapEmailMessage, JmapIdentity } from "@/lib/mail/types";
+import { buildEmbeddedSignatureHtml } from "@/lib/mail/signature-utils";
 import type { QuotedInlineAttachment } from "@/lib/mail/compose-editor-utils";
 import { readMailComposeSettings } from "@/lib/mail/compose-settings";
 import type { ComposeDraft, ComposeMode, MailReplyContext } from "./mail-compose-types";
@@ -41,11 +43,13 @@ export function buildComposeSnapshot(draft: ComposeDraft): ComposeSnapshot {
   };
 }
 
-export function resolveSignatureIdentity(
+/** The signature a seeded compose starts with, from the sealed defaults or the identity's own. */
+export function resolveSeedSignature(
   identities: JmapIdentity[],
   identityId: string | null,
-): JmapIdentity | null {
-  return resolveComposeSignatureIdentity(identities, identityId);
+  kind: MailSignatureKind,
+): SignatureSource | null {
+  return resolveComposeSignature(readMailComposeSettings(), identities, identityId, kind);
 }
 
 export function mapQuotedAttachments(
@@ -61,40 +65,26 @@ export function mapQuotedAttachments(
   }));
 }
 
+/** A new message opens with an empty writing line above the sender's signature. */
 export function buildNewComposeBodies(identity: JmapIdentity | null): {
   body: string;
   htmlBody: string;
-  signatureAlreadyEmbedded: boolean;
 } {
   const settings = readMailComposeSettings();
-  const signatureIdentity = resolveSignatureIdentity(
+  const signature = resolveSeedSignature(
     identity ? [identity] : [],
     identity?.id ?? null,
+    "newMessage",
   );
-  const hasSignature = Boolean(
-    signatureIdentity?.htmlSignature?.trim() ||
-      signatureIdentity?.textSignature?.trim(),
-  );
-
+  const separator = settings.signatureSeparatorEnabled;
   if (settings.plainTextMode) {
-    if (!hasSignature || !signatureIdentity) {
-      return { body: "", htmlBody: "", signatureAlreadyEmbedded: false };
-    }
-    const body = appendPlainTextSignature("", signatureIdentity, {
-      separator: settings.signatureSeparatorEnabled,
-    });
-    return { body, htmlBody: "", signatureAlreadyEmbedded: true };
+    return {
+      body: insertPlainTextSignature("", signature, { separator, aboveQuote: false }),
+      htmlBody: "",
+    };
   }
-
-  const embedded = buildEmbeddedSignatureHtml(signatureIdentity, {
-    embed: hasSignature,
-    separator: settings.signatureSeparatorEnabled,
-  });
-  return {
-    body: "",
-    htmlBody: embedded ? `<p></p>${embedded}` : "",
-    signatureAlreadyEmbedded: hasSignature,
-  };
+  const embedded = buildEmbeddedSignatureHtml(signature, { separator });
+  return { body: "", htmlBody: embedded ? `<p></p>${embedded}` : "" };
 }
 
 export type MailComposeDraftFields = {
@@ -107,7 +97,7 @@ export type MailComposeDraftFields = {
   composeAttachments: File[];
   composeMode: ComposeMode;
   quotedAttachments: QuotedInlineAttachment[];
-  signatureAlreadyEmbedded: boolean;
+  signatureChoice?: string | null;
   composeReplyContext: MailReplyContext | null;
 };
 
@@ -128,6 +118,6 @@ export function toComposeDraft(
     identityId,
     draftId,
     composeMode: fields.composeMode,
-    signatureAlreadyEmbedded: fields.signatureAlreadyEmbedded,
+    signatureChoice: fields.signatureChoice,
   };
 }

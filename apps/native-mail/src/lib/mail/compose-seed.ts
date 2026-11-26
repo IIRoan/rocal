@@ -1,10 +1,11 @@
 import {
   getErrorMessage,
+  insertPlainTextSignature,
   messageBodiesToComposeText,
-  prependPlainTextSignature,
   resolveMessageReplyRecipients,
   type ComposeTextFields,
   type QuotedDateOptions,
+  type SignatureSource,
 } from "@workspace/calendar-core";
 import type { ComposeRequest } from "./compose-request";
 import type { PendingComposeAttachment } from "./compose-attachments";
@@ -43,9 +44,10 @@ export interface ComposeSeedInput {
   params: ComposeRequest;
   sourceMessage: JmapEmailMessage | null;
   settingsLoaded: boolean;
-  signaturePosition: string;
-  signatureOptions: { separator?: boolean };
-  identity: JmapIdentity | null;
+  replySignaturePosition: string;
+  signatureOptions: { separator: boolean };
+  /** The sender's default signature, written into a new message, reply or forward as ordinary text. */
+  signature: SignatureSource | null;
   identities: JmapIdentity[];
   /** The sender for reply recipients: the auto-selected reply identity's address, else the account's. */
   fromEmail: string | null;
@@ -53,6 +55,22 @@ export interface ComposeSeedInput {
   runtime: MailRuntime | undefined;
   /** The decrypted source body, once an encrypted message has been opened for a reply or forward. */
   sourcePlaintext?: string;
+}
+
+function newMessageFields(params: ComposeRequest): ComposeTextFields {
+  if (params.mailto) {
+    const { to, cc, bcc, subject, body } = params.mailto;
+    return { to: to.join(", "), cc: cc.join(", "), bcc: bcc.join(", "), subject, body };
+  }
+  if (!params.to) return EMPTY_FIELDS;
+  const name = params.toName?.trim();
+  return {
+    ...EMPTY_FIELDS,
+    to:
+      name && name.toLowerCase() !== params.to.toLowerCase()
+        ? `${name} <${params.to}>`
+        : params.to,
+  };
 }
 
 function draftHeaders(message: JmapEmailMessage): ComposeTextFields {
@@ -65,14 +83,14 @@ function draftHeaders(message: JmapEmailMessage): ComposeTextFields {
   };
 }
 
-/** What the compose drawer opens with, or null while the source message or settings are still loading. */
+/** What the compose drawer opens with, or null while the mailbox, source message or settings are still loading. */
 export function planComposeSeed({
   params,
   sourceMessage,
   settingsLoaded,
-  signaturePosition,
+  replySignaturePosition,
   signatureOptions,
-  identity,
+  signature,
   identities,
   fromEmail,
   dateOptions,
@@ -87,25 +105,16 @@ export function planComposeSeed({
       restoredAttachments: params.restore.attachments,
     };
   }
-  if (params.mailto) {
-    const { to, cc, bcc, subject, body } = params.mailto;
-    return {
-      kind: "fields",
-      fields: { to: to.join(", "), cc: cc.join(", "), bcc: bcc.join(", "), subject, body },
-    };
-  }
-  if (params.to) {
-    const name = params.toName?.trim();
-    return {
-      kind: "fields",
-      fields: {
-        ...EMPTY_FIELDS,
-        to:
-          name && name.toLowerCase() !== params.to.toLowerCase()
-            ? `${name} <${params.to}>`
-            : params.to,
-      },
-    };
+  const withSignature = (body: string, quoted: boolean) =>
+    insertPlainTextSignature(body, signature, {
+      ...signatureOptions,
+      aboveQuote: quoted && replySignaturePosition === "above_quote",
+    });
+  if (params.mailto || params.to || !params.mode) {
+    // The signature depends on the sender, so a new message waits for the mailbox's identities.
+    if (!settingsLoaded || !runtime) return null;
+    const fields = newMessageFields(params);
+    return { kind: "fields", fields: { ...fields, body: withSignature(fields.body, false) } };
   }
   if (!sourceMessage || !settingsLoaded) return null;
 
@@ -117,11 +126,6 @@ export function planComposeSeed({
   ) {
     return runtime ? { kind: "decrypt-source" } : null;
   }
-
-  const withSignature = (quoteBody: string) =>
-    signaturePosition === "above_quote"
-      ? prependPlainTextSignature(quoteBody, identity, signatureOptions)
-      : quoteBody;
 
   switch (params.mode) {
     case "reply":
@@ -135,7 +139,7 @@ export function planComposeSeed({
             identities,
           }).to.join(", "),
           subject: prefixSubject(sourceMessage.subject, "Re:"),
-          body: withSignature(buildReplyBody(sourceMessage, dateOptions, sourcePlaintext)),
+          body: withSignature(buildReplyBody(sourceMessage, dateOptions, sourcePlaintext), true),
         },
       };
     case "reply-all": {
@@ -150,7 +154,7 @@ export function planComposeSeed({
           to: recipients.to,
           cc: recipients.cc,
           subject: prefixSubject(sourceMessage.subject, "Re:"),
-          body: withSignature(buildReplyBody(sourceMessage, dateOptions, sourcePlaintext)),
+          body: withSignature(buildReplyBody(sourceMessage, dateOptions, sourcePlaintext), true),
         },
       };
     }
@@ -160,7 +164,7 @@ export function planComposeSeed({
         fields: {
           ...EMPTY_FIELDS,
           subject: prefixSubject(sourceMessage.subject, "Fwd:"),
-          body: withSignature(buildForwardBody(sourceMessage, dateOptions, sourcePlaintext)),
+          body: withSignature(buildForwardBody(sourceMessage, dateOptions, sourcePlaintext), true),
         },
       };
     case "draft": {
@@ -177,8 +181,6 @@ export function planComposeSeed({
         },
       };
     }
-    default:
-      return { kind: "fields", fields: EMPTY_FIELDS };
   }
 }
 

@@ -223,17 +223,12 @@ export function messageBodiesToComposeText(bodies: {
 /** Plaintext plus HTML, but HTML only for formatted, unencrypted bodies. */
 export function resolveComposeSendBodies(input: {
   body: string;
-  bodyWithSignature: string;
   encrypted: boolean;
 }): { plaintext: string; htmlBody?: string } {
   const formatted = hasComposeFormatting(input.body);
-  const plaintext = formatted
-    ? composeTextToPlain(input.bodyWithSignature)
-    : input.bodyWithSignature;
+  const plaintext = formatted ? composeTextToPlain(input.body) : input.body;
   const htmlBody =
-    formatted && !input.encrypted
-      ? composeTextToHtml(input.bodyWithSignature)
-      : undefined;
+    formatted && !input.encrypted ? composeTextToHtml(input.body) : undefined;
   return htmlBody ? { plaintext, htmlBody } : { plaintext };
 }
 

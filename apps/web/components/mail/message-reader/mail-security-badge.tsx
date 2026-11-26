@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { reviewCurrentMailSenderKey } from "@/lib/mail/mail-trust-lifecycle";
-import { Info, ShieldAlert } from "lucide-react";
+import { Info, Shield, ShieldAlert, ShieldCheck } from "lucide-react";
 import {
   getMailSecurityNotice,
   MAIL_READABLE_METADATA,
@@ -20,8 +20,11 @@ export function MailSecurityBadge(
 ) {
   const meta = getMailSecurityNotice(props);
   const readingLimit = props.readState === "read_limit";
-  if (meta.tone !== "warning" && !readingLimit) return null;
-  const Icon = readingLimit ? Info : ShieldAlert;
+  const warning = meta.tone === "warning";
+  const signature = props.readState === "decrypted" ? props.signatureVerificationState : undefined;
+  const signed = signature === "verified" || signature === "attached_key";
+  if (!warning && !readingLimit && !signed) return null;
+  const Icon = readingLimit ? Info : warning ? ShieldAlert : signature === "verified" ? ShieldCheck : Shield;
 
   return (
     <DropdownPanel
@@ -36,8 +39,8 @@ export function MailSecurityBadge(
         >
           <Icon
             className={cn({
-              "text-muted-foreground": readingLimit,
-              "text-destructive": !readingLimit,
+              "text-muted-foreground": !warning,
+              "text-destructive": warning,
             })}
             aria-hidden
             strokeWidth={2}

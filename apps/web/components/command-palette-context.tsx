@@ -14,7 +14,7 @@ export type EventEditorMode = "modal" | "popover";
 export interface EventEditorOptions {
   mode?: EventEditorMode;
   anchorPosition?: { x: number; y: number };
-  eventViewMode?: "view" | "edit";
+  eventViewMode?: "view" | "edit" | "duplicate";
 }
 
 interface CommandPaletteContextType {
@@ -59,7 +59,7 @@ interface CommandPaletteProviderProps {
     initialView?: string;
     eventEditorMode?: EventEditorMode;
     popoverAnchorPosition?: { x: number; y: number } | null;
-    initialEventViewMode?: "view" | "edit";
+    initialEventViewMode?: "view" | "edit" | "duplicate";
     previewEvent?: CalendarEvent | null;
     updatePreviewEvent?: (updates: Partial<CalendarEvent>) => void;
   }>;
@@ -79,7 +79,7 @@ export function CommandPaletteProvider({
     y: number;
   } | null>(null);
   const [initialEventViewMode, setInitialEventViewMode] = useState<
-    "view" | "edit"
+    "view" | "edit" | "duplicate"
   >("view");
   const [previewEvent, setPreviewEvent] = useState<CalendarEvent | null>(null);
 

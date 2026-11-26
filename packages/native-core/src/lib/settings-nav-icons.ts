@@ -20,6 +20,8 @@ export const SETTINGS_MAIL_ICONS: Record<SettingsMailId, FeatherIcon> = {
   labels: "tag",
   contacts: "users",
   composing: "edit-3",
+  templates: "file-text",
+  signatures: "edit-3",
   "mail-display": "eye",
   "mail-list": "list",
   "auto-reply": "corner-up-left",

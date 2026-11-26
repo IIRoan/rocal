@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -17,19 +17,27 @@ import {
 } from "@workspace/native-core/components/BottomSheet";
 import { LAYOUT_METRICS } from "@workspace/native-core/lib/app-layout";
 import type { ComposeRequest } from "../../lib/mail/compose-request";
+import type { JmapIdentity } from "../../lib/mail/types";
 import {
   createMailSendSessionId,
   createMailSendScopeLifetime,
   discardMailSendAttempt,
   isMailSendScopeOpen,
-  appendPlainTextSignature,
+  composeSignatureCandidates,
+  composeSignatureKind,
   getErrorMessage,
   getOutgoingAttachmentSizeError,
   getPlainTextSignature,
   hasComposeUserContent,
-  hasPlainTextSignatureBlock,
-  replacePlainTextSignatureBlock,
+  insertPlainTextSignature,
+  listComposeSignatureOptions,
+  replaceComposePlainTextSignature,
+  resolveComposeSignature,
+  resolveMailTemplateSubject,
   type ComposeTextFields,
+  type MailComposeSettings,
+  type MailTemplate,
+  type SignatureSource,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
@@ -58,6 +66,7 @@ import { useComposeForm } from "../../hooks/use-compose-form";
 import { useComposeIdentity } from "../../hooks/use-compose-identity";
 import { useComposeLeave } from "../../hooks/use-compose-leave";
 import { useComposeSend } from "../../hooks/use-compose-send";
+import { useComposeSchedule } from "../../hooks/use-compose-schedule";
 import { ComposeRecipientFields } from "./ComposeRecipientFields";
 import {
   ComposeBodyEditor,
@@ -69,6 +78,8 @@ import { ComposeFormatBar } from "./ComposeFormatBar";
 import { ComposeAttachmentList } from "./ComposeAttachmentList";
 import { ComposeIdentitySheet } from "./ComposeIdentitySheet";
 import { ComposeScheduleSheet } from "./ComposeScheduleSheet";
+import { ComposeTemplatesSheet } from "./ComposeTemplatesSheet";
+import { ComposeSignatureSheet } from "./ComposeSignatureSheet";
 import {
   useMailSkin,
   type MailSkin,
@@ -136,7 +147,7 @@ function ComposeSession({
   const [draftSaveStatus, setDraftSaveStatus] =
     useState<DraftSaveStatus>("idle");
   const [bodyFocused, setBodyFocused] = useState(false);
-  const [schedule, setSchedule] = useState({ open: false, key: 0 });
+  const schedule = useComposeSchedule();
   const subjectInputRef = useRef<TextInputInstance>(null);
   const focusSubject = () => subjectInputRef.current?.focus();
   const bodyEditorRef = useRef<ComposeBodyEditorHandle>(null);
@@ -154,14 +165,15 @@ function ComposeSession({
   const signatureOptions = {
     separator: composeSettings.signatureSeparatorEnabled,
   };
+  const signatureChoice = useComposeSignatureChoice(composeSettings, identities, selectedIdentityId, params.mode);
 
   const [form, dispatch] = useComposeForm({
     params,
     sourceMessage,
     settingsLoaded: composeSettingsLoaded,
-    signaturePosition: composeSettings.signaturePosition,
+    replySignaturePosition: composeSettings.replySignaturePosition,
     signatureOptions,
-    identity: selectedIdentity,
+    signature: signatureChoice.signature,
     identities,
     fromEmail:
       (identity.autoReplyIdentityId ? selectedIdentity?.email : null) ??
@@ -207,11 +219,9 @@ function ComposeSession({
     mode: params.mode,
     sourceMessage,
     form,
-    identity: selectedIdentity,
     identityId: selectedIdentityId,
     composeContext,
     settings: composeSettings,
-    signatureOptions,
     settleDraftSave,
     setError,
     onRestore,
@@ -235,11 +245,9 @@ function ComposeSession({
     onClose: closeSendSession,
   });
 
-  const { handleInsertSignature, handleSelectIdentity } = useComposeSignatureActions(
-    dispatch,
-    identity,
-    signatureOptions,
-  );
+  const signaturePicker = useComposeSignatureActions({ dispatch, identity, settings: composeSettings, signatureChoice });
+
+  const templatePicker = useComposeTemplatePicker(dispatch, subject, bodyEditorRef);
 
   const handleAttach = async () => {
     await pickComposeAttachment(
@@ -274,8 +282,10 @@ function ComposeSession({
             onAttach={() => {
               void handleAttach();
             }}
-            onSend={() => send()}
-            onSchedule={runtime?.mailServerPolicy.maxDelayedSendSeconds ? () => setSchedule((current) => ({ open: true, key: current.key + 1 })) : undefined}
+            onSend={() => send(schedule.sendAt ?? undefined)}
+            onSchedule={runtime?.mailServerPolicy.maxDelayedSendSeconds ? schedule.open : undefined}
+            scheduledLabel={schedule.label}
+            onClearSchedule={schedule.clear}
           />
         </BottomSheetHeader>
         <View
@@ -312,7 +322,7 @@ function ComposeSession({
                 identities={identities}
                 composeContext={composeContext}
                 onChooseIdentity={() => identity.setPickerOpen(true)}
-                onSelectIdentity={handleSelectIdentity}
+                onSelectIdentity={signaturePicker.selectIdentity}
                 onSubmitEmpty={focusSubject}
               />
 
@@ -369,76 +379,135 @@ function ComposeSession({
           {bodyFocused ? (
             <ComposeFormatBar
               draftSaveStatus={draftSaveStatus}
-              hasSignature={Boolean(getPlainTextSignature(selectedIdentity))}
               plainTextMode={composeSettings.plainTextMode}
+              signed={composeSettings.signOutgoingMail}
               onBold={() => bodyEditorRef.current?.applyBold()}
               onItalic={() => bodyEditorRef.current?.applyItalic()}
               onUnderline={() => bodyEditorRef.current?.applyUnderline()}
               onList={() => bodyEditorRef.current?.applyList()}
-              onInsertSignature={handleInsertSignature}
+              onChooseSignature={signaturePicker.open}
+              onInsertTemplate={templatePicker.open}
             />
           ) : null}
         </View>
       </BottomSheet>
 
+      <ComposeTemplatesSheet templates={composeSettings.templates} {...templatePicker.sheet} />
+
+      <ComposeSignatureSheet {...signaturePicker.sheet} />
+
       <ComposeScheduleSheet
-        key={schedule.key}
-        visible={schedule.open}
+        key={schedule.sheet.key}
+        visible={schedule.sheet.visible}
         runtime={runtime}
         recipients={{ to, cc, bcc }}
-        onSchedule={send}
-        onDismiss={() => setSchedule((current) => ({ ...current, open: false }))}
+        onSchedule={schedule.sheet.onSchedule}
+        onDismiss={schedule.sheet.onDismiss}
       />
 
       <ComposeIdentitySheet
         visible={identity.pickerOpen}
         identities={identities}
         selectedIdentityId={selectedIdentityId}
-        onSelect={handleSelectIdentity}
+        onSelect={signaturePicker.selectIdentity}
         onDismiss={() => identity.setPickerOpen(false)}
       />
     </>
   );
 }
 
-/** Signature insert and identity switch, keeping the signature block in step with the sender. */
-function useComposeSignatureActions(
-  dispatch: ReturnType<typeof useComposeForm>[1],
-  identity: ReturnType<typeof useComposeIdentity>,
-  signatureOptions: { separator: boolean },
+/** The signature compose uses: the choice made in its picker, else the sender's default; null is none. */
+function useComposeSignatureChoice(
+  settings: MailComposeSettings,
+  identities: JmapIdentity[],
+  identityId: string | null,
+  mode: ComposeRequest["mode"],
 ) {
-  const { identities, selectedIdentity } = identity;
-  const handleInsertSignature = () => {
-    if (!getPlainTextSignature(selectedIdentity)) return;
+  const kind = composeSignatureKind(mode);
+  const [choice, setChoice] = useState<string | null>();
+  const signature = resolveComposeSignature(settings, identities, identityId, kind, choice);
+  return { kind, choice, setChoice, signature };
+}
+
+/** Signature picker and identity switch, keeping the body's signature block in step with the sender. */
+function useComposeSignatureActions({
+  dispatch,
+  identity,
+  settings,
+  signatureChoice,
+}: {
+  dispatch: ReturnType<typeof useComposeForm>[1];
+  identity: ReturnType<typeof useComposeIdentity>;
+  settings: MailComposeSettings;
+  signatureChoice: ReturnType<typeof useComposeSignatureChoice>;
+}) {
+  const { kind, choice, setChoice, signature } = signatureChoice;
+  const [visible, setVisible] = useState(false);
+  const { identities, selectedIdentityId } = identity;
+  const options = { separator: settings.signatureSeparatorEnabled };
+  const candidates = composeSignatureCandidates(settings, identities);
+  const replaceIn = (next: SignatureSource | null) => (current: string) =>
+    replaceComposePlainTextSignature(current, candidates, next, options) ?? current;
+
+  const placement = {
+    ...options,
+    aboveQuote: kind === "replyForward" && settings.replySignaturePosition === "above_quote",
+  };
+
+  // A signature the body lacks goes where a new compose puts it.
+  const onSelect = (nextChoice: string | null | undefined) => {
+    setVisible(false);
+    setChoice(nextChoice);
+    const next = resolveComposeSignature(settings, identities, selectedIdentityId, kind, nextChoice);
     dispatch({
       type: "editBody",
       update: (current) =>
-        hasPlainTextSignatureBlock(current, selectedIdentity)
-          ? current
-          : appendPlainTextSignature(
-              current,
-              selectedIdentity,
-              signatureOptions,
-            ),
+        replaceComposePlainTextSignature(current, candidates, next, options) ??
+        insertPlainTextSignature(current, next, placement),
     });
   };
 
-  const handleSelectIdentity = (id: string) => {
-    const nextIdentity = identities.find((entry) => entry.id === id) ?? null;
+  const selectIdentity = (id: string) => {
     dispatch({
       type: "editBody",
-      update: (current) =>
-        replacePlainTextSignatureBlock(
-          current,
-          selectedIdentity,
-          nextIdentity,
-          signatureOptions,
-        ) ?? current,
+      update: replaceIn(resolveComposeSignature(settings, identities, id, kind)),
     });
+    setChoice(undefined);
     identity.pick(id);
   };
 
-  return { handleInsertSignature, handleSelectIdentity };
+  return {
+    selectIdentity,
+    open: () => setVisible(true),
+    sheet: {
+      visible,
+      options: listComposeSignatureOptions(settings, identities, selectedIdentityId, kind, choice),
+      noneSelected: !getPlainTextSignature(signature),
+      onSelect,
+      onDismiss: () => setVisible(false),
+    },
+  };
+}
+
+/** Template picker state; a template fills an empty subject and goes in at the body's caret. */
+function useComposeTemplatePicker(
+  dispatch: ReturnType<typeof useComposeForm>[1],
+  subject: string,
+  bodyEditorRef: RefObject<ComposeBodyEditorHandle | null>,
+) {
+  const [visible, setVisible] = useState(false);
+  const onSelect = (template: MailTemplate) => {
+    setVisible(false);
+    const nextSubject = resolveMailTemplateSubject(subject, template);
+    if (nextSubject !== subject) {
+      dispatch({ type: "edit", field: "subject", value: nextSubject });
+    }
+    bodyEditorRef.current?.insertText(template.body);
+  };
+  return {
+    open: () => setVisible(true),
+    sheet: { visible, onSelect, onDismiss: () => setVisible(false) },
+  };
 }
 
 /** Picks one file; the picker's cache copy is plaintext, so it is deleted once read or refused; photos are re-encoded unless `reportStripNotice` is null. */

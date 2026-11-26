@@ -11,6 +11,8 @@ import {
   Check,
   AlertCircle,
   AlignLeft,
+  Clock,
+  FileSignature,
   Type,
 } from "lucide-react";
 import { useEffectEvent, useId, useRef, useState, useEffect } from "react";
@@ -40,10 +42,22 @@ import { useIsMobile, useShortcutLabel } from "@workspace/ui/hooks";
 import type { JmapIdentity } from "@/lib/mail/types";
 import {
   canSendCompose,
+  COMPOSE_SIGNED_DESCRIPTION,
+  COMPOSE_SIGNED_LABEL,
+  composeSignatureCandidates,
+  composeSignatureKind,
   getSimpleLoginComposeNotice,
+  insertMailTemplateText,
+  insertPlainTextSignature,
+  listComposeSignatureOptions,
   parsedAddressesToEmails,
+  replaceComposePlainTextSignature,
+  resolveComposeSignature,
+  resolveMailTemplateSubject,
   validateComposeRecipients,
   pickOutgoingAttachmentFiles,
+  type MailTemplate,
+  type SignatureSource,
   type SimpleLoginComposeNotice,
 } from "@workspace/calendar-core";
 import {
@@ -54,16 +68,10 @@ import { RichTextEditor, type InlineImageUpload } from "./rich-text-editor";
 import { RichTextEditorToolbar } from "./rich-text-editor-toolbar";
 import { RecipientSuggestInput } from "./recipient-suggest-input";
 import {
-  appendHtmlSignature,
-  appendPlainTextSignature,
-  buildEmbeddedSignatureHtml,
   getPlainTextSignature,
-  hasEmbeddedSignature,
   htmlToPlainText,
+  insertEmbeddedSignatureHtml,
   swapEmbeddedSignatureInHtml,
-  swapEmbeddedSignatureInPlainText,
-  resolveComposeSignatureIdentity,
-  sanitizeSignatureHtml,
 } from "@/lib/mail/signature-utils";
 import {
   useMailComposeSettings,
@@ -79,6 +87,8 @@ import { toast } from "@workspace/ui/lib/toast";
 import { cn } from "@workspace/ui/lib/utils";
 import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 import { ComposeSchedulePopover, type ComposeScheduling } from "./compose-schedule-popover";
+import { ComposeTemplatesPopover } from "./compose-templates-popover";
+import { ComposeSignaturePopover } from "./compose-signature-popover";
 
 export interface ComposeDialogProps {
   identities: JmapIdentity[];
@@ -198,6 +208,18 @@ function ClearComposeButton({
   );
 }
 
+function ComposeSignedIndicator() {
+  return (
+    <SimpleTooltip content={COMPOSE_SIGNED_DESCRIPTION}>
+      <p className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+        <FileSignature className="size-3.5 shrink-0" aria-hidden />
+        <span className="sr-only sm:not-sr-only">{COMPOSE_SIGNED_LABEL}</span>
+        <span className="sr-only">. {COMPOSE_SIGNED_DESCRIPTION}</span>
+      </p>
+    </SimpleTooltip>
+  );
+}
+
 function ComposeFieldError({ id, message }: { id: string; message: string }) {
   return (
     <p
@@ -258,6 +280,8 @@ export function ComposeForm({
     mailServerLimits,
     selectedIdentityId,
     setSelectedIdentityId,
+    signatureChoice,
+    setSignatureChoice,
     draftSaveStatus,
     composeDraftId,
     clearCompose,
@@ -276,6 +300,8 @@ export function ComposeForm({
     open: false,
     keyword: "",
   });
+  // A picked send time only arms the Schedule button; nothing is scheduled until the user presses it.
+  const [scheduledSendAt, setScheduledSendAt] = useState<string | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const dragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorRef = useRef<Editor | null>(null);
@@ -286,7 +312,6 @@ export function ComposeForm({
     setOpen: setFormatOpen,
   } = useFormatBar();
   const bodyRef = useRef<HTMLTextAreaElement>(null);
-  const prevSignatureIdentityIdRef = useRef<string | null>(null);
   const prevPlainTextModeRef = useRef(plainTextMode);
   const [ccBccVisible, setCcBccVisible] = useState({
     cc: !!composeCc,
@@ -317,19 +342,22 @@ export function ComposeForm({
     identities[0] ??
     null;
 
-  const signatureIdentity = resolveComposeSignatureIdentity(
+  const signatureKind = composeSignatureKind(composeMode);
+  const signatureOptions = { separator: composeSettings.signatureSeparatorEnabled };
+  const activeSignature = resolveComposeSignature(
+    composeSettings,
     identities,
     selectedIdentity?.id ?? null,
+    signatureKind,
+    signatureChoice,
   );
-  const signatureEmbeddedInBody = hasEmbeddedSignature(composeHtmlBody);
-  const showBelowQuoteSignaturePreview =
-    !plainTextMode &&
-    !signatureEmbeddedInBody &&
-    composeSettings.signaturePosition === "below_quote" &&
-    Boolean(
-      signatureIdentity?.htmlSignature?.trim() ||
-        signatureIdentity?.textSignature?.trim(),
-    );
+  const hasActiveSignature = Boolean(getPlainTextSignature(activeSignature));
+  const signaturePlacement = {
+    ...signatureOptions,
+    aboveQuote:
+      signatureKind === "replyForward" &&
+      composeSettings.replySignaturePosition === "above_quote",
+  };
 
   useComposeQuotedInlineImages({
     enabled:
@@ -381,57 +409,6 @@ export function ComposeForm({
     setComposeHtmlBody,
   ]);
 
-  useEffect(() => {
-    const previousIdentityId = prevSignatureIdentityIdRef.current;
-    const identityChanged = previousIdentityId !== signatureIdentity?.id;
-    prevSignatureIdentityIdRef.current = signatureIdentity?.id ?? null;
-    if (!identityChanged) return;
-    const isReplyLike = composeMode === "reply" || composeMode === "forward";
-    if (isReplyLike && composeSettings.signaturePosition !== "above_quote") {
-      return;
-    }
-    if (!isReplyLike && composeMode !== "new" && composeMode !== "draft") {
-      return;
-    }
-
-    const previousSignatureIdentity = resolveComposeSignatureIdentity(
-      identities,
-      previousIdentityId,
-    );
-
-    if (plainTextMode) {
-      const swapped = swapEmbeddedSignatureInPlainText(
-        composeBody,
-        previousSignatureIdentity,
-        signatureIdentity,
-        { separator: composeSettings.signatureSeparatorEnabled },
-      );
-      if (swapped !== null) {
-        setComposeBody(swapped);
-      }
-      return;
-    }
-
-    if (!editorRef.current) return;
-    const swapped = swapEmbeddedSignatureInHtml(
-      serializeEditorContent(editorRef.current),
-      signatureIdentity,
-      { separator: composeSettings.signatureSeparatorEnabled },
-    );
-    if (swapped) {
-      setComposeHtmlBody(swapped);
-    }
-  }, [
-    composeBody,
-    composeMode,
-    composeSettings.signaturePosition,
-    composeSettings.signatureSeparatorEnabled,
-    identities,
-    plainTextMode,
-    setComposeBody,
-    setComposeHtmlBody,
-    signatureIdentity,
-  ]);
   const fromEmail = selectedIdentity?.email ?? fallbackFromEmail;
   const fromLabel = selectedIdentity
     ? selectedIdentity.name
@@ -588,7 +565,10 @@ export function ComposeForm({
     editorRef.current?.commands.focus();
   }
 
-  async function requestSend(skipAttachmentCheck = false, sendAt?: string) {
+  async function requestSend(
+    skipAttachmentCheck = false,
+    sendAt: string | undefined = scheduledSendAt ?? undefined,
+  ) {
     if (isBusy) return;
     if (!canSend) {
       setFieldFeedback((current) => ({ ...current, sendAttempted: true }));
@@ -619,35 +599,70 @@ export function ComposeForm({
     }
   }
 
-  const applySignaturePreview = () => {
-    if (!signatureIdentity) return;
-    if (plainTextMode) {
-      setComposeBody(
-        appendPlainTextSignature(composeBody, signatureIdentity, {
-          separator: composeSettings.signatureSeparatorEnabled,
-        }),
-      );
-      return;
-    }
-    const embedded = buildEmbeddedSignatureHtml(signatureIdentity, {
-      embed: true,
-      separator: composeSettings.signatureSeparatorEnabled,
-    });
-    if (!embedded) return;
-    if (signatureEmbeddedInBody) {
-      const swapped = swapEmbeddedSignatureInHtml(composeHtmlBody, signatureIdentity, {
-        separator: composeSettings.signatureSeparatorEnabled,
-      });
-      if (swapped) {
-        setComposeHtmlBody(swapped);
-      }
-      return;
-    }
-    setComposeHtmlBody(
-      composeHtmlBody.trim()
-        ? `${composeHtmlBody}${embedded}`
-        : `<p></p>${embedded}`,
+  const insertAtTextareaCaret = (text: string) => {
+    const textarea = bodyRef.current;
+    const next = insertMailTemplateText(
+      composeBody,
+      textarea
+        ? { start: textarea.selectionStart, end: textarea.selectionEnd }
+        : null,
+      text,
     );
+    setComposeBody(next.text);
+    requestAnimationFrame(() => {
+      bodyRef.current?.focus();
+      bodyRef.current?.setSelectionRange(next.selection.start, next.selection.end);
+    });
+  };
+
+  /** Swaps the body's unchanged signature for `next`; when it holds none, `insert` adds `next` where a new compose puts it. */
+  const applySignature = (next: SignatureSource | null, insert: boolean) => {
+    const candidates = composeSignatureCandidates(composeSettings, identities);
+    if (plainTextMode) {
+      const updated =
+        replaceComposePlainTextSignature(composeBody, candidates, next, signatureOptions) ??
+        (insert ? insertPlainTextSignature(composeBody, next, signaturePlacement) : composeBody);
+      if (updated !== composeBody) setComposeBody(updated);
+      return;
+    }
+    const editor = editorRef.current;
+    const html = editor ? serializeEditorContent(editor) : composeHtmlBody;
+    const updated =
+      swapEmbeddedSignatureInHtml(html, candidates, next, signatureOptions) ??
+      (insert ? insertEmbeddedSignatureHtml(html, next, signaturePlacement) : html);
+    if (updated !== html) setComposeHtmlBody(updated);
+  };
+
+  const chooseSignature = (choice: string | null | undefined) => {
+    setSignatureChoice(choice);
+    applySignature(
+      resolveComposeSignature(
+        composeSettings,
+        identities,
+        selectedIdentity?.id ?? null,
+        signatureKind,
+        choice,
+      ),
+      true,
+    );
+  };
+
+  // A new sender's default replaces the inserted signature only while it is unchanged.
+  const changeIdentity = (identityId: string | null) => {
+    applySignature(
+      resolveComposeSignature(composeSettings, identities, identityId, signatureKind),
+      false,
+    );
+    setSelectedIdentityId(identityId);
+  };
+
+  const insertTemplate = (template: MailTemplate) => {
+    setComposeSubject(resolveMailTemplateSubject(composeSubject, template));
+    if (!plainTextMode) {
+      editorRef.current?.chain().focus().insertContent(plainTextToComposerBody(template.body)).run();
+      return;
+    }
+    insertAtTextareaCaret(template.body);
   };
 
   function handleRequestClose() {
@@ -658,6 +673,7 @@ export function ComposeForm({
 
   function clearMessage() {
     clearCompose();
+    setScheduledSendAt(null);
     setFieldFeedback((current) => ({
       ...current,
       toTouched: false,
@@ -724,21 +740,15 @@ export function ComposeForm({
           onClick={() => void requestSend()}
           aria-disabled={isBusy || undefined}
         >
-          <Send size={12} />
-          {isBusy ? "Sending…" : "Send"}
+          {scheduledSendAt ? <Clock size={12} /> : <Send size={12} />}
+          {scheduledSendAt
+            ? isBusy
+              ? "Scheduling…"
+              : "Schedule"
+            : isBusy
+              ? "Sending…"
+              : "Send"}
         </Button>
-        {scheduling ? (
-          <ComposeSchedulePopover
-            scheduling={scheduling}
-            recipients={parsedAddressesToEmails([
-              ...recipientValidation.to,
-              ...recipientValidation.cc,
-              ...recipientValidation.bcc,
-            ])}
-            disabled={isBusy}
-            onSchedule={(sendAt) => void requestSend(false, sendAt)}
-          />
-        ) : null}
       </div>
 
       <div
@@ -756,7 +766,7 @@ export function ComposeForm({
           <select
             id={`${fieldId}-from`}
             value={selectedIdentityId ?? ""}
-            onChange={(event) => setSelectedIdentityId(event.target.value || null)}
+            onChange={(event) => changeIdentity(event.target.value || null)}
             disabled={isBusy}
             className="flex-1 min-w-0 bg-transparent text-sm text-foreground border-0"
           >
@@ -773,18 +783,6 @@ export function ComposeForm({
             {fromLabel}
           </span>
         )}
-        {signatureIdentity &&
-          (signatureIdentity.textSignature || signatureIdentity.htmlSignature) &&
-          !signatureEmbeddedInBody &&
-          composeSettings.signaturePosition === "below_quote" && (
-            <button
-              type="button"
-              onClick={applySignaturePreview}
-              className="shrink-0 text-[11px] text-muted-foreground hover:text-foreground"
-            >
-              Insert signature
-            </button>
-          )}
       </div>
 
       {simpleLoginNotice.requiredFrom && (
@@ -792,7 +790,7 @@ export function ComposeForm({
           requiredFrom={simpleLoginNotice.requiredFrom}
           isMobile={isMobile}
           disabled={isBusy}
-          onSwitch={setSelectedIdentityId}
+          onSwitch={changeIdentity}
         />
       )}
 
@@ -993,31 +991,6 @@ export function ComposeForm({
         )}
       </div>
 
-      {showBelowQuoteSignaturePreview && signatureIdentity && (
-        <div
-          className={`shrink-0 border-t border-border/50 text-sm leading-6 text-muted-foreground ${
-            isMobile ? "px-3 py-2" : "px-4 py-2"
-          }`}
-        >
-          {composeSettings.signatureSeparatorEnabled ? (
-            <div className="mb-1">--</div>
-          ) : null}
-          {signatureIdentity.htmlSignature ? (
-            <div
-              className="break-words [&_a]:text-accent [&_a]:underline"
-              // repo-rules-allow secure-email-html: signature HTML is sanitized by sanitizeSignatureHtml before insertion.
-              dangerouslySetInnerHTML={{
-                __html: sanitizeSignatureHtml(signatureIdentity.htmlSignature),
-              }}
-            />
-          ) : (
-            <div className="whitespace-pre-wrap break-words font-mono">
-              {getPlainTextSignature(signatureIdentity)}
-            </div>
-          )}
-        </div>
-      )}
-
       {composeAttachments.length > 0 && (
         <div
           className={`flex flex-wrap gap-1.5 border-t border-border/50 shrink-0 ${
@@ -1093,6 +1066,37 @@ export function ComposeForm({
           >
             <Paperclip className="size-4" />
           </button>
+          <ComposeTemplatesPopover
+            templates={composeSettings.templates}
+            disabled={isBusy}
+            onInsert={insertTemplate}
+          />
+          <ComposeSignaturePopover
+            options={listComposeSignatureOptions(
+              composeSettings,
+              identities,
+              selectedIdentity?.id ?? null,
+              signatureKind,
+              signatureChoice,
+            )}
+            noneSelected={!hasActiveSignature}
+            disabled={isBusy}
+            onChoose={chooseSignature}
+          />
+          {scheduling ? (
+            <ComposeSchedulePopover
+              scheduling={scheduling}
+              recipients={parsedAddressesToEmails([
+                ...recipientValidation.to,
+                ...recipientValidation.cc,
+                ...recipientValidation.bcc,
+              ])}
+              disabled={isBusy}
+              scheduledSendAt={scheduledSendAt}
+              onSchedule={setScheduledSendAt}
+              onClear={() => setScheduledSendAt(null)}
+            />
+          ) : null}
           <SimpleTooltip content={composeSettings.plainTextMode ? "Rich text compose" : "Plain text compose"}>
             <button
               type="button"
@@ -1113,16 +1117,19 @@ export function ComposeForm({
             </button>
           </SimpleTooltip>
         </div>
-        {visibleErrors.body ? (
-          <ComposeFieldError id={errorId("body")} message={visibleErrors.body} />
-        ) : (
-          <span className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
-            <kbd className="px-1.5 py-0.5 bg-muted rounded text-[11px] font-medium">
-              {sendShortcut}
-            </kbd>
-            to send
-          </span>
-        )}
+        <div className="flex min-w-0 items-center gap-3">
+          {composeSettings.signOutgoingMail ? <ComposeSignedIndicator /> : null}
+          {visibleErrors.body ? (
+            <ComposeFieldError id={errorId("body")} message={visibleErrors.body} />
+          ) : (
+            <span className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
+              <kbd className="px-1.5 py-0.5 bg-muted rounded text-[11px] font-medium">
+                {sendShortcut}
+              </kbd>
+              {scheduledSendAt ? "to schedule" : "to send"}
+            </span>
+          )}
+        </div>
       </div>
 
       <Dialog

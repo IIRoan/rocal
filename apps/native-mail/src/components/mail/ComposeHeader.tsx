@@ -25,6 +25,9 @@ type ComposeHeaderProps = {
   onSend: () => void;
   /** Absent when the mail server can't hold messages. */
   onSchedule?: () => void;
+  /** The armed send time; while set, Send becomes Schedule. */
+  scheduledLabel?: string | null;
+  onClearSchedule?: () => void;
 };
 
 export function ComposeHeader({
@@ -35,7 +38,10 @@ export function ComposeHeader({
   onAttach,
   onSend,
   onSchedule,
+  scheduledLabel,
+  onClearSchedule,
 }: ComposeHeaderProps) {
+  const sendLabel = scheduledLabel ? "Schedule" : "Send";
   const { theme } = useTheme();
   const skin = useMailSkin();
   const styles = createStyles(theme, skin);
@@ -79,7 +85,7 @@ export function ComposeHeader({
               pressed && !sendDisabled && styles.pressed,
             ]}
             accessibilityRole="button"
-            accessibilityLabel="Send"
+            accessibilityLabel={sendLabel}
             accessibilityState={{ disabled: sendDisabled, busy: sending }}
           >
             {sending ? (
@@ -88,14 +94,36 @@ export function ComposeHeader({
                 color={theme.colors.primaryForeground}
               />
             ) : (
-              <Text style={styles.sendText}>Send</Text>
+              <Text style={styles.sendText}>{sendLabel}</Text>
             )}
           </Pressable>
         </View>
       </View>
-      <Text style={styles.title} numberOfLines={1} accessibilityRole="header">
+      <Text
+        style={[styles.title, scheduledLabel ? styles.titleTight : null]}
+        numberOfLines={1}
+        accessibilityRole="header"
+      >
         {title}
       </Text>
+      {scheduledLabel ? (
+        <View style={styles.scheduleRow}>
+          <Feather name="clock" size={14} color={theme.colors.primaryBase} />
+          <Text style={styles.scheduleText} numberOfLines={1}>
+            Scheduled for {scheduledLabel}
+          </Text>
+          {onClearSchedule ? (
+            <ComposeIconButton
+              icon="x"
+              label="Don't schedule"
+              onPress={onClearSchedule}
+              color={theme.colors.mutedForeground}
+              styles={styles}
+              size={16}
+            />
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -166,6 +194,13 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
     pressed: {
       opacity: 0.6,
     },
+    scheduleRow: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: theme.spacing["2"],
+      paddingLeft: theme.spacing["4"],
+      paddingRight: theme.spacing["1"],
+    },
   } satisfies Record<string, ViewStyle>;
 
   const text = {
@@ -179,6 +214,14 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       paddingHorizontal: theme.spacing["4"],
       paddingTop: theme.spacing["2"],
       paddingBottom: theme.spacing["4"],
+    },
+    titleTight: {
+      paddingBottom: 0,
+    },
+    scheduleText: {
+      flex: 1,
+      fontSize: 14,
+      color: theme.colors.mutedForeground,
     },
   } satisfies Record<string, TextStyle>;
 

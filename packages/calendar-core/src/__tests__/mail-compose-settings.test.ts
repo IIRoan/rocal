@@ -18,7 +18,7 @@ describe("mail compose settings", () => {
     const stored = {
       ...DEFAULT_MAIL_COMPOSE_SETTINGS,
       plainTextMode: true,
-      signaturePosition: "above_quote" as const,
+      replySignaturePosition: "below_quote" as const,
       attachmentReminderKeywords: ["enclosed"],
     };
     expect(parseMailComposeSettings(serializeMailComposeSettings(stored))).toEqual(stored);
@@ -26,6 +26,14 @@ describe("mail compose settings", () => {
       parseMailComposeSettings(JSON.stringify({ attachmentReminderKeywords: ["ok", 1] }))
         .attachmentReminderKeywords,
     ).toEqual(["ok"]);
+  });
+
+  it("puts reply signatures above the quote unless the new key says otherwise", () => {
+    expect(DEFAULT_MAIL_COMPOSE_SETTINGS.replySignaturePosition).toBe("above_quote");
+    expect(
+      parseMailComposeSettings(JSON.stringify({ signaturePosition: "below_quote" }))
+        .replySignaturePosition,
+    ).toBe("above_quote");
   });
 
   it("strips image metadata by default and keeps an explicit choice and unknown keys", () => {

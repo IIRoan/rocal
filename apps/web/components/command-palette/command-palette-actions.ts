@@ -30,6 +30,7 @@ export function toUpdateSettingsRequest(
     browserNotifications: settings.browserNotifications,
     reminderSound: settings.reminderSound,
     defaultEventDuration: settings.defaultEventDuration,
+    defaultReminderMinutes: settings.defaultReminderMinutes,
     defaultCalendarId: settings.defaultCalendarId,
     compactView: settings.compactView,
     showWeekNumbers: settings.showWeekNumbers,

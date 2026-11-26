@@ -40,7 +40,11 @@ import {
   extractTextQueryFromJmapFilter,
   toJmapTextQuery,
   buildEmailDestroyMethodCall,
+  buildEmailMarkReadMethodCall,
+  buildUnreadMailboxQueryMethodCall,
   destroyMailboxMessagesInBatches,
+  markMailboxMessagesReadInBatches,
+  assertSuccessfulJmapResponses,
   AUTH_RESULTS_JMAP_PROPERTY,
   LIST_UNSUBSCRIBE_POST_JMAP_PROPERTY,
   SIMPLELOGIN_JMAP_PROPERTIES,
@@ -1941,6 +1945,32 @@ export class StalwartJmapClient {
           })
         ).ids,
       destroy: (ids) => this.bulkDestroyMessages(session, ids),
+    });
+  }
+
+  /** Marks every unread message in a mailbox read, loaded or not; returns how many were marked. */
+  async markMailboxAsRead(
+    session: JmapSession,
+    mailboxId: string,
+  ): Promise<number> {
+    const accountId = this.requirePrimaryAccountId(session);
+    const using = ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"];
+    return markMailboxMessagesReadInBatches({
+      listUnreadIds: async (limit) => {
+        const envelope = await this.call(session, using, [
+          buildUnreadMailboxQueryMethodCall(accountId, mailboxId, limit),
+        ]);
+        return (
+          this.getMethodResult<{ ids?: string[] }>(envelope, "Email/query")
+            .ids ?? []
+        );
+      },
+      markRead: async (ids) => {
+        const envelope = await this.call(session, using, [
+          buildEmailMarkReadMethodCall(accountId, ids),
+        ]);
+        assertSuccessfulJmapResponses(envelope, "Mark as read");
+      },
     });
   }
 

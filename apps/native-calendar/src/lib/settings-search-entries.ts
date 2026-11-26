@@ -18,6 +18,18 @@ export const CALENDAR_SETTINGS_SEARCH_ENTRIES: AccountSheetSearchEntry[] = [
   },
   {
     pageId: "calendar",
+    label: "Default event duration",
+    location: "Calendar settings · Default event duration",
+    keywords: "length new event minutes hour",
+  },
+  {
+    pageId: "calendar",
+    label: "Default reminder",
+    location: "Calendar settings · Default reminder",
+    keywords: "alert notification new event",
+  },
+  {
+    pageId: "calendar",
     label: "Week starts on",
     location: "Calendar settings · Week starts on",
     keywords: "sunday monday first day",

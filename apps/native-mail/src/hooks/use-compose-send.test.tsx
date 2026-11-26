@@ -9,6 +9,7 @@ import {
   discardMailSendAttempt,
   DEFAULT_MAIL_COMPOSE_SETTINGS,
   type HeldSubmissionCancelResult,
+  type MailComposeSettings,
 } from "@workspace/calendar-core";
 import { buildMailRuntime } from "../lib/mail/mail-runtime";
 import type { MailRuntime } from "../lib/mail/mail-runtime";
@@ -97,11 +98,15 @@ function Composer({
   mode,
   attachments = [],
   recipient = "peer@solace.test",
+  body = "My reply",
+  settings = DEFAULT_MAIL_COMPOSE_SETTINGS,
 }: {
   runtime: MailRuntime;
   mode: ComposeMode | undefined;
   attachments?: PendingComposeAttachment[];
   recipient?: string;
+  body?: string;
+  settings?: MailComposeSettings;
 }) {
   const compose = useComposeSend({
     sendScope: "compose:test-session",
@@ -113,13 +118,11 @@ function Composer({
       to: recipient,
       attachments,
       subject: "Re: Plans",
-      body: "My reply",
+      body,
     },
-    identity: null,
     identityId: "self",
     composeContext: resolveComposeContext(runtime),
-    settings: DEFAULT_MAIL_COMPOSE_SETTINGS,
-    signatureOptions: { separator: true },
+    settings,
     settleDraftSave: async () => null,
     setError: mockSetError,
     onSent: mockOnSent,
@@ -178,6 +181,8 @@ describe("native reply send headers", () => {
       recipient?: string;
       expectSend?: boolean;
       maxDelayedSendSeconds?: number;
+      body?: string;
+      settings?: MailComposeSettings;
     } = {},
   ) {
     const base = await buildMailRuntime();
@@ -197,6 +202,8 @@ describe("native reply send headers", () => {
             mode={mode}
             attachments={options.attachments}
             recipient={options.recipient}
+            body={options.body}
+            settings={options.settings}
           />
         </QueryClientProvider>,
       ),
@@ -402,6 +409,18 @@ describe("native reply send headers", () => {
     });
     expect(mockMoveCanceledSendToDrafts).toHaveBeenCalledWith(expect.anything(), { copyEmailId: "reply", draftsMailboxId: "drafts" });
     expect(mockToast).toHaveBeenLastCalledWith("Moved to Drafts.", "success");
+  });
+
+  it("sends the body as typed, so a signature the user deleted stays deleted", async () => {
+    const settings: MailComposeSettings = {
+      ...DEFAULT_MAIL_COMPOSE_SETTINGS,
+      signatures: [{ id: "s-work", name: "Work", body: "Alex Doe" }],
+      signatureDefaults: [{ identityId: "self", newMessage: "s-work", replyForward: "s-work" }],
+    };
+    await send("reply", { body: "Thanks\n\nOn Monday, Sam wrote:\n> Hello", settings });
+    expect(resolveOutgoingMessageBody).toHaveBeenCalledWith(
+      expect.objectContaining({ plaintext: "Thanks\n\nOn Monday, Sam wrote:\n> Hello" }),
+    );
   });
 
   it("sends at once without a hold when the server can't delay mail", async () => {

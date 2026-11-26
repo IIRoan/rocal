@@ -2,10 +2,19 @@
 
 import { describe, expect, it, jest } from "@jest/globals";
 import { Inbox, SquarePen } from "lucide-react";
-import { handleMailPaletteKeyDown } from "../../components/mail/mail-command-palette-actions";
-import type { MailPaletteItem } from "../../components/mail/mail-command-palette-items";
+import {
+  handleMailPaletteKeyDown,
+  selectMailPaletteItem,
+} from "../../components/mail/mail-command-palette-actions";
+import {
+  buildMailBrowseItems,
+  buildMailSearchableItems,
+  filterMailPaletteItems,
+  MARK_ALL_READ_PALETTE_ITEM,
+  type MailPaletteItem,
+} from "../../components/mail/mail-command-palette-items";
 
-jest.mock("lucide-react", () => ({ Inbox: () => null, SquarePen: () => null }));
+jest.mock("lucide-react", () => ({ Inbox: () => null, MailOpen: () => null, SquarePen: () => null }));
 
 const items: MailPaletteItem[] = [
   { id: "compose", label: "Compose", description: "", icon: SquarePen },
@@ -52,5 +61,35 @@ describe("handleMailPaletteKeyDown", () => {
     expect(run(enter.event).onSelectItem).not.toHaveBeenCalled();
     expect(run(arrow.event).onMoveSelection).not.toHaveBeenCalled();
     expect(enter.preventDefault).not.toHaveBeenCalled();
+  });
+});
+
+describe("selectMailPaletteItem", () => {
+  it("closes the palette and marks the open folder read", () => {
+    const onOpenChange = jest.fn();
+    const onMarkAllRead = jest.fn();
+    const goForward = jest.fn();
+    selectMailPaletteItem({
+      item: MARK_ALL_READ_PALETTE_ITEM,
+      onOpenChange,
+      onCompose: jest.fn(),
+      onMarkAllRead,
+      goForward,
+    });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(onMarkAllRead).toHaveBeenCalledTimes(1);
+    expect(goForward).not.toHaveBeenCalled();
+  });
+
+  it("offers the action only when the open folder has unread mail", () => {
+    expect(buildMailBrowseItems(undefined).map((item) => item.id)).not.toContain(
+      MARK_ALL_READ_PALETTE_ITEM.id,
+    );
+    expect(
+      filterMailPaletteItems(
+        buildMailSearchableItems(undefined, [MARK_ALL_READ_PALETTE_ITEM]),
+        "read",
+      ).map((item) => item.id),
+    ).toContain(MARK_ALL_READ_PALETTE_ITEM.id);
   });
 });

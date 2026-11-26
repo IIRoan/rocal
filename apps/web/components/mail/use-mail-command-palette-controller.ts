@@ -28,6 +28,7 @@ import {
   buildMailBrowseItems,
   buildMailSearchableItems,
   filterMailPaletteItems,
+  MARK_ALL_READ_PALETTE_ITEM,
 } from "./mail-command-palette-items";
 import {
   createInitialMailChromeState,
@@ -39,6 +40,7 @@ export type UseMailCommandPaletteControllerOptions = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCompose: () => void;
+  onMarkAllRead?: () => void;
   mailboxes: JmapMailbox[];
   onCreateMailbox?: (name: string) => Promise<void>;
   onDeleteMailbox?: (id: string) => Promise<void>;
@@ -59,6 +61,7 @@ export function useMailCommandPaletteController({
   open,
   onOpenChange,
   onCompose,
+  onMarkAllRead,
   mailboxes,
   onCreateMailbox,
   onDeleteMailbox,
@@ -200,11 +203,15 @@ export function useMailCommandPaletteController({
         dispatchBusy({ type: "setLocalImageOverride", value: image }),
     });
 
-  const searchableItems = buildMailSearchableItems(settings?.timezone);
+  const actionItems = onMarkAllRead ? [MARK_ALL_READ_PALETTE_ITEM] : [];
+  const searchableItems = buildMailSearchableItems(
+    settings?.timezone,
+    actionItems,
+  );
   const items = filterMailPaletteItems(searchableItems, chrome.query);
   const mainListItems = chrome.query.trim()
     ? items
-    : buildMailBrowseItems(settings?.timezone);
+    : buildMailBrowseItems(settings?.timezone, actionItems);
 
   const showUnifiedSearch =
     currentView === "main" && chrome.debouncedSearchQuery.trim().length >= 2;
@@ -229,6 +236,7 @@ export function useMailCommandPaletteController({
       item,
       onOpenChange,
       onCompose,
+      onMarkAllRead,
       goForward,
     });
   };

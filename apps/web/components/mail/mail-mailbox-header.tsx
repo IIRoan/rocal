@@ -32,6 +32,7 @@ export function MailMailboxHeader({
   advanced,
   refresh,
   emptyFolder,
+  onMarkAllRead,
 }: {
   title: string;
   unreadCount: number;
@@ -57,6 +58,7 @@ export function MailMailboxHeader({
   };
   refresh: { spinning: boolean; disabled: boolean; onClick: () => void };
   emptyFolder?: { label: string; onClick: () => void };
+  onMarkAllRead?: () => void;
 }) {
   const filterLabel =
     MAIL_LIST_VIEW_FILTERS.find((option) => option.value === filter.value)
@@ -182,6 +184,15 @@ export function MailMailboxHeader({
                 tooltip="Refresh"
                 variant={FilledVariant.FILLED}
               />
+              {onMarkAllRead ? (
+                <IconText
+                  dataTest="mailbox-mark-all-read"
+                  onClick={onMarkAllRead}
+                  startIcon={Icon.EnvelopeRead}
+                  tooltip="Mark all as read"
+                  variant={FilledVariant.FILLED}
+                />
+              ) : null}
               {emptyFolder ? (
                 <IconText
                   color="destructive"

@@ -100,7 +100,6 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     const { textBody: plainBody, htmlBody } = resolveOutgoingComposeBodies({
       body: draft.body,
       htmlBody: draft.htmlBody,
-      signatureAlreadyEmbedded: draft.signatureAlreadyEmbedded,
     });
     const htmlForDraft = composeSettings.plainTextMode ? undefined : htmlBody;
 

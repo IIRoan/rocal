@@ -12,11 +12,152 @@ import {
   DropdownMenuTrigger,
 } from "@workspace/ui/components/ui/dropdown-menu";
 import { cn } from "@workspace/ui/lib/utils";
-import { Check, ChevronDown, Download, Edit3, Loader2, Save, Trash2 } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  Copy,
+  Download,
+  Edit3,
+  Loader2,
+  Save,
+  Trash2,
+} from "lucide-react";
 
 import { isRecurringEventDeleteCandidate } from "@/lib/event-editor-view-model";
 import type { EventEditorFooterProps } from "./types";
 import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
+
+type InvitationActionProps = Pick<
+  EventEditorFooterProps,
+  "invitationResponsePending" | "invitationStatus" | "onInvitationResponse"
+>;
+
+function InvitationResponseButtons({
+  invitationResponsePending,
+  onInvitationResponse,
+}: InvitationActionProps) {
+  return (
+    <>
+      <Button
+        size="sm"
+        disabled={invitationResponsePending !== null}
+        onClick={() => onInvitationResponse("accepted")}
+        className="gap-1"
+      >
+        {invitationResponsePending === "accepted" ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <Check className="size-4" />
+        )}
+        Accept
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={invitationResponsePending !== null}
+        onClick={() => onInvitationResponse("tentative")}
+      >
+        {invitationResponsePending === "tentative" && (
+          <Loader2 className="size-4 animate-spin" />
+        )}
+        Maybe
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={invitationResponsePending !== null}
+        onClick={() => onInvitationResponse("declined")}
+        className="text-muted-foreground"
+      >
+        {invitationResponsePending === "declined" && (
+          <Loader2 className="size-4 animate-spin" />
+        )}
+        Decline
+      </Button>
+    </>
+  );
+}
+
+function InvitationStatusMenu({
+  invitationResponsePending,
+  invitationStatus,
+  onInvitationResponse,
+}: InvitationActionProps) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={invitationResponsePending !== null}
+          className="gap-1.5"
+        >
+          {invitationResponsePending !== null && (
+            <Loader2 className="size-4 animate-spin" />
+          )}
+          {invitationStatus === "declined"
+            ? "Declined"
+            : invitationStatus === "tentative"
+              ? "Maybe"
+              : "Accepted"}
+          <ChevronDown className="size-4 opacity-50" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-28">
+        <DropdownMenuItem
+          onClick={() => onInvitationResponse("accepted")}
+          className={cn(invitationStatus === "accepted" && "font-medium")}
+        >
+          <Check
+            className={cn(
+              "size-4",
+              invitationStatus !== "accepted" && "opacity-0",
+            )}
+          />
+          Accept
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => onInvitationResponse("tentative")}
+          className={cn(invitationStatus === "tentative" && "font-medium")}
+        >
+          <Check
+            className={cn(
+              "size-4",
+              invitationStatus !== "tentative" && "opacity-0",
+            )}
+          />
+          Maybe
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          variant="destructive"
+          onClick={() => onInvitationResponse("declined")}
+          className={cn(invitationStatus === "declined" && "font-medium")}
+        >
+          <Check
+            className={cn(
+              "size-4",
+              invitationStatus !== "declined" && "opacity-0",
+            )}
+          />
+          Decline
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function EventInvitationActions(props: InvitationActionProps) {
+  return (
+    <div className="flex items-center gap-2">
+      {props.invitationStatus === null ? (
+        <InvitationResponseButtons {...props} />
+      ) : (
+        <InvitationStatusMenu {...props} />
+      )}
+    </div>
+  );
+}
 
 export function EventEditorFooter({
   canEditEvent,
@@ -57,112 +198,18 @@ export function EventEditorFooter({
     handleEventDelete();
   };
 
+  const handleDuplicate = () => {
+    if (eventForm.selectedEvent) eventForm.duplicateEvent(eventForm.selectedEvent);
+  };
+
   const showInvitationActions =
     Boolean(eventForm.selectedEvent?.id) && !canEditEvent && !isCancelledEvent;
   const invitationActions = showInvitationActions ? (
-    <div className="flex items-center gap-2">
-      {invitationStatus === null ? (
-        <>
-          <Button
-            size="sm"
-            disabled={invitationResponsePending !== null}
-            onClick={() => onInvitationResponse("accepted")}
-            className="gap-1"
-          >
-            {invitationResponsePending === "accepted" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Check className="size-4" />
-            )}
-            Accept
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={invitationResponsePending !== null}
-            onClick={() => onInvitationResponse("tentative")}
-          >
-            {invitationResponsePending === "tentative" && (
-              <Loader2 className="size-4 animate-spin" />
-            )}
-            Maybe
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={invitationResponsePending !== null}
-            onClick={() => onInvitationResponse("declined")}
-            className="text-muted-foreground"
-          >
-            {invitationResponsePending === "declined" && (
-              <Loader2 className="size-4 animate-spin" />
-            )}
-            Decline
-          </Button>
-        </>
-      ) : (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={invitationResponsePending !== null}
-              className="gap-1.5"
-            >
-              {invitationResponsePending !== null && (
-                <Loader2 className="size-4 animate-spin" />
-              )}
-              {invitationStatus === "declined"
-                ? "Declined"
-                : invitationStatus === "tentative"
-                  ? "Maybe"
-                  : "Accepted"}
-              <ChevronDown className="size-4 opacity-50" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="min-w-28">
-            <DropdownMenuItem
-              onClick={() => onInvitationResponse("accepted")}
-              className={cn(invitationStatus === "accepted" && "font-medium")}
-            >
-              <Check
-                className={cn(
-                  "size-4",
-                  invitationStatus !== "accepted" && "opacity-0",
-                )}
-              />
-              Accept
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => onInvitationResponse("tentative")}
-              className={cn(invitationStatus === "tentative" && "font-medium")}
-            >
-              <Check
-                className={cn(
-                  "size-4",
-                  invitationStatus !== "tentative" && "opacity-0",
-                )}
-              />
-              Maybe
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              variant="destructive"
-              onClick={() => onInvitationResponse("declined")}
-              className={cn(invitationStatus === "declined" && "font-medium")}
-            >
-              <Check
-                className={cn(
-                  "size-4",
-                  invitationStatus !== "declined" && "opacity-0",
-                )}
-              />
-              Decline
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
-    </div>
+    <EventInvitationActions
+      invitationResponsePending={invitationResponsePending}
+      invitationStatus={invitationStatus}
+      onInvitationResponse={onInvitationResponse}
+    />
   ) : null;
 
   if (desktop) {
@@ -190,6 +237,11 @@ export function EventEditorFooter({
             )}
             {invitationActions}
             <div className="flex-1" />
+            {eventForm.canDuplicate && (
+              <Button variant="ghost" size="sm" onClick={handleDuplicate}>
+                <Copy className="size-4" /> Duplicate
+              </Button>
+            )}
             {eventForm.selectedEvent?.id && (
               <SimpleTooltip content="Download .ics">
                 <Button
@@ -259,6 +311,17 @@ export function EventEditorFooter({
           )}
           {invitationActions}
           <div className="flex-1" />
+          {eventForm.canDuplicate && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleDuplicate}
+              aria-label="Duplicate"
+              className="tap-target"
+            >
+              <Copy className="size-4" />
+            </Button>
+          )}
           {eventForm.selectedEvent?.id && (
             <Button variant="outline" onClick={handleEventDownloadIcs}>
               <Download className="size-4 mr-2" /> Export

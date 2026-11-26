@@ -87,7 +87,7 @@ export interface EventCalendarProps {
     options?: {
       mode?: "modal" | "popover";
       anchorPosition?: { x: number; y: number };
-      eventViewMode?: "view" | "edit";
+      eventViewMode?: "view" | "edit" | "duplicate";
     },
   ) => void;
   onSetPreview?: (event: CalendarEvent | null) => void;
@@ -124,7 +124,7 @@ export function EventCalendar({
   onCreateShortcut,
   onSearchShortcut,
 }: EventCalendarProps) {
-  const { currentDate, setCurrentDate, currentView, setCurrentView } =
+  const { calendars, currentDate, setCurrentDate, currentView, setCurrentView } =
     useCalendarContext();
   const view = currentView;
   const resolvedTimezone = resolveTimezone(timezone);
@@ -362,6 +362,7 @@ export function EventCalendar({
       </div>
 
       <EventCalendarContextMenu
+        calendars={calendars}
         currentDate={currentDate}
         onCreateEvent={handleEventCreate}
         onDeleteEvent={handleEventDelete}

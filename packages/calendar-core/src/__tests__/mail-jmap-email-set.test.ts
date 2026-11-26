@@ -1,9 +1,12 @@
 import {
   buildEmailDestroyMethodCall,
+  buildEmailMarkReadMethodCall,
   buildEmailMoveMethodCall,
   buildEmailRestoreMailboxesMethodCall,
+  buildUnreadMailboxQueryMethodCall,
   collectMailboxRestores,
   destroyMailboxMessagesInBatches,
+  markMailboxMessagesReadInBatches,
 } from "../mail-jmap-email-set";
 
 describe("mail JMAP Email/set builders", () => {
@@ -79,5 +82,62 @@ describe("destroyMailboxMessagesInBatches", () => {
     });
     expect(count).toBe(2);
     expect(destroy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("markMailboxMessagesReadInBatches", () => {
+  it("queries only the mailbox's unread messages from the first position", () => {
+    expect(buildUnreadMailboxQueryMethodCall("acc", "inbox", 50)).toEqual([
+      "Email/query",
+      {
+        accountId: "acc",
+        filter: { inMailbox: "inbox", notKeyword: "$seen" },
+        position: 0,
+        limit: 50,
+      },
+      "q1",
+    ]);
+    expect(buildEmailMarkReadMethodCall("acc", ["m1"])).toEqual([
+      "Email/set",
+      { accountId: "acc", update: { m1: { "keywords/$seen": true } } },
+      "c1",
+    ]);
+  });
+
+  it("marks unread messages read page by page until none are left", async () => {
+    let unread = Array.from({ length: 5 }, (_, i) => `m${i}`);
+    const marked: string[][] = [];
+    const count = await markMailboxMessagesReadInBatches({
+      batchSize: 2,
+      listUnreadIds: async (limit) => unread.slice(0, limit),
+      markRead: async (ids) => {
+        marked.push(ids);
+        unread = unread.filter((id) => !ids.includes(id));
+      },
+    });
+    expect(count).toBe(5);
+    expect(marked).toEqual([["m0", "m1"], ["m2", "m3"], ["m4"]]);
+  });
+
+  it("stops when the server keeps the same messages unread", async () => {
+    const markRead = jest.fn(async () => undefined);
+    const count = await markMailboxMessagesReadInBatches({
+      batchSize: 2,
+      listUnreadIds: async () => ["m1", "m2"],
+      markRead,
+    });
+    expect(count).toBe(2);
+    expect(markRead).toHaveBeenCalledTimes(1);
+  });
+
+  it("surfaces a failed write instead of reporting progress", async () => {
+    await expect(
+      markMailboxMessagesReadInBatches({
+        listUnreadIds: async () => ["m1"],
+        markRead: async () => {
+          throw new Error("refused");
+        },
+      }),
+    ).rejects.toThrow("refused");
   });
 });

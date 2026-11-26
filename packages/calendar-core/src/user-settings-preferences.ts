@@ -1,4 +1,5 @@
 import { z } from "./zod";
+import { REMINDER_MINUTE_OPTIONS } from "./event-editor-options";
 import {
   riftboundImportedIdsSchema,
   riftboundPreferencesSchema,
@@ -17,6 +18,7 @@ export const SEALED_USER_SETTINGS_FIELDS = [
   "browserNotifications",
   "reminderSound",
   "defaultEventDuration",
+  "defaultReminderMinutes",
   "compactView",
   "showWeekNumbers",
   "showDeclinedEvents",
@@ -59,6 +61,7 @@ const preferenceSchemas = {
   browserNotifications: z.boolean(),
   reminderSound: z.boolean(),
   defaultEventDuration: z.number().int().min(1).max(2_147_483_647),
+  defaultReminderMinutes: z.literal([0, ...REMINDER_MINUTE_OPTIONS]),
   compactView: z.boolean(),
   showWeekNumbers: z.boolean(),
   showDeclinedEvents: z.boolean(),

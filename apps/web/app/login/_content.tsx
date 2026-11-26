@@ -12,7 +12,11 @@ import {
 } from "@/lib/auth-navigation";
 import { Key, Eye, EyeOff, ArrowRight, Check, X, Ticket } from "lucide-react";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
-import { afterPaint, getErrorMessage } from "@workspace/calendar-core";
+import {
+  afterPaint,
+  getErrorMessage,
+  getSignInErrorMessage,
+} from "@workspace/calendar-core";
 import { LogoMark, ThemeToggle } from "@workspace/ui/components/layout";
 import { PageLoadingOverlay } from "@workspace/ui/components/ui";
 import { Button } from "@workspace/ui/components/ui/button";
@@ -890,9 +894,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
           clearPendingAuthPassword();
           dispatchChrome({
             type: "set-error",
-            error:
-              signInResult.error.message ||
-              "Email or password is incorrect. Check both and try again.",
+            error: getSignInErrorMessage(signInResult.error),
           });
           dispatchChrome({ type: "finish-email-auth" });
           return;

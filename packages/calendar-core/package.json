@@ -32,6 +32,7 @@
     "./mail-mime-parser": "./src/mail-mime-parser.ts",
     "./mail-pgp-layers": "./src/mail-pgp-layers.ts",
     "./mail-pgp-encryption": "./src/mail-pgp-encryption.ts",
+    "./mail-pgp-signature": "./src/mail-pgp-signature.ts",
     "./event-ics-export": "./src/event-ics-export.ts",
     "./ics-import": "./src/ics-import.ts",
     "./riftbound": "./src/riftbound.ts",

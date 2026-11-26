@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
+import { Selection } from "@tiptap/pm/state";
 import { serializeEditorContent } from "./quoted-html";
 import { cn } from "@workspace/ui/lib/utils";
 import { richTextEditorExtensions } from "./rich-text-editor-extensions";
@@ -150,7 +151,11 @@ export function RichTextEditor({
         lastEmittedHtmlRef.current = content;
         return;
       }
+      const { from } = editor.state.selection;
       editor.commands.setContent(content, { emitUpdate: false });
+      // setContent leaves the caret after the new content; it goes back where it was, the top of a freshly opened compose.
+      const { doc, tr } = editor.state;
+      editor.view.dispatch(tr.setSelection(Selection.near(doc.resolve(Math.min(from, doc.content.size)))));
       lastEmittedHtmlRef.current = content;
     });
 

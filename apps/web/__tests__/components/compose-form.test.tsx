@@ -68,11 +68,15 @@ jest.mock("../../components/mail/rich-text-editor", () => {
 });
 
 import { ComposeForm } from "../../components/mail/compose-dialog";
-import { MailComposeProvider } from "../../components/mail/mail-compose-context";
+import { getMailComposeBridge } from "../../components/mail/mail-compose-bridge";
+import { MailComposeProvider, useMailComposeChrome } from "../../components/mail/mail-compose-context";
+import type { ComposeScheduling } from "../../components/mail/compose-schedule-popover";
+import type { JmapIdentity } from "@/lib/mail/types";
 
 let container: HTMLDivElement;
 let root: Root;
-let onSend: jest.Mock<() => Promise<void>>;
+type SendOptions = { skipAttachmentCheck?: boolean; sendAt?: string };
+let onSend: jest.Mock<(options?: SendOptions) => Promise<void>>;
 
 function renderForms(autoFocusForm: boolean) {
   const form = (autoFocus: boolean) => (
@@ -102,7 +106,7 @@ beforeEach(() => {
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
-  onSend = jest.fn(async () => undefined);
+  onSend = jest.fn(async (_options?: SendOptions) => undefined);
   mockEditorFocus.mockClear();
   renderForms(false);
 });
@@ -236,5 +240,148 @@ describe("ComposeForm autoFocus", () => {
     await waitForFrame();
 
     expect(mockEditorFocus).not.toHaveBeenCalled();
+  });
+});
+
+describe("ComposeForm signatures, signing and scheduling", () => {
+  const identities: JmapIdentity[] = [
+    { id: "work", email: "alex@solace.onl", name: "Alex", textSignature: "Alex Doe\nSolace" },
+    { id: "home", email: "alex@home.test", name: "Alex", textSignature: "Alex" },
+  ];
+  const scheduling: ComposeScheduling = {
+    maxDelayedSendSeconds: 7 * 86_400,
+    internalDomain: "solace.onl",
+    timezone: "Europe/Amsterdam",
+    timeFormat: "24h",
+    weekStartsOn: 1,
+  };
+
+  function OpenCompose() {
+    const { isComposeOpen } = useMailComposeChrome();
+    return isComposeOpen ? (
+      <ComposeForm
+        identities={identities}
+        fallbackFromEmail="alex@solace.onl"
+        onClose={jest.fn()}
+        onSend={onSend}
+        isBusy={false}
+        scheduling={scheduling}
+      />
+    ) : null;
+  }
+
+  function openNewCompose(settings: object) {
+    localStorage.setItem("mail:composeSettings", JSON.stringify({ plainTextMode: true, ...settings }));
+    // A fresh tree reads the settings just stored.
+    act(() => root.render(null));
+    act(() =>
+      root.render(
+        <MailComposeProvider
+          identities={identities}
+          mailServerLimits={resolveMailServerLimits({})}
+          quoteDateOptions={{ timeFormat: "24h" }}
+        >
+          <OpenCompose />
+        </MailComposeProvider>,
+      ),
+    );
+    act(() => getMailComposeBridge()?.openNewCompose());
+    const body = container.querySelector("textarea");
+    if (!body) throw new Error("No plain-text body");
+    return body;
+  }
+
+  function edit(body: HTMLTextAreaElement, value: string) {
+    const setValue = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+    act(() => {
+      setValue?.call(body, value);
+      body.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
+
+  function chooseFrom(identityId: string) {
+    const from = container.querySelector("select");
+    if (!from) throw new Error("No From picker");
+    act(() => {
+      from.value = identityId;
+      from.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  }
+
+  afterEach(() => localStorage.removeItem("mail:composeSettings"));
+
+  it("opens a new message with the signature below an empty writing line and the caret at the top", () => {
+    const body = openNewCompose({});
+    expect(body.value).toBe("\n\n-- \nAlex Doe\nSolace");
+    expect([body.selectionStart, body.selectionEnd]).toEqual([0, 0]);
+  });
+
+  it("swaps an unchanged signature for the new sender's and leaves an edited one alone", () => {
+    const body = openNewCompose({});
+    chooseFrom("home");
+    expect(body.value).toBe("\n\n-- \nAlex");
+    edit(body, "Hi\n\n-- \nAlex, edited");
+    chooseFrom("work");
+    expect(body.value).toBe("Hi\n\n-- \nAlex, edited");
+  });
+
+  it("removes the signature with No signature, adds it back from the picker and sends what is written", async () => {
+    const body = openNewCompose({});
+    const signaturePicker = container.querySelector<HTMLButtonElement>('button[aria-label="Signature"]');
+    if (!signaturePicker) throw new Error("No signature picker");
+    act(() => signaturePicker.click());
+    act(() => button("No signature").click());
+    expect(body.value).toBe("\n\n");
+    act(() => signaturePicker.click());
+    act(() => button("Account signatureAlex Doe Solace").click());
+    expect(body.value).toBe("\n\n-- \nAlex Doe\nSolace");
+    edit(body, "Hello");
+    expect(getMailComposeBridge()?.getDraft().body).toBe("Hello");
+  });
+
+  it("shows that the message is signed only while signing is on", () => {
+    openNewCompose({ signOutgoingMail: true });
+    expect(container.textContent).toContain("Signed with your key");
+    expect(container.textContent).toContain("Mail to Solace accounts is always signed inside its encryption.");
+    openNewCompose({ signOutgoingMail: false });
+    expect(container.textContent).not.toContain("Signed with your key");
+  });
+
+  it("only arms Schedule when a time is picked, and schedules when Schedule is pressed", async () => {
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: (media: string) => ({
+        matches: false,
+        media,
+        onchange: null,
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+        addListener: jest.fn(),
+        removeListener: jest.fn(),
+        dispatchEvent: () => false,
+      }),
+    });
+    const body = openNewCompose({});
+    type(field("To"), "sam@solace.onl");
+    type(field("Subject"), "Plan");
+    edit(body, "See you then");
+    act(() => (container.querySelector('button[aria-label="Schedule send"]') as HTMLButtonElement).click());
+    const preset = Array.from(document.body.querySelectorAll("button")).find((item) =>
+      item.querySelector("span.tabular-nums"),
+    );
+    act(() => preset?.click());
+
+    expect(onSend).not.toHaveBeenCalled();
+    expect(container.querySelector('button[aria-label^="Scheduled for "]')).toBeTruthy();
+    await act(async () => button("Schedule").click());
+    expect(onSend).toHaveBeenCalledWith({ skipAttachmentCheck: false, sendAt: expect.any(String) });
+  });
+
+  it("keeps Schedule send with the other compose tools, not beside Send", () => {
+    openNewCompose({});
+    const schedule = container.querySelector('button[aria-label="Schedule send"]');
+    const attach = container.querySelector('button[aria-label="Attach files"]');
+    expect(schedule?.parentElement).toBe(attach?.parentElement);
+    expect(schedule?.parentElement?.contains(button("Send"))).toBe(false);
   });
 });

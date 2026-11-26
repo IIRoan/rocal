@@ -24,12 +24,14 @@ async function handleLogout() {
 type UseDashboardUserActionsOptions = {
   defaultCalendarId?: string | null;
   fallbackCalendarId?: string | null;
+  defaultEventDuration?: number;
   openEventEditor: (event: CalendarEvent) => void;
 };
 
 export function useDashboardUserActions({
   defaultCalendarId,
   fallbackCalendarId,
+  defaultEventDuration,
   openEventEditor,
 }: UseDashboardUserActionsOptions) {
   function openNewEventEditor() {
@@ -37,6 +39,7 @@ export function useDashboardUserActions({
       createDraftCalendarEvent({
         defaultCalendarId,
         fallbackCalendarId,
+        durationMinutes: defaultEventDuration,
       }),
     );
   }

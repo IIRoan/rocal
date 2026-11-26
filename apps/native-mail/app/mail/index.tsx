@@ -103,6 +103,9 @@ export default function MailScreen() {
         onSelectMailbox={controller.handleSelectMailbox}
         onEmptyMailbox={controller.handleEmptyMailbox}
         emptyingMailboxId={controller.emptyingMailboxId}
+        markReadMailbox={controller.markReadMailbox}
+        onMarkMailboxRead={controller.handleMarkMailboxAsRead}
+        markingMailboxRead={controller.markingMailboxRead}
       />
 
       <MailFilterSheet

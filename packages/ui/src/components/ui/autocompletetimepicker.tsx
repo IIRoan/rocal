@@ -32,6 +32,8 @@ interface TimePickerProps {
   /** Names the field, such as "Start time"; the accessible name then reads "Start time, 09:00". */
   label?: string;
   className?: string;
+  /** Lets a picker inside another raised surface, such as a popover, stack its own list above it. */
+  contentClassName?: string;
   inline?: boolean;
   variant?: "outline" | "ghost";
 }
@@ -284,6 +286,7 @@ export function ShadcnAutocomleteTimePicker({
   placeholder = "Select time…",
   label,
   className,
+  contentClassName,
   inline = false,
   variant = "outline",
 }: TimePickerProps) {
@@ -439,7 +442,7 @@ export function ShadcnAutocomleteTimePicker({
       <PopoverContent
         id={timePickerContentId}
         align="start"
-        className="w-44 p-0"
+        className={cn("w-44 p-0", contentClassName)}
       >
         <div className="flex items-center gap-1 border-b border-border p-1.5">
           <TimeInput

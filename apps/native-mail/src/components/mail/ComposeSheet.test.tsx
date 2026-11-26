@@ -22,6 +22,7 @@ jest.mock("../../hooks/use-mail-settings", () => ({ useMailComposeSettings: () =
 jest.mock("../../hooks/use-compose-identity", () => ({ useComposeIdentity: () => ({ identities: [], selectedIdentity: null, selectedIdentityId: null, composeContext: null, pickerOpen: false, setPickerOpen: jest.fn(), pick: jest.fn() }) }));
 jest.mock("../../hooks/use-compose-form", () => ({ useComposeForm: () => [jest.requireActual<typeof import("../../lib/mail/compose-form")>("../../lib/mail/compose-form").INITIAL_COMPOSE_FORM, mockDispatch] }));
 jest.mock("../../hooks/use-compose-draft-autosave", () => ({ useComposeDraftAutosave: () => ({ saveDraft: jest.fn(), settleDraftSave: jest.fn() }) }));
+jest.mock("../../hooks/use-compose-schedule", () => ({ useComposeSchedule: () => ({ sendAt: null, label: null, open: jest.fn(), clear: jest.fn(), sheet: { key: 0, visible: false, onSchedule: jest.fn(), onDismiss: jest.fn() } }) }));
 jest.mock("../../hooks/use-compose-send", () => ({ useComposeSend: (input: { sendScope: string; onSent: () => void }) => { mockScope = input.sendScope; mockOnSent = input.onSent; return { send: jest.fn(), sending: false, canSend: true }; } }));
 jest.mock("../../hooks/use-compose-leave", () => ({ useComposeLeave: () => ({ cancel: jest.fn(), dismiss: jest.fn() }) }));
 jest.mock("expo-document-picker", () => ({ getDocumentAsync: async () => ({ canceled: false, assets: [{ uri: "file:///cache/trip.jpg", name: "trip.jpg", mimeType: "image/jpeg", size: 4 }] }) }));
@@ -34,6 +35,8 @@ jest.mock("./ComposeFormatBar", () => ({ ComposeFormatBar: () => null }));
 jest.mock("./ComposeAttachmentList", () => ({ ComposeAttachmentList: () => null }));
 jest.mock("./ComposeIdentitySheet", () => ({ ComposeIdentitySheet: () => null }));
 jest.mock("./ComposeScheduleSheet", () => ({ ComposeScheduleSheet: () => null }));
+jest.mock("./ComposeTemplatesSheet", () => ({ ComposeTemplatesSheet: () => null }));
+jest.mock("./ComposeSignatureSheet", () => ({ ComposeSignatureSheet: () => null }));
 
 it("preserves the actual ComposeSheet scope during StrictMode replay and retires it on unmount", async () => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

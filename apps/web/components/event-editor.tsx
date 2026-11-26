@@ -43,7 +43,7 @@ interface EventEditorProps {
   localSettings: UserSettings;
   editorMode?: EventEditorMode;
   anchorPosition?: { x: number; y: number } | null;
-  initialEventViewMode?: "view" | "edit";
+  initialEventViewMode?: "view" | "edit" | "duplicate";
   updatePreviewEvent?: (updates: Partial<CalendarEvent>) => void;
   showBackButton?: boolean;
   closeHandleRef?: Ref<EventEditorCloseHandle>;
@@ -90,6 +90,7 @@ export function EventEditor({
     handleEventDelete: deleteEvent,
     handleEventSave: saveEvent,
     handleRecurringDelete: deleteRecurring,
+    duplicateEvent,
     isRecurring,
     loadEventData,
     resetForm,
@@ -132,6 +133,10 @@ export function EventEditor({
       return;
     }
 
+    if (initialEventViewMode === "duplicate") {
+      duplicateEvent(eventToEdit);
+      return;
+    }
     loadEventData(eventToEdit);
     const canEditEvent = canCurrentUserEditEvent(eventToEdit);
     if (
@@ -144,6 +149,7 @@ export function EventEditor({
       setEventViewMode("edit");
     }
   }, [
+    duplicateEvent,
     eventToEdit,
     initialEventViewMode,
     loadEventData,

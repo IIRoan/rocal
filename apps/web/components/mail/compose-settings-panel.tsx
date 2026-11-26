@@ -86,10 +86,10 @@ export function ComposeSettingsPanel({ goBack }: { goBack: () => void }) {
         <PaletteSelect
           id="mail-signature-position"
           label="Signature position"
-          value={settings.signaturePosition}
+          value={settings.replySignaturePosition}
           options={SIGNATURE_POSITION_OPTIONS}
-          onValueChange={(signaturePosition) =>
-            updateSettings({ signaturePosition })
+          onValueChange={(replySignaturePosition) =>
+            updateSettings({ replySignaturePosition })
           }
         />
       </PaletteField>

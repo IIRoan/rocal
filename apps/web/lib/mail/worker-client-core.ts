@@ -200,6 +200,8 @@ export class MailCryptoWorkerClient {
 
   async decryptMessage(input: {
     armoredMessage: string;
+    /** The From address an attached signing key must name. */
+    senderEmail?: string;
     senderPublicKeyArmored?: string;
     expectedVaultFingerprint?: string;
     /** A draft about to be edited keeps its whole HTML instead of the read limit. */
@@ -219,6 +221,10 @@ export class MailCryptoWorkerClient {
       "ENCRYPT_FOR_RECIPIENTS",
       input,
     );
+  }
+
+  signDetached(input: { data: string }): Promise<{ armoredSignature: string; micalg: string }> {
+    return this.call<{ armoredSignature: string; micalg: string }>("SIGN_DETACHED", input);
   }
 
   clear(): Promise<{ cleared: boolean }> {

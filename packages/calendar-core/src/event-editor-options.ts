@@ -106,3 +106,29 @@ export function formatReminderShort(minutes: number): string {
   if (minutes % 10080 === 0) return pluralUnit(minutes / 10080, "week");
   return pluralUnit(minutes / 1440, "day");
 }
+
+export const DEFAULT_REMINDER_MINUTES = 15;
+
+/** Reminders a new event starts with: an unset preference keeps 15 minutes, 0 means none. */
+export function getDefaultReminderMinutes(
+  defaultReminderMinutes: number | undefined,
+): number[] {
+  return normalizeReminderMinutes([
+    defaultReminderMinutes ?? DEFAULT_REMINDER_MINUTES,
+  ]);
+}
+
+export const DEFAULT_REMINDER_SETTING_OPTIONS = [
+  { value: 0, label: "None" },
+  ...REMINDER_MINUTE_OPTIONS.map((minutes) => ({
+    value: minutes,
+    label: `${formatReminderShort(minutes)} before`,
+  })),
+];
+
+/** Lengths offered for new events; a stored length off the list stays selectable. */
+export function eventDurationOptions(current: number) {
+  return [...new Set([15, 30, 45, 60, 90, 120, current])]
+    .sort((left, right) => left - right)
+    .map((minutes) => ({ value: minutes, label: formatReminderShort(minutes) }));
+}

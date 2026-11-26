@@ -36,7 +36,9 @@ export function MailSecurityIndicator(props: MailSecurityIndicatorProps) {
     messageContext: props.messageContext,
   });
   const readingLimit = props.readState === "read_limit";
-  if (meta.tone !== "warning" && !readingLimit) return null;
+  const warning = meta.tone === "warning";
+  const signature = props.readState === "decrypted" ? props.signatureVerificationState : undefined;
+  if (!warning && !readingLimit && signature !== "verified" && signature !== "attached_key") return null;
 
   return (
     <Pressable
@@ -58,13 +60,9 @@ export function MailSecurityIndicator(props: MailSecurityIndicatorProps) {
       accessibilityLabel={meta.label}
     >
       <Feather
-        name={readingLimit ? "info" : "alert-triangle"}
+        name={readingLimit ? "info" : warning ? "alert-triangle" : "shield"}
         size={16}
-        color={
-          readingLimit
-            ? theme.colors.mutedForeground
-            : theme.colors.destructive
-        }
+        color={warning ? theme.colors.destructive : theme.colors.mutedForeground}
       />
     </Pressable>
   );

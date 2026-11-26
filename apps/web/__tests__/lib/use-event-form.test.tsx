@@ -203,6 +203,28 @@ describe("useEventForm reminder hydration", () => {
     expect(latestFormRef.current?.showNotifications).toBe(true);
   });
 
+  it("starts a new event with the account's default reminder", async () => {
+    const newEvent = { ...baseEvent, id: "" };
+    await act(async () => {
+      await latestFormRef.current!.loadEventData(newEvent);
+    });
+    expect(latestFormRef.current?.eventReminder).toBe(15);
+    expect(latestFormRef.current?.showNotifications).toBe(true);
+    expect(latestFormRef.current?.isDirty).toBe(false);
+
+    localSettings.defaultReminderMinutes = 0;
+    try {
+      await act(async () => {
+        await latestFormRef.current!.loadEventData(newEvent);
+      });
+      expect(latestFormRef.current?.eventNotifications).toEqual([]);
+      expect(latestFormRef.current?.showNotifications).toBe(false);
+    } finally {
+      delete localSettings.defaultReminderMinutes;
+    }
+    expect(mockGetEventNotifications).not.toHaveBeenCalled();
+  });
+
   it("keeps the reminder section collapsed when no reminders exist", async () => {
     mockGetEventNotifications.mockResolvedValue({
       data: { notifications: [] },
@@ -1065,5 +1087,44 @@ describe("useEventForm reminder hydration", () => {
         expect.objectContaining({ id: "event-new" }),
       ]);
     });
+  });
+
+  it("duplicates an event into an unsaved copy with its reminders and no invitees", async () => {
+    mockGetEventNotifications.mockResolvedValue({
+      data: {
+        notifications: [
+          { id: "n1", isEnabled: true, minutesBefore: 45, notificationType: "email" },
+          { id: "n2", isEnabled: true, minutesBefore: 5, notificationType: "email" },
+        ],
+      },
+      success: true,
+    } as any);
+    const source = {
+      ...baseEvent,
+      location: "Room 4",
+      participants: [
+        { id: "p1", eventId: "event-1", email: "a@x.test", role: "organizer", status: "accepted" },
+      ],
+    };
+
+    await act(async () => {
+      await latestFormRef.current!.loadEventData(source);
+    });
+    expect(latestFormRef.current?.canDuplicate).toBe(true);
+
+    await act(async () => {
+      latestFormRef.current!.duplicateEvent(source);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    const form = latestFormRef.current!;
+    expect(form.selectedEvent?.id).toBe("");
+    expect(form.eventViewMode).toBe("edit");
+    expect(form.eventTitle).toBe("Encrypted event");
+    expect(form.eventLocation).toBe("Room 4");
+    expect(form.eventCalendarId).toBe("cal-1");
+    expect(form.eventParticipants).toEqual([]);
+    expect(form.eventNotifications.map((n) => n.minutesBefore)).toEqual([45, 5]);
+    expect(form.isDirty).toBe(false);
   });
 });

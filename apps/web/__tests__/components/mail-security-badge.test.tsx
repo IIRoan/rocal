@@ -5,6 +5,7 @@ import { expect, it, jest } from "@jest/globals";
 import { MailSecurityBadge } from "@/components/mail/message-reader/mail-security-badge";
 
 jest.mock("lucide-react", () => ({
+  Shield: () => null,
   ShieldCheck: () => null,
   ShieldAlert: () => null,
   Lock: () => null,
@@ -134,3 +135,25 @@ it.each([
     act(() => root.unmount());
   },
 );
+
+it.each([
+  ["verified", { kind: "self" }, "PGP encrypted: signed with your local key", "Signature verified"],
+  ["attached_key", { kind: "not_applicable" }, "PGP encrypted, signed with an unconfirmed key", "not who owns it"],
+] as const)("shows a %s signature as a quiet notice", (signatureVerificationState, senderKeyTrustState, label, detail) => {
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  act(() =>
+    root.render(
+      <MailSecurityBadge
+        messageState="pgp_mime"
+        accountEncryptedAtRest
+        readState="decrypted"
+        signatureVerificationState={signatureVerificationState}
+        senderKeyTrustState={senderKeyTrustState}
+      />,
+    ),
+  );
+  expect(container.textContent).toContain(label);
+  expect(container.textContent).toContain(detail);
+  act(() => root.unmount());
+});

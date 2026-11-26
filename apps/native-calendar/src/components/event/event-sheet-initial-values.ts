@@ -1,8 +1,11 @@
-import type {
-  CalendarEvent,
-  CreateEventRequest,
+import {
+  buildEventDuplicate,
+  resolveTimezone,
+  wallClockToUtc,
+  type Calendar,
+  type CalendarEvent,
+  type CreateEventRequest,
 } from "@workspace/calendar-core";
-import { resolveTimezone, wallClockToUtc } from "@workspace/calendar-core";
 import type { EventSheetMode } from "./EventSheet";
 import {
   parseCreateEventCalendarDay,
@@ -36,16 +39,28 @@ function eventToInitialValues(
   };
 }
 
-/** Form seed for the sheet: the saved event when editing, or the swept range or a one-hour slot on the tapped day/hour when creating. */
+/** Create-sheet seed copying `event` into a writable calendar, or null when it cannot be duplicated. */
+export function eventDuplicateInitialValues(
+  event: CalendarEvent,
+  calendars: readonly Calendar[],
+  timezone: string,
+): Partial<CreateEventRequest> | null {
+  const copy = buildEventDuplicate(event, calendars);
+  return copy ? eventToInitialValues(copy, timezone) : null;
+}
+
+/** Form seed for the sheet: the saved event when editing, or the swept range or a default-length slot on the tapped day/hour when creating. */
 export function eventSheetInitialValues(
   mode: EventSheetMode | null,
   event: CalendarEvent | undefined,
   timezone: string,
+  durationMinutes = 60,
 ): Partial<CreateEventRequest> | undefined {
   if ((mode?.type === "view" || mode?.type === "edit") && event) {
     return eventToInitialValues(event, timezone);
   }
   if (mode?.type !== "create") return undefined;
+  if (mode.duplicate) return mode.duplicate.values;
   if (mode.start && mode.end) {
     return {
       start: toTimezonePickerISOString(new Date(mode.start), timezone),
@@ -63,7 +78,7 @@ export function eventSheetInitialValues(
     0,
     timezone,
   );
-  const endDate = new Date(zonedStart.getTime() + 60 * 60 * 1000);
+  const endDate = new Date(zonedStart.getTime() + durationMinutes * 60 * 1000);
   return {
     start: toTimezonePickerISOString(zonedStart, timezone),
     end: toTimezonePickerISOString(endDate, timezone),

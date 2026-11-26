@@ -416,6 +416,26 @@ export const SEARCH_INDEX = [
   },
   // Calendar defaults
   {
+    id: "default-event-duration",
+    label: "Default Event Duration",
+    icon: Calendar,
+    description: "Set how long new events last",
+    targetView: "calendar-defaults",
+    keywords: ["duration", "length", "new event", "calendar defaults"],
+    parent: "calendar-defaults",
+    parentLabel: "Calendar Defaults",
+  },
+  {
+    id: "default-reminder",
+    label: "Default Reminder",
+    icon: Calendar,
+    description: "Set the reminder new events start with",
+    targetView: "calendar-defaults",
+    keywords: ["reminder", "alert", "notification", "calendar defaults"],
+    parent: "calendar-defaults",
+    parentLabel: "Calendar Defaults",
+  },
+  {
     id: "week-start",
     label: "First Day of Week",
     icon: Calendar,

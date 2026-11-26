@@ -2331,7 +2331,7 @@ describe("MailApp", () => {
         plainTextMode: true,
         attachmentReminderEnabled: false,
         attachmentReminderKeywords: [],
-        signaturePosition: "below_quote",
+        replySignaturePosition: "below_quote",
         signatureSeparatorEnabled: true,
         autoSelectReplyIdentity: false,
       }),

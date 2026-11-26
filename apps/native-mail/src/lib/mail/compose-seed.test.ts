@@ -33,9 +33,9 @@ function plan(overrides: Partial<ComposeSeedInput>) {
     params: {},
     sourceMessage: source,
     settingsLoaded: true,
-    signaturePosition: "below_quote",
-    signatureOptions: {},
-    identity: me,
+    replySignaturePosition: "below_quote",
+    signatureOptions: { separator: true },
+    signature: me,
     identities: [me],
     fromEmail: "me@example.com",
     dateOptions: { timeFormat: "24h", timezone: "Europe/Amsterdam" },
@@ -61,8 +61,19 @@ describe("planComposeSeed", () => {
   it("addresses a new message from a mailto with the name shown", () => {
     expect(plan({ params: { to: "ann@example.com", toName: "Ann" }, sourceMessage: null })).toEqual({
       kind: "fields",
-      fields: { to: "Ann <ann@example.com>", cc: "", bcc: "", subject: "", body: "" },
+      fields: { to: "Ann <ann@example.com>", cc: "", bcc: "", subject: "", body: "\n\n-- \nMe" },
     });
+  });
+
+  it("opens a new message with an empty writing line above the signature, once the mailbox is in", () => {
+    expect(plan({ sourceMessage: null })).toEqual({
+      kind: "fields",
+      fields: { to: "", cc: "", bcc: "", subject: "", body: "\n\n-- \nMe" },
+    });
+    expect(plan({ sourceMessage: null, signatureOptions: { separator: false } })).toMatchObject({ fields: { body: "\n\nMe" } });
+    expect(plan({ sourceMessage: null, signature: null })).toMatchObject({ fields: { body: "" } });
+    expect(plan({ sourceMessage: null, runtime: undefined })).toBeNull();
+    expect(plan({ sourceMessage: null, settingsLoaded: false })).toBeNull();
   });
 
   it("reopens an undone send from its form before loading the source", () => {
@@ -77,7 +88,7 @@ describe("planComposeSeed", () => {
     const mailto = { to: ["a@example.com", "b@example.com"], cc: ["c@example.com"], bcc: [], subject: "Hi", body: "Line one\nLine two" };
     expect(plan({ params: { mailto }, sourceMessage: null })).toEqual({
       kind: "fields",
-      fields: { to: "a@example.com, b@example.com", cc: "c@example.com", bcc: "", subject: "Hi", body: "Line one\nLine two" },
+      fields: { to: "a@example.com, b@example.com", cc: "c@example.com", bcc: "", subject: "Hi", body: "Line one\nLine two\n\n-- \nMe" },
     });
   });
 
@@ -86,25 +97,23 @@ describe("planComposeSeed", () => {
     expect(plan({ params: { mode: "reply" }, settingsLoaded: false })).toBeNull();
   });
 
-  it("replies to the sender with a quoted body", () => {
+  it("replies to the sender with the quote and the signature below it", () => {
     const seed = plan({ params: { mode: "reply" } });
     expect(seed).toMatchObject({
       kind: "fields",
       fields: { to: "ann@example.com", cc: "", subject: "Re: Plans" },
     });
-    expect(seed?.kind === "fields" && seed.fields.body).toContain("Ann wrote:\n> See you there");
+    expect(seed?.kind === "fields" && seed.fields.body).toMatch(/^\n\nOn .+, Ann wrote:\n> See you there\n\n-- \nMe$/);
   });
 
-  it("replies to all, keeps the signature above the quote when asked, and forwards", () => {
-    const replyAll = plan({ params: { mode: "reply-all" }, signaturePosition: "above_quote" });
+  it("replies to all with the signature above the quote when asked, and forwards", () => {
+    const replyAll = plan({ params: { mode: "reply-all" }, replySignaturePosition: "above_quote" });
     expect(replyAll).toMatchObject({ fields: { to: "ann@example.com", cc: "bo@example.com" } });
-    expect(replyAll?.kind === "fields" && replyAll.fields.body.indexOf("Me")).toBeLessThan(
-      replyAll?.kind === "fields" ? replyAll.fields.body.indexOf("wrote:") : 0,
-    );
+    expect(replyAll?.kind === "fields" && replyAll.fields.body).toMatch(/^\n\n-- \nMe\n\nOn .+, Ann wrote:\n> See you there$/);
 
-    const forward = plan({ params: { mode: "forward" } });
+    const forward = plan({ params: { mode: "forward" }, replySignaturePosition: "above_quote" });
     expect(forward).toMatchObject({ fields: { to: "", subject: "Fwd: Plans" } });
-    expect(forward?.kind === "fields" && forward.fields.body).toContain("Forwarded message");
+    expect(forward?.kind === "fields" && forward.fields.body).toMatch(/^\n\n-- \nMe\n\n---------- Forwarded message ----------\n/);
   });
 
   it("matches web reply-all semantics for Reply-To, other recipients and self aliases", () => {
@@ -122,7 +131,7 @@ describe("planComposeSeed", () => {
     expect(seed).toMatchObject({ fields: { to: "reply@example.com", cc: "other@example.com, bo@example.com", bcc: "" } });
   });
 
-  it("reopens a plain draft with its id, headers and body", () => {
+  it("reopens a plain draft with its id, headers and body, and adds no signature", () => {
     expect(plan({ params: { mode: "draft" } })).toEqual({
       kind: "fields",
       draftId: "m1",
@@ -153,13 +162,6 @@ describe("planComposeSeed", () => {
     const body = reply?.kind === "fields" ? reply.fields.body : "";
     expect(body).toContain("Ann wrote:\n> See you there");
     expect(body).not.toContain("BEGIN PGP");
-  });
-
-  it("opens a blank message for other requests", () => {
-    expect(plan({})).toEqual({
-      kind: "fields",
-      fields: { to: "", cc: "", bcc: "", subject: "", body: "" },
-    });
   });
 });
 

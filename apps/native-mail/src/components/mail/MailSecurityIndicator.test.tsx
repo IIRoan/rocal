@@ -173,6 +173,28 @@ describe("native mail encryption notice", () => {
     expect(review).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    ["verified", { kind: "self" }, "PGP encrypted: signed with your local key", "Signature verified"],
+    ["attached_key", { kind: "not_applicable" }, "PGP encrypted, signed with an unconfirmed key", "not who owns it"],
+  ] as const)("shows a %s signature as a quiet notice", (signatureVerificationState, senderKeyTrustState, label, detail) => {
+    act(() =>
+      root.render(
+        <MailSecurityIndicator
+          encryption="pgp_mime"
+          encryptedAtRest
+          readState="decrypted"
+          signatureVerificationState={signatureVerificationState}
+          senderKeyTrustState={senderKeyTrustState}
+        />,
+      ),
+    );
+    expect(mockIconName).toBe("shield");
+    expect(mockPressable?.accessibilityLabel).toBe(label);
+    jest.mocked(Alert.alert).mockClear();
+    mockPressable?.onPress();
+    expect(Alert.alert).toHaveBeenCalledWith(label, expect.stringContaining(detail));
+  });
+
   it.each(["decrypted", "pending"] as const)(
     "hides routine MIME reading status: %s",
     (readState) => {

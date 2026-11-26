@@ -166,6 +166,7 @@ function SidebarWithContext() {
   const { handleLogout, openNewEventEditor } = useDashboardUserActions({
     defaultCalendarId: settings?.defaultCalendarId,
     fallbackCalendarId: calendarData.calendars?.[0]?.id,
+    defaultEventDuration: settings?.defaultEventDuration,
     openEventEditor,
   });
 
@@ -205,6 +206,7 @@ function MobileLayoutContent() {
   const { handleLogout, openNewEventEditor } = useDashboardUserActions({
     defaultCalendarId: settings?.defaultCalendarId,
     fallbackCalendarId: calendarData.calendars?.[0]?.id,
+    defaultEventDuration: settings?.defaultEventDuration,
     openEventEditor,
   });
   const {

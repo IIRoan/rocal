@@ -1,18 +1,20 @@
 "use client";
 
 import type { ComponentType } from "react";
-import { Monitor, Moon, Shield, Sun } from "lucide-react";
+import { KeyRound, Monitor, Moon, Shield, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import type { UnifiedSearchResult } from "@workspace/calendar-core";
 import type { UserSettings } from "@/lib/types/calendar";
-import type { JmapEmailMessage, JmapMailbox, LabelDef } from "@/lib/mail/types";
+import type { JmapEmailMessage, JmapIdentity, JmapMailbox, LabelDef } from "@/lib/mail/types";
 import { AccountSettings } from "../command-palette/account-settings";
 import { InviteSettings } from "../command-palette/invite-settings";
 import { NotificationSettings } from "../command-palette/notification-settings";
 import { PasswordSection } from "../command-palette/password-section";
 import { PrivateSearchIndexToggle } from "../command-palette/private-search-index-toggle";
+import { SettingToggleRow } from "../command-palette/setting-toggle-row";
 import { TimeRegionSettings } from "../command-palette/time-region-settings";
 import { PasskeySettings } from "@/components/passkey-settings";
+import { useMailComposeSettings } from "@/lib/mail/compose-settings";
 import { ComposeSettingsPanel } from "./compose-settings-panel";
 import { ContactsSettingsPanel } from "./contacts-settings-panel";
 import type { MailPaletteItem } from "./mail-command-palette-items";
@@ -20,6 +22,8 @@ import type { MailPaletteView } from "./mail-command-palette-ui-state";
 import { MailDisplaySettingsPanel } from "./mail-display-settings-panel";
 import { MailListSettingsPanel } from "./mail-list-settings-panel";
 import { MailSettingsHub } from "./mail-settings-hub";
+import { MailTemplatesPanel } from "./mail-templates-panel";
+import { MailSignaturesPanel } from "./mail-signatures-panel";
 import { VacationReplySettingsPanel } from "./vacation-reply-settings-panel";
 import { ScheduledSendsPanel } from "./scheduled-sends-panel";
 import type { MailConnection } from "@/hooks/use-mail-vacation-response";
@@ -94,6 +98,7 @@ export type MailCommandPaletteViewContentProps = {
   ) => Promise<void>;
   onDeleteLabel?: (id: string) => Promise<void>;
   mailConnection: MailConnection | null;
+  identities: JmapIdentity[];
   userId: string | null;
 };
 
@@ -144,6 +149,7 @@ function MailSecurityView({
   changingPassword: boolean;
   handleChangePassword: (values: PasswordValues) => Promise<void>;
 }) {
+  const { settings, updateSettings } = useMailComposeSettings();
   return (
     <PaletteView title="Security" onBack={goBack}>
       <PaletteSection label="Authentication">
@@ -161,6 +167,17 @@ function MailSecurityView({
             privateSearchIndex.enabled
               ? privateSearchIndex.disable
               : privateSearchIndex.enable
+          }
+        />
+      </PaletteSection>
+      <PaletteSection label="Signing">
+        <SettingToggleRow
+          icon={KeyRound}
+          label="Sign messages with my key"
+          description="Recipients can confirm a message came from you and was not changed. Messages to people outside Solace include your public key, so they can see its fingerprint."
+          checked={settings.signOutgoingMail}
+          onToggle={() =>
+            updateSettings({ signOutgoingMail: !settings.signOutgoingMail })
           }
         />
       </PaletteSection>
@@ -290,6 +307,7 @@ export function MailCommandPaletteViewContent(
       onUpdateLabel={props.onUpdateLabel}
       onDeleteLabel={props.onDeleteLabel}
       mailConnection={props.mailConnection}
+      identities={props.identities}
       userId={props.userId}
       timezone={localSettings?.timezone}
     />
@@ -297,9 +315,14 @@ export function MailCommandPaletteViewContent(
 }
 
 const BACK_ONLY_PANELS: Partial<
-  Record<MailPaletteView, ComponentType<{ goBack: () => void }>>
+  Record<
+    MailPaletteView,
+    ComponentType<{ goBack: () => void; identities: JmapIdentity[] }>
+  >
 > = {
   composing: ComposeSettingsPanel,
+  templates: MailTemplatesPanel,
+  signatures: MailSignaturesPanel,
   "mail-list": MailListSettingsPanel,
   contacts: ContactsSettingsPanel,
 };
@@ -319,6 +342,7 @@ type MailPreferencesViewContentProps = Pick<
   | "onUpdateLabel"
   | "onDeleteLabel"
   | "mailConnection"
+  | "identities"
   | "userId"
 > & { timezone?: string | null };
 
@@ -387,7 +411,7 @@ function MailPreferencesViewContent(props: MailPreferencesViewContentProps) {
 
   const Panel = BACK_ONLY_PANELS[currentView];
   if (Panel) {
-    return <Panel goBack={goBack} />;
+    return <Panel goBack={goBack} identities={props.identities} />;
   }
 
   if (currentView === "auto-reply") {

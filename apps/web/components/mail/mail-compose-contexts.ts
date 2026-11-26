@@ -24,6 +24,8 @@ export type MailComposeFieldsContextValue = {
   mailServerLimits: MailServerLimits;
   selectedIdentityId: string | null;
   setSelectedIdentityId: (id: string | null) => void;
+  signatureChoice: string | null | undefined;
+  setSignatureChoice: (choice: string | null | undefined) => void;
   draftSaveStatus: DraftSaveStatus;
   setDraftSaveStatus: (status: DraftSaveStatus) => void;
   composeDraftId: string | null;

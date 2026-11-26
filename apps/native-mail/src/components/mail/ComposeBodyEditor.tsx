@@ -22,6 +22,7 @@ import {
   composeTextToHtml,
   FORWARDED_MESSAGE_HEADER,
   htmlToComposeText,
+  insertMailTemplateText,
   QUOTE_FOLD_LABEL,
   REPLY_QUOTE_HEADER_PATTERN,
   toggleComposeList,
@@ -52,6 +53,8 @@ export type ComposeBodyEditorHandle = {
   applyItalic: () => void;
   applyUnderline: () => void;
   applyList: () => void;
+  /** Inserts compose text at the last caret, or at the start when the body was never focused; `afterSelection` keeps selected text. */
+  insertText: (text: string, options?: { afterSelection?: boolean }) => void;
 };
 
 type ComposeBodyEditorProps = {
@@ -212,8 +215,41 @@ function buildEditorDocument(input: {
         document.execCommand(command, false, null);
         post({ type: 'change', html: ed.innerHTML });
       };
+      // Opening the template picker blurs the editor, so the caret is remembered for the insert.
+      var savedRange = null;
+      document.addEventListener('selectionchange', function() {
+        var selection = window.getSelection();
+        if (selection && selection.rangeCount > 0 && ed.contains(selection.anchorNode)) {
+          savedRange = selection.getRangeAt(0).cloneRange();
+        }
+      });
+      window.insertHtmlAtCaret = function(html, afterSelection) {
+        ed.focus();
+        var selection = window.getSelection();
+        var range = savedRange && ed.contains(savedRange.startContainer) ? savedRange : document.createRange();
+        if (range !== savedRange) {
+          range.setStart(ed, 0);
+          range.collapse(true);
+        } else if (afterSelection) {
+          range.collapse(false);
+        }
+        selection.removeAllRanges();
+        selection.addRange(range);
+        document.execCommand('insertHTML', false, html);
+        post({ type: 'change', html: ed.innerHTML });
+      };
+      var typed = false;
+      function caretToStart() {
+        var range = document.createRange();
+        range.setStart(ed.firstChild || ed, 0);
+        range.collapse(true);
+        var selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
       ed.addEventListener('input', function() {
         if (skip) return;
+        typed = true;
         var html = ed.innerHTML;
         if (html === '<br>' || html === '<div><br></div>' || html === '<p><br></p>') {
           ed.innerHTML = '';
@@ -227,6 +263,8 @@ function buildEditorDocument(input: {
       ed.addEventListener('click', function(event) {
         var quote = event.target && event.target.closest ? event.target.closest('.quote.collapsed') : null;
         if (quote) expandReplyQuote(quote);
+        // A tap below the text of an untouched body starts writing at the top, above the seeded signature and quote.
+        else if (!typed && event.target === ed) caretToStart();
         post({ type: 'focus' });
       });
       ed.addEventListener('blur', function() {
@@ -338,6 +376,24 @@ export const ComposeBodyEditor = forwardRef<
           return;
         }
         applyFallback(toggleComposeList);
+      },
+      insertText: (text: string, options?: { afterSelection?: boolean }) => {
+        const afterSelection = options?.afterSelection === true;
+        if (WebView && editorReady) {
+          injectJavaScriptRef.current?.(
+            `window.insertHtmlAtCaret(${JSON.stringify(composeTextToHtml(text))}, ${afterSelection}); true;`,
+          );
+          return;
+        }
+        applyFallback((current, currentSelection) =>
+          insertMailTemplateText(
+            current,
+            afterSelection
+              ? { start: currentSelection.end, end: currentSelection.end }
+              : currentSelection,
+            text,
+          ),
+        );
       },
     }),
   );

@@ -1,5 +1,8 @@
 import {
   EVENT_CONTENT_UNAVAILABLE_MESSAGE,
+  findEventCallLink,
+  getEventLinkLabel,
+  getEventLocationMapQuery,
   hasOptionalEventParticipants,
   isCancelledCalendarEvent,
 } from "@workspace/calendar-core";
@@ -9,6 +12,7 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@workspace/ui/components/ui/alert";
+import { Button } from "@workspace/ui/components/ui/button";
 import { getColorSwatchValue } from "@workspace/ui/components/calendar";
 import {
   Popover,
@@ -27,6 +31,7 @@ import {
   Server,
   Tag,
   Users,
+  Video,
 } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 
@@ -140,6 +145,13 @@ export function EventEditorReadView({
       eventForm.selectedEvent?.category ??
       null)
     : null;
+  const callLink = isCancelledEvent
+    ? null
+    : findEventCallLink({
+        location: eventForm.eventLocation,
+        description: eventForm.eventDescription,
+      });
+  const mapQuery = getEventLocationMapQuery(eventForm.eventLocation);
 
   return (
     <div className="space-y-3 py-1">
@@ -202,6 +214,27 @@ export function EventEditorReadView({
             </div>
           </div>
         </EventEditorRow>
+
+        {callLink ? (
+          <EventEditorRow desktop icon={Video} label="Video call">
+            <div className="flex min-h-9 items-center gap-2">
+              <Button asChild size="sm">
+                <a
+                  href={callLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Join video call on ${getEventLinkLabel(callLink)} (opens in a new tab)`}
+                >
+                  <Video className="size-4" aria-hidden />
+                  Join
+                </a>
+              </Button>
+              <span className="min-w-0 truncate text-xs text-muted-foreground">
+                {getEventLinkLabel(callLink)}
+              </span>
+            </div>
+          </EventEditorRow>
+        ) : null}
 
         <EventEditorRow desktop icon={CalendarDays} label="Calendar">
           <div className="flex min-h-9 items-center gap-2 text-sm text-foreground">
@@ -269,6 +302,17 @@ export function EventEditorReadView({
           <EventEditorRow desktop icon={MapPin} label="Location">
             <div className="py-2 text-sm leading-snug text-foreground break-words">
               {eventForm.eventLocation}
+              {mapQuery ? (
+                <a
+                  href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(mapQuery)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-0.5 block w-fit text-xs text-accent underline hover:text-accent/80"
+                >
+                  Open in OpenStreetMap
+                  <span className="sr-only"> (opens in a new tab)</span>
+                </a>
+              ) : null}
             </div>
           </EventEditorRow>
         )}

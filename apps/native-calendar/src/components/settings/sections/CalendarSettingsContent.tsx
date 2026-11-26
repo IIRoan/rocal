@@ -1,5 +1,10 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { partitionCalendarsByKind } from "@workspace/calendar-core";
+import {
+  DEFAULT_REMINDER_MINUTES,
+  DEFAULT_REMINDER_SETTING_OPTIONS,
+  eventDurationOptions,
+  partitionCalendarsByKind,
+} from "@workspace/calendar-core";
 import { SettingsPage } from "@workspace/native-core/components/settings/SettingsPage";
 import {
   SheetCenteredState,
@@ -72,6 +77,9 @@ export function CalendarSettingsContent() {
 
   const weekStartDay = settings?.weekStartDay ?? 0;
   const weekStartPending = pendingKeys.has("weekStartDay");
+  const eventDuration = settings?.defaultEventDuration ?? 60;
+  const defaultReminder =
+    settings?.defaultReminderMinutes ?? DEFAULT_REMINDER_MINUTES;
 
   if (isLoading && !settings) {
     return (
@@ -102,6 +110,56 @@ export function CalendarSettingsContent() {
               ))}
             </SheetGroup>
           )}
+        </SheetSection>
+
+        <SheetSection
+          title="Default event duration"
+          footer="Used for new events."
+        >
+          <SheetGroup>
+            {eventDurationOptions(eventDuration).map((option) => {
+              const selected = eventDuration === option.value;
+              return (
+                <SheetItem
+                  key={option.value}
+                  label={option.label}
+                  checked={selected}
+                  pending={selected && pendingKeys.has("defaultEventDuration")}
+                  onPress={() =>
+                    updateSetting({ defaultEventDuration: option.value })
+                  }
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                />
+              );
+            })}
+          </SheetGroup>
+        </SheetSection>
+
+        <SheetSection
+          title="Default reminder"
+          footer="New events start with this reminder."
+        >
+          <SheetGroup>
+            {DEFAULT_REMINDER_SETTING_OPTIONS.map((option) => {
+              const selected = defaultReminder === option.value;
+              return (
+                <SheetItem
+                  key={option.value}
+                  label={option.label}
+                  checked={selected}
+                  pending={
+                    selected && pendingKeys.has("defaultReminderMinutes")
+                  }
+                  onPress={() =>
+                    updateSetting({ defaultReminderMinutes: option.value })
+                  }
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                />
+              );
+            })}
+          </SheetGroup>
         </SheetSection>
 
         <SheetSection title="Week starts on">

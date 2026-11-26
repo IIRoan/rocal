@@ -60,6 +60,8 @@ export function MailAppOverlays({
     emptyFolderLabel,
     selectedMailbox,
     handleEmptyMailbox,
+    canMarkFolderRead,
+    handleMarkMailboxAsRead,
     hasMoreMessages,
     isOverlayLoading,
   } = controller;
@@ -71,6 +73,14 @@ export function MailAppOverlays({
         onOpenChange={handlePaletteOpenChange}
         initialView={paletteInitialView}
         onCompose={() => handleOpenCompose()}
+        onMarkAllRead={
+          canMarkFolderRead
+            ? () =>
+                void handleMarkMailboxAsRead().catch((error) =>
+                  log.error("Failed to mark folder as read", error),
+                )
+            : undefined
+        }
         mailboxes={activeMailbox?.mailboxes ?? []}
         onCreateMailbox={(name) => handleCreateMailbox(name)}
         onDeleteMailbox={(id) => handleDeleteMailbox(id)}
@@ -99,6 +109,7 @@ export function MailAppOverlays({
             ? { client: activeMailbox.client, session: activeMailbox.session }
             : null
         }
+        identities={activeMailbox?.pickerIdentities}
       />
 
       <ComposeDialog
