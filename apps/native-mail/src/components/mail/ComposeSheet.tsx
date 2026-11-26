@@ -300,6 +300,8 @@ function ComposeSession({
               onSelectIdentity={signaturePicker.selectIdentity}
               subject={subject}
               threadReply={isThreadReply(params.mode)}
+              // A reply to your own message seeds no recipient, so its To must stay editable.
+              lockedTo={isThreadReply(params.mode) && Boolean(form.seed?.to.trim())}
               mailboxLoading={runtimeQuery.isLoading}
               attachments={attachments}
               error={error}

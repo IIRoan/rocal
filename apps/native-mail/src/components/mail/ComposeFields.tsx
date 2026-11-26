@@ -19,12 +19,12 @@ import type { ComposeFormAction } from "../../lib/mail/compose-form";
 import { ComposeAttachmentList } from "./ComposeAttachmentList";
 import { ComposeRecipientFields } from "./ComposeRecipientFields";
 
-type RecipientProps = Omit<ComponentProps<typeof ComposeRecipientFields>, "onSubmitEmpty" | "lockedTo" | "dispatch">;
+type RecipientProps = Omit<ComponentProps<typeof ComposeRecipientFields>, "onSubmitEmpty" | "dispatch">;
 
 type ComposeFieldsProps = RecipientProps & {
   dispatch: Dispatch<ComposeFormAction>;
   subject: string;
-  /** A reply keeps its thread's recipients and subject; only Cc and Bcc can be added. */
+  /** A reply keeps its thread's subject. */
   threadReply: boolean;
   mailboxLoading: boolean;
   attachments: PendingComposeAttachment[];
@@ -61,12 +61,11 @@ export function ComposeFields({
       <ComposeRecipientFields
         {...recipients}
         dispatch={dispatch}
-        lockedTo={threadReply}
         onSubmitEmpty={() => subjectInputRef.current?.focus()}
       />
 
       {threadReply ? (
-        <View style={styles.replySubject} accessible accessibilityLabel={`Subject ${subject}`}>
+        <View style={styles.replySubject} accessible accessibilityLabel={`Subject ${subject}`} testID="compose-reply-subject">
           <Feather name="corner-up-left" size={14} color={skin.textTertiary} />
           <Text style={styles.replySubjectText} numberOfLines={1}>
             {subject}

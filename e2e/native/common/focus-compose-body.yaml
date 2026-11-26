@@ -1,0 +1,14 @@
+appId: ${APP_ID}
+---
+- extendedWaitUntil:
+    visible: Message body
+    timeout: 60000
+# The editor frame can extend behind the keyboard, so its center is not always tappable.
+- tapOn:
+    text: Message body
+    point: 20%,5%
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible: Attach file
+    timeout: 30000
+- waitForAnimationToEnd

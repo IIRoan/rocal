@@ -48,7 +48,7 @@ beforeEach(() => {
 
 afterEach(() => act(() => root.unmount()));
 
-function render(threadReply: boolean, to = "Maya Chen <maya@example.com>, bo@example.com") {
+function render(threadReply: boolean, to = "Maya Chen <maya@example.com>, bo@example.com", lockedTo = threadReply) {
   act(() =>
     root.render(
       <ComposeFields
@@ -65,6 +65,7 @@ function render(threadReply: boolean, to = "Maya Chen <maya@example.com>, bo@exa
         onSelectIdentity={jest.fn()}
         subject="Re: Plans for Friday"
         threadReply={threadReply}
+        lockedTo={lockedTo}
         mailboxLoading={false}
         attachments={[]}
         error={null}
@@ -83,6 +84,12 @@ it("shows a reply's recipients and subject as the thread's own, with Cc and Bcc 
 
   act(() => container.querySelector<HTMLButtonElement>('button[aria-label="Show Cc, Bcc, and From"]')?.click());
   expect(dispatch).toHaveBeenCalledWith({ type: "toggleCcBcc" });
+});
+
+it("keeps To editable on a reply that seeded no recipient, so a reply to your own message can still be addressed", () => {
+  render(true, "", false);
+  expect(container.querySelector('input[aria-label="To recipients"]')).not.toBeNull();
+  expect(container.querySelector('input[aria-label="Subject"]')).toBeNull();
 });
 
 it("gives a new message editable recipients and a subject row", () => {

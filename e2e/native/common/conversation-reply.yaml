@@ -38,7 +38,7 @@ appId: ${APP_ID}
 - assertVisible:
     text: ${"(?s).*" + REPLY_TEXT + ".*"}
     below:
-      text: Subject
+      id: compose-reply-subject
 - assertNotVisible:
     id: compose-recipient-to
     text: ${"(?s).*" + REPLY_TEXT + ".*"}

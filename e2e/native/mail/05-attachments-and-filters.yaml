@@ -7,6 +7,8 @@ appId: ${APP_ID}
 - tapOn: Compose message
 - assertVisible: Send
 - waitForAnimationToEnd
+# The format bar, which holds Attach file, shows while the body is being edited.
+- runFlow: ../common/focus-compose-body.yaml
 - runFlow:
     when:
       platform: iOS
@@ -22,9 +24,7 @@ appId: ${APP_ID}
                   - swipe:
                       start: 50%,8%
                       end: 50%,75%
-                  - extendedWaitUntil:
-                      visible: Attach file
-                      timeout: 30000
+                  - runFlow: ../common/focus-compose-body.yaml
             - tapOn:
                 text: Attach file
                 enabled: true
