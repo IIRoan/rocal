@@ -61,6 +61,7 @@ export async function pickComposeAttachments(
   for (const asset of result.assets) {
     if (!asset.uri) continue;
     const picked = { uri: asset.uri, name: asset.name ?? "attachment", type: asset.mimeType, size: asset.size ?? 0 };
+    // oxlint-disable-next-line react-doctor/async-await-in-loop -- one picked file in memory at a time, attached in the order picked.
     await readPickedFile(picked, maxBytes, reportStripNotice).then(
       (file) => onAttach(createPendingComposeAttachment(file)),
       (err: unknown) => onError(getErrorMessage(err, "Failed to attach file.")),

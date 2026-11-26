@@ -18,7 +18,7 @@ const GOOGLE_SEPARATOR_LINE = /^-[-:~]{10,}$/;
 const EDITOR_BOILERPLATE_LINE = /^Please do not edit this section\.$/i;
 const TEAMS_LINK_URL = /^https?:\/\/[^>]/;
 const BARE_URL = /https?:\/\/[^\s<>]+/g;
-const TRAILING_PUNCTUATION = /[.,;:!?)\]'"]+$/;
+const TRAILING_PUNCTUATION = ".,;:!?)]'\"";
 const HTTPS_URL = /^https:\/\//i;
 const CALL_HOSTS = [
   "meet.google.com",
@@ -53,11 +53,18 @@ export function findTeamsLinks(line: string): TeamsLink[] {
   return links;
 }
 
+/** Scans back from the end; an unanchored `[…]+$` regex is quadratic on long punctuation runs (CodeQL js/polynomial-redos). */
+function trimTrailingPunctuation(url: string): string {
+  let end = url.length;
+  while (end > 0 && TRAILING_PUNCTUATION.includes(url.charAt(end - 1))) end -= 1;
+  return url.slice(0, end);
+}
+
 function bareUrlRuns(line: string): EventTextRun[] {
   const runs: EventTextRun[] = [];
   let lastIndex = 0;
   for (const match of line.matchAll(BARE_URL)) {
-    const url = match[0].replace(TRAILING_PUNCTUATION, "");
+    const url = trimTrailingPunctuation(match[0]);
     const start = match.index;
     if (start > lastIndex) runs.push({ kind: "text", text: line.slice(lastIndex, start) });
     runs.push({ kind: "link", url, label: null });

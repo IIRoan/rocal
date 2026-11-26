@@ -48,6 +48,17 @@ describe("splitEventTextLine", () => {
     ]);
   });
 
+  it("stays linear on a URL full of punctuation that is not at its end", () => {
+    const hostile = `https://x.test/${"!".repeat(200_000)}a`;
+    const started = performance.now();
+    expect(splitEventTextLine(hostile)).toEqual([{ kind: "link", url: hostile, label: null }]);
+    expect(splitEventTextLine("https://x.test/a!?).")).toEqual([
+      { kind: "link", url: "https://x.test/a", label: null },
+      { kind: "text", text: "!?)." },
+    ]);
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+
   it("prefers Teams-style labels", () => {
     expect(splitEventTextLine("Join<https://teams.microsoft.com/l/x> now")).toEqual([
       { kind: "link", url: "https://teams.microsoft.com/l/x", label: "Join" },

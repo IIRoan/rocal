@@ -16,6 +16,7 @@ export type QuotedImages = {
 };
 
 const NO_IMAGES: QuotedImages = { loaded: new Map(), failed: new Set() };
+const NO_PENDING_IMAGES = Promise.resolve(NO_IMAGES);
 const IMG_TAG = /<img\b[^>]*>/gi;
 const EMBEDDABLE_IMAGE = /^image\/(?:png|gif|jpe?g|webp|bmp|avif)$/i;
 
@@ -69,7 +70,7 @@ export function useComposeQuotedImages({
   /** Puts the loaded images into the open editor without replacing its content. */
   onLoaded: (images: QuotedImages) => void;
 }) {
-  const pendingRef = useRef<Promise<QuotedImages>>(Promise.resolve(NO_IMAGES));
+  const pendingRef = useRef<Promise<QuotedImages>>(NO_PENDING_IMAGES);
   const hasPlaceholders = htmlHasUnhydratedInlinePlaceholders(htmlBody);
   const start = useEffectEvent((isCancelled: () => boolean) => {
     if (!runtime || !sourceMessage) return;
