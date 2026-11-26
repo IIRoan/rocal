@@ -10,11 +10,16 @@ import {
   isSpamMailboxRole,
   isTrashMailboxRole,
 } from "@/lib/mail/mail-mailbox-roles";
-import { MessageListBulkBar } from "./message-list/message-list-bulk-bar";
+import {
+  MessageListBulkBar,
+  type MessageListBarTarget,
+} from "./message-list/message-list-bulk-bar";
 import { MessageListVirtualized } from "./message-list/message-list-virtualized";
 import {
   initialMessageListState,
   messageListReducer,
+  type MessageListAction,
+  type MessageListState,
 } from "./message-list/message-list-state";
 import type {
   MessageListRowInteraction,
@@ -23,11 +28,86 @@ import type {
 import {
   buildMessageListItems,
   buildMessageListThreadRows,
+  type MessageListThreadRow,
 } from "./message-list/message-list-utils";
 
 const MOVE_EXCLUDED_ROLES = new Set(["sent", "drafts"]);
 const EMPTY_RELATED_MESSAGES: JmapEmailMessage[] = [];
 const EMPTY_LABELS: LabelDef[] = [];
+
+/** Where the current mailbox lets messages go, and whether they can be reported as spam or rescued from it. */
+function resolveMailboxActions(
+  mailboxes: JmapMailbox[] | undefined,
+  currentMailboxId: string | null | undefined,
+  canReport: boolean,
+  canRescue: boolean,
+) {
+  const role = mailboxes?.find((mailbox) => mailbox.id === currentMailboxId)?.role;
+  const isInSpam = isSpamMailboxRole(role);
+  const hasSpamMailbox = Boolean(findSpamMailbox(mailboxes ?? []));
+  return {
+    moveTargets: (mailboxes ?? []).filter(
+      (mailbox) =>
+        mailbox.id !== currentMailboxId &&
+        !MOVE_EXCLUDED_ROLES.has(mailbox.role?.toLowerCase() ?? ""),
+    ),
+    canReportSpam: canReport && !isInSpam && !isTrashMailboxRole(role) && hasSpamMailbox,
+    canNotSpam: canRescue && isInSpam,
+  };
+}
+
+/** The bar acts on the checked conversations, else on the one open in the reader, else it is hidden. */
+function resolveBarTarget(
+  threadRows: MessageListThreadRow[],
+  selectedMessageId: string | null,
+  checkedIds: string[],
+  primaryIds: Set<string>,
+): MessageListBarTarget | null {
+  if (checkedIds.length > 0) return { kind: "selection", messageIds: checkedIds };
+  const openRow = selectedMessageId
+    ? threadRows.find((row) => row.messageIds.includes(selectedMessageId))
+    : undefined;
+  if (!openRow) return null;
+  return {
+    kind: "open",
+    messageIds: openRow.messageIds,
+    subject: openRow.latestMessage.subject || "(No subject)",
+    isRead: openRow.messages.every(
+      (entry) => !primaryIds.has(entry.id) || entry.keywords?.["$seen"],
+    ),
+  };
+}
+
+/** Opens a thread in place, showing messages held from an earlier visit at once while they refresh. */
+function expandThread(
+  threadId: string,
+  state: MessageListState,
+  dispatch: (action: MessageListAction) => void,
+  onExpandThread: MessageListProps["onExpandThread"],
+  cachedThreadMessages: MessageListProps["cachedThreadMessages"],
+) {
+  const isExpanded = state.expandedThreads.has(threadId);
+  dispatch({ type: "toggleThread", threadId });
+  if (isExpanded || !onExpandThread || state.expandedThreadMessages[threadId]) return;
+  const held = cachedThreadMessages?.(threadId);
+  if (held?.length) {
+    dispatch({ type: "setThreadMessages", threadId, messages: held });
+  } else {
+    dispatch({ type: "setThreadLoading", threadId, loading: true });
+  }
+  void Promise.resolve(onExpandThread(threadId))
+    .then((threadMessages) => {
+      if (threadMessages && threadMessages.length > 0) {
+        dispatch({ type: "setThreadMessages", threadId, messages: threadMessages });
+      }
+    })
+    .catch(() => {
+      // Non-critical
+    })
+    .finally(() => {
+      dispatch({ type: "setThreadLoading", threadId, loading: false });
+    });
+}
 
 export interface MessageListProps {
   messages: JmapEmailMessage[];
@@ -116,21 +196,11 @@ export function MessageList({
   // Day headings are counted from when this mailbox opened; switching mailboxes remounts the list.
   const [openedAt] = useState(() => new Date());
 
-  const currentMailbox = mailboxes?.find(
-    (mailbox) => mailbox.id === currentMailboxId,
-  );
-  const currentMailboxRole = currentMailbox?.role;
-  const isInSpam = isSpamMailboxRole(currentMailboxRole);
-  const isInTrash = isTrashMailboxRole(currentMailboxRole);
-  const spamMailbox = findSpamMailbox(mailboxes ?? []);
-  const canReportSpam =
-    Boolean(onReportSpam) && !isInSpam && !isInTrash && Boolean(spamMailbox);
-  const canNotSpam = Boolean(onNotSpam) && isInSpam;
-
-  const moveTargets = (mailboxes ?? []).filter(
-    (mailbox) =>
-      mailbox.id !== currentMailboxId &&
-      !MOVE_EXCLUDED_ROLES.has(mailbox.role?.toLowerCase() ?? ""),
+  const { moveTargets, canReportSpam, canNotSpam } = resolveMailboxActions(
+    mailboxes,
+    currentMailboxId,
+    Boolean(onReportSpam),
+    Boolean(onNotSpam),
   );
 
   const threadRows = buildMessageListThreadRows(
@@ -151,11 +221,8 @@ export function MessageList({
   const selectedIds = new Set(bulkIds);
   const hasBulkSelection = bulkIds.length > 0;
   const primaryIds = new Set(messages.map((message) => message.id));
-  // With nothing checked, the bar acts on the conversation open in the reader.
-  const openRow = selectedMessageId
-    ? threadRows.find((row) => row.messageIds.includes(selectedMessageId))
-    : undefined;
-  const barShown = hasBulkSelection || Boolean(openRow);
+  const barTarget = resolveBarTarget(threadRows, selectedMessageId, bulkIds, primaryIds);
+  const barShown = barTarget !== null;
 
   useLayoutEffect(() => {
     const bar = barRef.current;
@@ -173,38 +240,8 @@ export function MessageList({
     dispatch({ type: "toggleSelect", ids });
   };
 
-  const handleToggleThreadExpand = (threadId: string) => {
-    const isExpanded = state.expandedThreads.has(threadId);
-    dispatch({ type: "toggleThread", threadId });
-    if (
-      !isExpanded &&
-      onExpandThread &&
-      !state.expandedThreadMessages[threadId]
-    ) {
-      const held = cachedThreadMessages?.(threadId);
-      if (held?.length) {
-        dispatch({ type: "setThreadMessages", threadId, messages: held });
-      } else {
-        dispatch({ type: "setThreadLoading", threadId, loading: true });
-      }
-      void Promise.resolve(onExpandThread(threadId))
-        .then((threadMessages) => {
-          if (threadMessages && threadMessages.length > 0) {
-            dispatch({
-              type: "setThreadMessages",
-              threadId,
-              messages: threadMessages,
-            });
-          }
-        })
-        .catch(() => {
-          // Non-critical
-        })
-        .finally(() => {
-          dispatch({ type: "setThreadLoading", threadId, loading: false });
-        });
-    }
-  };
+  const handleToggleThreadExpand = (threadId: string) =>
+    expandThread(threadId, state, dispatch, onExpandThread, cachedThreadMessages);
 
   if (messages.length === 0 && !hasMore) {
     return (
@@ -267,21 +304,10 @@ export function MessageList({
         selectionActive={hasBulkSelection}
         reserveBarSpace={barShown}
       />
-      {barShown && (
+      {barTarget ? (
         <MessageListBulkBar
           barRef={barRef}
-          target={
-            hasBulkSelection || !openRow
-              ? { kind: "selection", messageIds: bulkIds }
-              : {
-                  kind: "open",
-                  messageIds: openRow.messageIds,
-                  subject: openRow.latestMessage.subject || "(No subject)",
-                  isRead: openRow.messages.every(
-                    (entry) => !primaryIds.has(entry.id) || entry.keywords?.["$seen"],
-                  ),
-                }
-          }
+          target={barTarget}
           allMessageIds={messages.map((message) => message.id)}
           moveTargets={moveTargets}
           canReportSpam={canReportSpam}
@@ -307,7 +333,7 @@ export function MessageList({
           onReportSpam={onReportSpam}
           onMove={onMove}
         />
-      )}
+      ) : null}
     </div>
   );
 }

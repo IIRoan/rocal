@@ -41,6 +41,84 @@ type MessageListBulkBarProps = {
   onMove?: (id: string, targetMailboxId: string) => void;
 };
 
+const ICON_BUTTON = {
+  size: Size.SMALL,
+  type: Type.TERTIARY,
+  variant: FilledVariant.UNFILLED,
+} as const;
+
+function BarLabel({ target }: { target: MessageListBarTarget }) {
+  return (
+    <span className="mr-1.5 ml-0.5 min-w-0 truncate text-[13px] font-medium whitespace-nowrap tabular-nums text-[var(--text-primary)]">
+      {target.kind === "selection" ? (
+        `${target.messageIds.length} selected`
+      ) : (
+        <>
+          <span className="sr-only">Open conversation: </span>
+          {target.subject}
+        </>
+      )}
+    </span>
+  );
+}
+
+/** A selection offers both; the open conversation offers whichever it needs. */
+function BarReadButtons({
+  target,
+  onRead,
+  onUnread,
+}: {
+  target: MessageListBarTarget;
+  onRead: () => void;
+  onUnread: () => void;
+}) {
+  const showRead = target.kind === "selection" || !target.isRead;
+  const showUnread = target.kind === "selection" || target.isRead;
+  return (
+    <>
+      {showRead ? <IconButton {...ICON_BUTTON} icon={Icon.EnvelopeRead} onClick={onRead} tooltip="Mark as read" /> : null}
+      {showUnread ? (
+        <IconButton {...ICON_BUTTON} icon={Icon.EnvelopeUnread} onClick={onUnread} tooltip="Mark as unread" />
+      ) : null}
+    </>
+  );
+}
+
+function BarMoveMenu({
+  moveTargets,
+  open,
+  onOpenChange,
+  onMove,
+}: {
+  moveTargets: JmapMailbox[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onMove: (mailboxId: string) => void;
+}) {
+  if (moveTargets.length === 0) return null;
+  return (
+    <Dropdown
+      open={open}
+      onOpenChange={onOpenChange}
+      align="center"
+      side="top"
+      width={208}
+      trigger={<IconButton {...ICON_BUTTON} icon={Icon.MoveMailbox} onClick={() => undefined} tooltip="Move to" />}
+    >
+      <DropdownSection label="Move to">
+        {moveTargets.map((mailbox) => (
+          <DropdownItem
+            key={mailbox.id}
+            icon={Icon.Folder}
+            label={getMailboxDisplayName(mailbox)}
+            onSelect={() => onMove(mailbox.id)}
+          />
+        ))}
+      </DropdownSection>
+    </Dropdown>
+  );
+}
+
 export function MessageListBulkBar({
   barRef,
   target,
@@ -64,26 +142,16 @@ export function MessageListBulkBar({
 }: MessageListBulkBarProps) {
   const { messageIds } = target;
   const selection = target.kind === "selection";
-  const selected = new Set(selection ? messageIds : []);
-  const allSelected = allMessageIds.every((id) => selected.has(id));
+  const checked = new Set(selection ? messageIds : []);
+  const allSelected = selection && allMessageIds.every((id) => checked.has(id));
   // A one-message conversation takes the single-message actions, which also keep an open message unread.
   const single = !selection && messageIds.length === 1 ? messageIds[0] : undefined;
-  const run = (bulk?: (ids: string[]) => void, one?: (id: string) => void) => {
+  const finish = (bulk?: (ids: string[]) => void, one?: (id: string) => void) => {
     if (single && one) one(single);
     else bulk?.(messageIds);
-  };
-
-  const finishBulkAction = (action: () => void) => {
-    action();
     onClearSelection();
     onBulkActionsOpenChange(false);
   };
-
-  const iconButton = {
-    size: Size.SMALL,
-    type: Type.TERTIARY,
-    variant: FilledVariant.UNFILLED,
-  } as const;
 
   // Floats over the bottom of the list so it never pushes the rows down.
   return (
@@ -94,96 +162,47 @@ export function MessageListBulkBar({
           className="pointer-events-auto flex max-w-full min-w-0 items-center gap-0.5 rounded-[14px] border border-[var(--border-secondary)] bg-[var(--bg-l3-solid)] py-1 pr-1 pl-1.5 shadow-[var(--shadow-l2)]"
         >
           <IconButton
-            {...iconButton}
+            {...ICON_BUTTON}
             icon={allSelected ? Icon.CheckboxFilled : Icon.CheckboxEmpty}
             onClick={allSelected ? onClearSelection : onSelectAll}
             tooltip={allSelected ? "Clear selection" : "Select all"}
           />
-          <span className="mr-1.5 ml-0.5 min-w-0 truncate text-[13px] font-medium whitespace-nowrap tabular-nums text-[var(--text-primary)]">
-            {selection ? (
-              `${messageIds.length} selected`
-            ) : (
-              <>
-                <span className="sr-only">Open conversation: </span>
-                {target.subject}
-              </>
-            )}
-          </span>
-          {selection || target.isRead ? null : (
-            <IconButton
-              {...iconButton}
-              icon={Icon.EnvelopeRead}
-              onClick={() => finishBulkAction(() => run(onBulkMarkAsRead, onMarkAsRead))}
-              tooltip="Mark as read"
-            />
-          )}
-          {selection ? (
-            <IconButton
-              {...iconButton}
-              icon={Icon.EnvelopeRead}
-              onClick={() => finishBulkAction(() => run(onBulkMarkAsRead, onMarkAsRead))}
-              tooltip="Mark as read"
-            />
-          ) : null}
-          {selection || target.isRead ? (
-            <IconButton
-              {...iconButton}
-              icon={Icon.EnvelopeUnread}
-              onClick={() => finishBulkAction(() => run(onBulkMarkAsUnread, onMarkAsUnread))}
-              tooltip="Mark as unread"
-            />
-          ) : null}
-          {moveTargets.length > 0 ? (
-            <Dropdown
-              open={bulkActionsOpen}
-              onOpenChange={onBulkActionsOpenChange}
-              align="center"
-              side="top"
-              width={208}
-              trigger={
-                <IconButton
-                  {...iconButton}
-                  icon={Icon.MoveMailbox}
-                  onClick={() => undefined}
-                  tooltip="Move to"
-                />
-              }
-            >
-              <DropdownSection label="Move to">
-                {moveTargets.map((mailbox) => (
-                  <DropdownItem
-                    key={mailbox.id}
-                    icon={Icon.Folder}
-                    label={getMailboxDisplayName(mailbox)}
-                    onSelect={() =>
-                      finishBulkAction(() =>
-                        single && onMove ? onMove(single, mailbox.id) : onBulkMove?.(messageIds, mailbox.id),
-                      )
-                    }
-                  />
-                ))}
-              </DropdownSection>
-            </Dropdown>
-          ) : null}
+          <BarLabel target={target} />
+          <BarReadButtons
+            target={target}
+            onRead={() => finish(onBulkMarkAsRead, onMarkAsRead)}
+            onUnread={() => finish(onBulkMarkAsUnread, onMarkAsUnread)}
+          />
+          <BarMoveMenu
+            moveTargets={moveTargets}
+            open={bulkActionsOpen}
+            onOpenChange={onBulkActionsOpenChange}
+            onMove={(mailboxId) =>
+              finish(
+                (ids) => onBulkMove?.(ids, mailboxId),
+                onMove ? (id) => onMove(id, mailboxId) : undefined,
+              )
+            }
+          />
           {canReportSpam && (onBulkReportSpam || onReportSpam) ? (
             <IconButton
-              {...iconButton}
+              {...ICON_BUTTON}
               icon={Icon.Spam}
-              onClick={() => finishBulkAction(() => run(onBulkReportSpam, onReportSpam))}
+              onClick={() => finish(onBulkReportSpam, onReportSpam)}
               tooltip="Report spam"
             />
           ) : null}
           <IconButton
-            {...iconButton}
+            {...ICON_BUTTON}
             type={Type.DESTRUCTIVE}
             icon={Icon.Trash}
-            onClick={() => finishBulkAction(() => run(onBulkDelete, onDelete))}
+            onClick={() => finish(onBulkDelete, onDelete)}
             tooltip="Delete"
           />
           {selection ? (
             <>
               <span aria-hidden className="mx-1 h-4 w-px bg-[var(--border-secondary)]" />
-              <IconButton {...iconButton} icon={Icon.Close} onClick={onClearSelection} tooltip="Clear selection" />
+              <IconButton {...ICON_BUTTON} icon={Icon.Close} onClick={onClearSelection} tooltip="Clear selection" />
             </>
           ) : null}
         </div>
