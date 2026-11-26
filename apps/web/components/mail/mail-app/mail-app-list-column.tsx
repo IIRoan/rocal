@@ -1,8 +1,8 @@
 "use client";
 
-import { useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { cn } from "@workspace/ui/lib/utils";
-import { MOTION_EASING, slideFadeIn } from "@workspace/ui/lib/motion";
+import { MOTION_EASING, moveFrom, slideFadeIn } from "@workspace/ui/lib/motion";
 import { toast } from "@workspace/ui/lib/toast";
 import { getErrorMessage } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
@@ -15,6 +15,31 @@ import { applyMailListViewFilter } from "../mail-app-list-chrome-state";
 import type { MailAppContentController } from "../use-mail-app-content-controller";
 
 const log = createLogger("mail-app-list-column");
+const SEARCH_COVERAGE_TOAST = "mail-search-coverage";
+const SEARCH_ISSUES_TOAST = "mail-search-issues";
+
+/** Search notes ride in toasts so the list never moves under them: coverage once per distinct note, problems once typing pauses. */
+function useSearchNoticeToasts(coverageText: string | null, issues: string[], debouncing: boolean) {
+  const shownCoverageRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!coverageText || shownCoverageRef.current === coverageText) return;
+    shownCoverageRef.current = coverageText;
+    toast(coverageText, { id: SEARCH_COVERAGE_TOAST });
+  }, [coverageText]);
+
+  const issuesText = debouncing ? "" : issues.join(" ");
+  const issuesShownRef = useRef(false);
+  useEffect(() => {
+    if (issuesText) {
+      issuesShownRef.current = true;
+      toast.warning(issuesText, { id: SEARCH_ISSUES_TOAST });
+      return;
+    }
+    if (!issuesShownRef.current) return;
+    issuesShownRef.current = false;
+    toast.dismiss(SEARCH_ISSUES_TOAST);
+  }, [issuesText]);
+}
 
 function MailSearchState({ loading, query, mailbox }: { loading: boolean; query: string; mailbox: string }) {
   if (loading) {
@@ -130,6 +155,7 @@ export function MailAppListColumn({
     searchActive,
     searchCoverageText,
     searchIssues,
+    isSearchDebouncing,
     showSearchLoadingState,
     activeMailbox,
     filteredListMessages,
@@ -162,6 +188,25 @@ export function MailAppListColumn({
     composeScheduling,
   } = controller;
   const listBodyRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const hasMailbox = Boolean(activeMailbox);
+  useSearchNoticeToasts(searchCoverageText, searchIssues, isSearchDebouncing);
+
+  // When the header grows or shrinks, as search filters open or chips appear, the list glides to its new place instead of jumping.
+  useEffect(() => {
+    const header = headerRef.current;
+    const body = listBodyRef.current;
+    if (!header || !body || typeof ResizeObserver === "undefined") return;
+    let height = header.offsetHeight;
+    const observer = new ResizeObserver(() => {
+      const next = header.offsetHeight;
+      const delta = next - height;
+      height = next;
+      if (delta !== 0) moveFrom(body, { y: -delta }, { duration: 240, easing: MOTION_EASING.soft });
+    });
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, [isMobile, hasMailbox]);
   const listSource = `${activeMailbox?.selectedMailboxId}|${activeLabelId}|${listViewFilter}`;
 
   // A new mailbox, label or filter lifts its rows in once painted, so the switch reads as fresh content in a fixed frame.
@@ -209,21 +254,15 @@ export function MailAppListColumn({
       }
     >
       <div className="flex min-h-0 flex-1 flex-col">
-        {searchCoverageText ? (
-          <p role="status" className="px-3 py-2 text-xs text-muted-foreground">
-            {searchCoverageText}
-          </p>
-        ) : null}
         {!isMobile && (
-          <MailAppListHeader
-            controller={controller}
-            title={listTitle}
-            unreadCount={unreadCount}
-          />
+          <div ref={headerRef}>
+            <MailAppListHeader
+              controller={controller}
+              title={listTitle}
+              unreadCount={unreadCount}
+            />
+          </div>
         )}
-        <p role="status" className="px-3 py-1 text-xs text-destructive empty:hidden">
-          {searchIssues.join(" ")}
-        </p>
         <p role="status" className="sr-only">
           {listStatus}
         </p>
