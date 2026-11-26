@@ -304,7 +304,7 @@ describe("MessageList", () => {
     expect(renderedContainer.textContent).not.toContain("1 selected");
   });
 
-  it("collapses row actions into a menu that does not open the message when narrow", () => {
+  it("floats trash and the full actions menu over a row without opening the message", () => {
     const onSelect = jest.fn();
     const onDelete = jest.fn();
     container = document.createElement("div");
@@ -326,28 +326,98 @@ describe("MessageList", () => {
       );
     });
 
-    expect(renderedContainer.querySelector('[aria-label="Trash"]')).toBeNull();
-    const trigger = renderedContainer.querySelector(
-      '[aria-label="Message actions"]',
-    ) as HTMLElement | null;
-    expect(trigger).not.toBeNull();
+    const trash = renderedContainer.querySelector<HTMLElement>('[aria-label="Trash"]');
+    act(() => trash?.click());
+    expect(onDelete).toHaveBeenCalledWith("message-1");
+    expect(onSelect).not.toHaveBeenCalled();
+    onDelete.mockClear();
 
+    const trigger = renderedContainer.querySelector<HTMLElement>('[aria-label="Message actions"]');
+    expect(trigger).not.toBeNull();
     act(() => {
-      trigger!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-      trigger!.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
-      );
+      trigger?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      trigger?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     });
     expect(onSelect).not.toHaveBeenCalled();
 
     const deleteItem = Array.from(
       document.body.querySelectorAll<HTMLElement>('[role="menuitem"]'),
     ).find((item) => item.textContent?.includes("Delete"));
-    expect(deleteItem).toBeDefined();
-    act(() => {
-      deleteItem!.click();
-    });
+    act(() => deleteItem?.click());
     expect(onDelete).toHaveBeenCalledWith("message-1");
+  });
+
+  it("acts on the open conversation from the bar until a conversation is checked", () => {
+    const onDelete = jest.fn();
+    const onBulkDelete = jest.fn();
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const renderedContainer = container;
+    const renderedRoot = root;
+    const other: JmapEmailMessage = { ...message, id: "message-2", threadId: "thread-2", subject: "Plans" };
+
+    act(() => {
+      renderedRoot.render(
+        <MessageList
+          messages={[message, other]}
+          selectedMessageId="message-1"
+          timeFormat="24h"
+          onSelect={jest.fn()}
+          onDelete={onDelete}
+          onBulkDelete={onBulkDelete}
+          narrow
+        />,
+      );
+    });
+
+    expect(renderedContainer.textContent).toContain("Open conversation: Hello");
+    act(() => renderedContainer.querySelector<HTMLElement>('[aria-label="Delete"]')?.click());
+    expect(onDelete).toHaveBeenCalledWith("message-1");
+
+    act(() => renderedContainer.querySelectorAll<HTMLButtonElement>('button[aria-label="Select message"]')[1]?.click());
+    expect(renderedContainer.textContent).toContain("1 selected");
+    act(() => renderedContainer.querySelector<HTMLElement>('[aria-label="Delete"]')?.click());
+    expect(onBulkDelete).toHaveBeenCalledWith(["message-2"]);
+  });
+
+  it("puts conversations under day headings that select their day while selecting", () => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const renderedContainer = container;
+    const renderedRoot = root;
+    const now = Date.now();
+    const today: JmapEmailMessage = { ...message, id: "today", threadId: "t-today", receivedAt: new Date(now).toISOString() };
+    const older: JmapEmailMessage = { ...message, id: "older", threadId: "t-older", receivedAt: "2020-03-04T10:00:00.000Z" };
+    const sameDay: JmapEmailMessage = { ...message, id: "older-2", threadId: "t-older-2", receivedAt: "2020-03-04T09:00:00.000Z" };
+
+    act(() => {
+      renderedRoot.render(
+        <MessageList
+          messages={[today, older, sameDay]}
+          selectedMessageId={null}
+          timeFormat="24h"
+          timezone="Europe/Amsterdam"
+          onSelect={jest.fn()}
+          narrow
+        />,
+      );
+    });
+
+    expect(Array.from(renderedContainer.querySelectorAll("h2")).map((heading) => heading.textContent)).toEqual([
+      "Today",
+      "March 2020",
+    ]);
+    const selectButtons = renderedContainer.querySelectorAll<HTMLButtonElement>('button[aria-label="Select message"]');
+    act(() => selectButtons[0]?.click());
+    expect(renderedContainer.textContent).toContain("1 selected");
+
+    const selectDay = Array.from(renderedContainer.querySelectorAll("button")).find((button) =>
+      button.textContent?.startsWith("Select all from March 2020"),
+    );
+    act(() => selectDay?.click());
+    expect(renderedContainer.textContent).toContain("3 selected");
   });
 
   it("expands a thread held from an earlier visit at once while it refreshes", () => {

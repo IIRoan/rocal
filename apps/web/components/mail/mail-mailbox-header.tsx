@@ -4,9 +4,8 @@ import { useLayoutEffect, useRef, type KeyboardEvent, type Ref } from "react";
 import { RotateCcw, Search, X } from "lucide-react";
 import { Input } from "@workspace/ui/components/ui/input";
 import { MOTION_EASING, slideFadeIn } from "@workspace/ui/lib/motion";
+import { cn } from "@workspace/ui/lib/utils";
 import {
-  Dropdown,
-  DropdownItem,
   Icon,
   Icons,
   IconText,
@@ -68,9 +67,6 @@ export function MailMailboxHeader({
     const enter = slideFadeIn(heading, null, { duration: 180, easing: MOTION_EASING.soft });
     return () => enter?.cancel();
   }, [title]);
-  const filterLabel =
-    MAIL_LIST_VIEW_FILTERS.find((option) => option.value === filter.value)
-      ?.label ?? "All";
   const {
     open: searchOpen,
     value: searchValue,
@@ -130,12 +126,6 @@ export function MailMailboxHeader({
               {title}
             </Typography>
           </h1>
-          {unreadCount > 0 ? (
-            <Typography color="link" selectable={false} className="shrink-0">
-              {unreadCount.toLocaleString()}
-              <span className="sr-only"> unread</span>
-            </Typography>
-          ) : null}
         </div>
         <WarmTooltipGroup lean={8}>
         <div className="flex shrink-0 items-center gap-0.5">
@@ -147,32 +137,6 @@ export function MailMailboxHeader({
             />
           ) : (
             <>
-              <Dropdown
-                width={176}
-                trigger={
-                  <button
-                    type="button"
-                    className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-md px-2 text-[13px] text-[var(--text-secondary)] outline-none transition-colors hover:bg-[var(--bg-overlay-tertiary)] hover:text-[var(--text-primary)] focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-[var(--bg-overlay-tertiary)]"
-                  >
-                    <span className="sr-only">Filter: </span>
-                    {filterLabel}
-                    <Icons
-                      color="secondary"
-                      icon={Icon.ChevronDown}
-                      size={Size.SMALL}
-                    />
-                  </button>
-                }
-              >
-                {MAIL_LIST_VIEW_FILTERS.map((option) => (
-                  <DropdownItem
-                    key={option.value}
-                    label={option.label}
-                    active={option.value === filter.value}
-                    onSelect={() => filter.onChange(option.value)}
-                  />
-                ))}
-              </Dropdown>
               <IconText
                 color="secondary"
                 dataTest="mailbox-search"
@@ -213,6 +177,34 @@ export function MailMailboxHeader({
         </div>
         </WarmTooltipGroup>
       </div>
+      {searchOpen ? null : (
+        <div role="group" aria-label="Show" className="-mt-2 flex items-center gap-1 px-3 pb-2.5">
+          {MAIL_LIST_VIEW_FILTERS.map((option) => {
+            const active = option.value === filter.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={active}
+                onClick={() => filter.onChange(option.value)}
+                className={cn(
+                  "inline-flex h-[26px] cursor-pointer items-center gap-1 rounded-full px-2.5 text-xs transition-colors",
+                  active
+                    ? "bg-[var(--bg-overlay-secondary)] font-medium text-[var(--text-primary)]"
+                    : "text-[var(--text-secondary)] hover:bg-[var(--bg-overlay-tertiary)] hover:text-[var(--text-primary)]",
+                )}
+              >
+                {option.label}
+                {option.value === "unread" && unreadCount > 0 ? (
+                  <span className="tabular-nums text-[var(--text-tertiary)]">
+                    {unreadCount.toLocaleString()}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      )}
       {searchOpen ? (
         <div className="px-5 pb-2">
           <AdvancedSearchPanel

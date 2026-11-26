@@ -1,5 +1,8 @@
 import {
   formatClockTime,
+  formatInstantCalendarDayKey,
+  formatPickerDate,
+  parseCalendarDayKey,
   resolveTimezone,
   type TimeFormat,
 } from "@workspace/calendar-core";
@@ -32,16 +35,15 @@ export function formatMessageDate(
 ): string {
   if (!receivedAt) return "";
   const date = new Date(receivedAt);
-  const now = new Date();
+  if (Number.isNaN(date.getTime())) return "";
   const timeZone = resolveTimezone(timezone);
-  const dateStr = date.toLocaleDateString(undefined, { timeZone });
-  const todayStr = now.toLocaleDateString(undefined, { timeZone });
-  if (dateStr === todayStr) {
+  const dayKey = formatInstantCalendarDayKey(date, timeZone);
+  const todayKey = formatInstantCalendarDayKey(new Date(), timeZone);
+  if (dayKey === todayKey) {
     return formatClockTime(date, timeZone, timeFormat);
   }
-  return date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    timeZone,
-  });
+  // One fixed format, not the browser locale's, so every date in the list reads the same way ("29 Sep", "3 Mar 2025").
+  const day = parseCalendarDayKey(dayKey);
+  if (!day) return "";
+  return formatPickerDate(day, dayKey.slice(0, 4) === todayKey.slice(0, 4) ? "d MMM" : "d MMM yyyy");
 }

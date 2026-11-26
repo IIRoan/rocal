@@ -2,7 +2,6 @@ import type { JmapEmailMessage } from "@/lib/mail/types";
 
 export type MessageListState = {
   selectedIds: Set<string>;
-  isBarVisible: boolean;
   bulkActionsOpen: boolean;
   expandedThreads: Set<string>;
   expandedThreadMessages: Record<string, JmapEmailMessage[]>;
@@ -11,7 +10,6 @@ export type MessageListState = {
 
 export const initialMessageListState: MessageListState = {
   selectedIds: new Set(),
-  isBarVisible: false,
   bulkActionsOpen: false,
   expandedThreads: new Set(),
   expandedThreadMessages: {},
@@ -23,7 +21,6 @@ export type MessageListAction =
   | { type: "clearSelection" }
   | { type: "selectAll"; ids: string[] }
   | { type: "setBulkActionsOpen"; open: boolean }
-  | { type: "hideBar" }
   | { type: "toggleThread"; threadId: string }
   | {
       type: "setThreadMessages";
@@ -47,20 +44,14 @@ export function messageListReducer(
           next.add(id);
         }
       }
-      return {
-        ...state,
-        selectedIds: next,
-        isBarVisible: next.size > 0 ? true : state.isBarVisible,
-      };
+      return { ...state, selectedIds: next };
     }
     case "clearSelection":
       return { ...state, selectedIds: new Set() };
     case "selectAll":
-      return { ...state, selectedIds: new Set(action.ids), isBarVisible: true };
+      return { ...state, selectedIds: new Set(action.ids) };
     case "setBulkActionsOpen":
       return { ...state, bulkActionsOpen: action.open };
-    case "hideBar":
-      return { ...state, isBarVisible: false };
     case "toggleThread": {
       const next = new Set(state.expandedThreads);
       if (next.has(action.threadId)) {

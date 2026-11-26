@@ -10,6 +10,7 @@ export * from "./mail-sender-verification";
 export * from "./mail-attachment-preview";
 export * from "./mail-pagination";
 export * from "./mail-addresses";
+export * from "./mail-list-day-groups";
 export * from "./mail-compose-format";
 export * from "./mail-quote";
 export * from "./mail-compose-html";

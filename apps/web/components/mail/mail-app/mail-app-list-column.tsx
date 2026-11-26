@@ -159,6 +159,7 @@ export function MailAppListColumn({
     isLoadingMore,
     listSettings,
     scheduledSendAtById,
+    composeScheduling,
   } = controller;
   const listBodyRef = useRef<HTMLDivElement>(null);
   const listSource = `${activeMailbox?.selectedMailboxId}|${activeLabelId}|${listViewFilter}`;
@@ -306,6 +307,7 @@ export function MailAppListColumn({
               labels={labels}
               timeFormat={timeFormat}
               timezone={timezone}
+              weekStartsOn={composeScheduling.weekStartsOn}
               scheduledSendAtById={scheduledSendAtById}
               onLoadMore={
                 searchActive

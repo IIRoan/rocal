@@ -1,13 +1,9 @@
 "use client";
 
-import type { TimeFormat } from "@workspace/calendar-core";
-import { useLayoutEffect, useReducer, useRef } from "react";
+import { mailListDayLabel, type TimeFormat } from "@workspace/calendar-core";
+import { useLayoutEffect, useReducer, useRef, useState } from "react";
 import { useIsMobile } from "@workspace/ui/hooks";
-import {
-  MOTION_EASING,
-  slideFadeIn,
-  slideFadeOut,
-} from "@workspace/ui/lib/motion";
+import { MOTION_EASING, slideFadeIn } from "@workspace/ui/lib/motion";
 import type { JmapEmailMessage, JmapMailbox, LabelDef } from "@/lib/mail/types";
 import {
   findSpamMailbox,
@@ -24,7 +20,10 @@ import type {
   MessageListRowInteraction,
   MessageListRowPresentation,
 } from "./message-list/message-list-types";
-import { buildMessageListThreadRows } from "./message-list/message-list-utils";
+import {
+  buildMessageListItems,
+  buildMessageListThreadRows,
+} from "./message-list/message-list-utils";
 
 const MOVE_EXCLUDED_ROLES = new Set(["sent", "drafts"]);
 const EMPTY_RELATED_MESSAGES: JmapEmailMessage[] = [];
@@ -54,6 +53,8 @@ export interface MessageListProps {
   labels?: LabelDef[];
   timeFormat: TimeFormat;
   timezone?: string;
+  /** First day of the account's week, for the "Earlier this week" heading. */
+  weekStartsOn?: number;
   scheduledSendAtById?: ReadonlyMap<string, string>;
   onLoadMore?: () => void;
   hasMore?: boolean;
@@ -93,6 +94,7 @@ export function MessageList({
   labels = EMPTY_LABELS,
   timeFormat,
   timezone,
+  weekStartsOn = 1,
   scheduledSendAtById,
   onLoadMore,
   hasMore,
@@ -111,6 +113,8 @@ export function MessageList({
   );
   const barRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
+  // Day headings are counted from when this mailbox opened; switching mailboxes remounts the list.
+  const [openedAt] = useState(() => new Date());
 
   const currentMailbox = mailboxes?.find(
     (mailbox) => mailbox.id === currentMailboxId,
@@ -134,36 +138,35 @@ export function MessageList({
     relatedMessages,
     preserveMessageOrder,
   );
+  // Search results keep relevance order, so only date-ordered lists sit under day headings.
+  const items = buildMessageListItems(
+    threadRows,
+    preserveMessageOrder
+      ? null
+      : (row) => mailListDayLabel(row.latestMessage.receivedAt, openedAt, timezone, weekStartsOn),
+  );
   const visibleIds = new Set(threadRows.flatMap((row) => row.messageIds));
   // Filters, labels and search hide rows without clearing selection; bulk actions must only hit shown messages.
   const bulkIds = Array.from(state.selectedIds).filter((id) => visibleIds.has(id));
   const selectedIds = new Set(bulkIds);
   const hasBulkSelection = bulkIds.length > 0;
+  const primaryIds = new Set(messages.map((message) => message.id));
+  // With nothing checked, the bar acts on the conversation open in the reader.
+  const openRow = selectedMessageId
+    ? threadRows.find((row) => row.messageIds.includes(selectedMessageId))
+    : undefined;
+  const barShown = hasBulkSelection || Boolean(openRow);
 
   useLayoutEffect(() => {
     const bar = barRef.current;
-    if (!bar) return;
-    if (hasBulkSelection) {
-      const enter = slideFadeIn(bar, { y: -6 }, {
-        duration: 220,
-        easing: MOTION_EASING.soft,
-      });
-      return () => enter?.cancel();
-    }
-    if (!state.isBarVisible) return;
-    const exit = slideFadeOut(bar, { y: -6 }, { duration: 160 });
-    if (!exit) {
-      dispatch({ type: "hideBar" });
-      return;
-    }
-    exit.onfinish = () => dispatch({ type: "hideBar" });
-    return () => {
-      exit.onfinish = null;
-      exit.cancel();
-    };
-  }, [hasBulkSelection, state.isBarVisible]);
+    if (!bar || !barShown) return;
+    const enter = slideFadeIn(bar, { y: 8 }, {
+      duration: 220,
+      easing: MOTION_EASING.soft,
+    });
+    return () => enter?.cancel();
+  }, [barShown]);
 
-  const primaryIds = new Set(messages.map((message) => message.id));
 
   const handleToggleSelect = (event: React.MouseEvent, ids: string[]) => {
     event.stopPropagation();
@@ -254,15 +257,34 @@ export function MessageList({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      {state.isBarVisible && (
+    <div className="@container/list relative flex min-h-0 flex-1 flex-col">
+      <MessageListVirtualized
+        items={items}
+        primaryIds={primaryIds}
+        interaction={interaction}
+        presentation={presentation}
+        pagination={{ hasMore, isLoadingMore, onLoadMore }}
+        selectionActive={hasBulkSelection}
+        reserveBarSpace={barShown}
+      />
+      {barShown && (
         <MessageListBulkBar
           barRef={barRef}
-          selectedCount={bulkIds.length}
-          messageIds={bulkIds}
+          target={
+            hasBulkSelection || !openRow
+              ? { kind: "selection", messageIds: bulkIds }
+              : {
+                  kind: "open",
+                  messageIds: openRow.messageIds,
+                  subject: openRow.latestMessage.subject || "(No subject)",
+                  isRead: openRow.messages.every(
+                    (entry) => !primaryIds.has(entry.id) || entry.keywords?.["$seen"],
+                  ),
+                }
+          }
           allMessageIds={messages.map((message) => message.id)}
           moveTargets={moveTargets}
-          canReportSpam={canReportSpam && Boolean(onBulkReportSpam)}
+          canReportSpam={canReportSpam}
           bulkActionsOpen={state.bulkActionsOpen}
           onBulkActionsOpenChange={(open) =>
             dispatch({ type: "setBulkActionsOpen", open })
@@ -279,15 +301,13 @@ export function MessageList({
           onBulkDelete={onBulkDelete}
           onBulkReportSpam={onBulkReportSpam}
           onBulkMove={onBulkMove}
+          onMarkAsRead={onMarkAsRead}
+          onMarkAsUnread={onMarkAsUnread}
+          onDelete={onDelete}
+          onReportSpam={onReportSpam}
+          onMove={onMove}
         />
       )}
-      <MessageListVirtualized
-        threadRows={threadRows}
-        primaryIds={primaryIds}
-        interaction={interaction}
-        presentation={presentation}
-        pagination={{ hasMore, isLoadingMore, onLoadMore }}
-      />
     </div>
   );
 }
