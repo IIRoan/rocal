@@ -397,7 +397,7 @@ export function RichTextEditorToolbar({
   };
 
   return (
-    <div className="flex h-11 w-full shrink-0 items-center border-t border-[var(--border-tertiary)] bg-[var(--bg-overlay-tertiary)] pl-4 pr-2">
+    <div className="flex h-11 w-full shrink-0 items-center border-b border-[var(--border-tertiary)] pl-3 pr-2">
       <div
         role="toolbar"
         aria-label="Formatting"

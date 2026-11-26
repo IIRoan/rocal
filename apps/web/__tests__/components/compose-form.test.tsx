@@ -23,6 +23,10 @@ jest.mock("@/hooks/use-compose-quoted-inline-images", () => ({
   useComposeQuotedInlineImages: () => undefined,
 }));
 
+jest.mock("../../components/mail/mail-avatar", () => ({
+  SenderAvatar: () => null,
+}));
+
 jest.mock("@/hooks/use-recent-contacts", () => ({
   useRecentContacts: () => ({
     payload: { version: 1, contacts: [] },
@@ -180,7 +184,7 @@ describe("ComposeForm", () => {
     const subject = field("Subject");
     type(subject, "Quarterly report");
 
-    act(() => button("Clear").click());
+    act(() => container.querySelector<HTMLButtonElement>('button[aria-label="Clear message"]')?.click());
     expect(document.body.textContent).toContain("Clear this message?");
     expect(subject.value).toBe("Quarterly report");
 
@@ -300,12 +304,16 @@ describe("ComposeForm signatures, signing and scheduling", () => {
   }
 
   function chooseFrom(identityId: string) {
-    const from = container.querySelector("select");
-    if (!from) throw new Error("No From picker");
-    act(() => {
-      from.value = identityId;
-      from.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    const email = identities.find((identity) => identity.id === identityId)?.email ?? "";
+    const label = Array.from(container.querySelectorAll("label")).find((element) => element.textContent === "From");
+    const trigger = label?.htmlFor ? document.getElementById(label.htmlFor) : null;
+    if (!trigger) throw new Error("No From picker");
+    act(() => trigger.click());
+    const option = Array.from(document.body.querySelectorAll<HTMLButtonElement>("button[aria-pressed]")).find((item) =>
+      item.textContent?.includes(email),
+    );
+    if (!option) throw new Error(`No From option for ${email}`);
+    act(() => option.click());
   }
 
   afterEach(() => localStorage.removeItem("mail:composeSettings"));
@@ -377,11 +385,21 @@ describe("ComposeForm signatures, signing and scheduling", () => {
     expect(onSend).toHaveBeenCalledWith({ skipAttachmentCheck: false, sendAt: expect.any(String) });
   });
 
-  it("keeps Schedule send with the other compose tools, not beside Send", () => {
+  it("opens Schedule send from the chevron half of the Send button", () => {
     openNewCompose({});
     const schedule = container.querySelector('button[aria-label="Schedule send"]');
-    const attach = container.querySelector('button[aria-label="Attach files"]');
-    expect(schedule?.parentElement).toBe(attach?.parentElement);
-    expect(schedule?.parentElement?.contains(button("Send"))).toBe(false);
+    expect(schedule?.parentElement?.contains(button("Send"))).toBe(true);
+  });
+
+  it("says the message is end-to-end encrypted only while every finished recipient is on Solace", () => {
+    openNewCompose({});
+    expect(container.textContent).not.toContain("end-to-end encrypted");
+    const to = field("To");
+    type(to, "sam@solace.onl");
+    act(() => to.dispatchEvent(new FocusEvent("focusout", { bubbles: true })));
+    expect(container.textContent).toContain("End-to-end encrypted");
+    expect(container.querySelector('button[aria-label="Remove sam@solace.onl"]')).toBeTruthy();
+    type(to, "ext@example.com");
+    expect(container.textContent).toContain("Not end-to-end encrypted");
   });
 });

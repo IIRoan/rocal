@@ -14,7 +14,6 @@ import {
   useEffect,
   useReducer,
   useRef,
-  useState,
   type KeyboardEvent,
   type RefObject,
 } from "react";
@@ -22,7 +21,7 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "@workspace/ui/lib/toast";
 import { afterPaint, getErrorMessage } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
-import { useIsMobile, usePaintedValue } from "@workspace/ui/hooks";
+import { useIsMobile } from "@workspace/ui/hooks";
 import { useMailApp } from "@/hooks/use-mail-app";
 import { useMailUrlSync } from "@/hooks/use-mail-url-sync";
 import { useSettings } from "@/hooks/use-settings";
@@ -51,7 +50,6 @@ import {
   type MailAppListChromeAction,
   type MailAppListChromeState,
 } from "./mail-app-list-chrome-state";
-import { MAIL_READER_TRANSITION_MS } from "./mail-app/mail-reader-transition";
 
 const log = createLogger("mail-app-content-controller");
 
@@ -301,14 +299,6 @@ export function useMailAppContentController(
     }
   };
 
-  const [closingMessageId, setClosingMessageId] = useState<string | null>(null);
-  // Clears the close once the selection is cleared or another message is opened.
-  if (closingMessageId !== null && closingMessageId !== selectedMessageId) {
-    setClosingMessageId(null);
-  }
-  const isReaderClosing =
-    closingMessageId !== null && closingMessageId === selectedMessageId;
-
   const performSelectMessage = (id: string | null) => {
     if (!id) {
       editingDraftIdRef.current = null;
@@ -337,8 +327,6 @@ export function useMailAppContentController(
     }
 
     editingDraftIdRef.current = null;
-    // Re-opening the message that is sliding out keeps it open.
-    setClosingMessageId(null);
     void openMessageById(id, message ?? undefined).catch((error) =>
       log.error("Failed to open message", error),
     );
@@ -428,11 +416,7 @@ export function useMailAppContentController(
       handleDismissCompose();
       return;
     }
-    if (isMobile || !selectedMessageId) {
-      setSelectedMessageId(null);
-      return;
-    }
-    setClosingMessageId(selectedMessageId);
+    setSelectedMessageId(null);
   };
 
   useMailUrlSync({
@@ -545,25 +529,6 @@ export function useMailAppContentController(
   const showMobileDetailPane =
     isMobile &&
     (isFullCompose || (Boolean(selectedMessageId) && !selectedIsDraft));
-  const wantsDesktopDetailPane =
-    !isMobile &&
-    (isFullCompose ||
-      (Boolean(selectedMessage) && !selectedIsDraft && !isReaderClosing));
-  const showDesktopDetailPane = usePaintedValue(wantsDesktopDetailPane);
-  const desktopDetailPanePending = wantsDesktopDetailPane && !showDesktopDetailPane;
-  // Drives the list layout and reader interactivity: flips with the slide on open, at the click on close.
-  const desktopDetailPaneActive = wantsDesktopDetailPane && showDesktopDetailPane;
-
-  // Keep the message mounted until the reader has slid out; the slide starts a couple of frames after the click.
-  useEffect(() => {
-    if (closingMessageId === null || showDesktopDetailPane) return;
-    const timer = setTimeout(
-      () => setSelectedMessageId(null),
-      MAIL_READER_TRANSITION_MS,
-    );
-    return () => clearTimeout(timer);
-  }, [closingMessageId, showDesktopDetailPane, setSelectedMessageId]);
-
   const selectedMailboxName = selectedMailbox
     ? getMailboxDisplayName(selectedMailbox)
     : "Inbox";
@@ -676,9 +641,6 @@ export function useMailAppContentController(
     isSearchDebouncing,
     showSearchLoadingState,
     showMobileDetailPane,
-    showDesktopDetailPane,
-    desktopDetailPanePending,
-    desktopDetailPaneActive,
     selectedIsDraft,
     selectedMessage,
     selectedMessageId,
@@ -703,6 +665,8 @@ export function useMailAppContentController(
     scheduledSendAtById,
     handleOpenScheduledPalette,
     listThreadRelatedMessages,
+    cachedThreadMessages: mail.cachedThreadMessages,
+    loadThreadMessages: mail.loadThreadMessages,
     filteredListMessages,
     labels,
     timeFormat,

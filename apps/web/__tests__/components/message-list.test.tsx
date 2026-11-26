@@ -349,4 +349,36 @@ describe("MessageList", () => {
     });
     expect(onDelete).toHaveBeenCalledWith("message-1");
   });
+
+  it("expands a thread held from an earlier visit at once while it refreshes", () => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const renderedContainer = container;
+    const renderedRoot = root;
+    const reply: JmapEmailMessage = { ...message, id: "message-2", subject: "Re: Hello", receivedAt: "2026-05-21T10:00:00.000Z" };
+    const earlier: JmapEmailMessage = { ...message, id: "message-0", subject: "Earlier note", receivedAt: "2026-05-19T10:00:00.000Z" };
+    const onExpandThread = jest.fn((_threadId: string) => new Promise<JmapEmailMessage[]>(() => {}));
+
+    act(() => {
+      renderedRoot.render(
+        <MessageList
+          messages={[message, reply]}
+          selectedMessageId={null}
+          timeFormat="24h"
+          onSelect={jest.fn()}
+          onExpandThread={onExpandThread}
+          cachedThreadMessages={(threadId) => (threadId === "thread-1" ? [earlier, message, reply] : undefined)}
+        />,
+      );
+    });
+
+    act(() => {
+      renderedContainer.querySelector<HTMLButtonElement>('button[aria-label="Show thread messages"]')?.click();
+    });
+
+    expect(onExpandThread).toHaveBeenCalledWith("thread-1");
+    expect(renderedContainer.textContent).toContain("Earlier note");
+    expect(renderedContainer.querySelector(".animate-spin")).toBeNull();
+  });
 });

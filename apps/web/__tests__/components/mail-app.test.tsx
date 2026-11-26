@@ -267,7 +267,14 @@ const mockJmapClient = {
         ...args: Parameters<StalwartJmapClient["getMailboxMessages"]>
       ) => Promise<unknown>
     >(),
-  getMessagesByIds: jest.fn<() => Promise<any>>(),
+  getMessagesByIds:
+    jest.fn<
+      (...args: Parameters<StalwartJmapClient["getMessagesByIds"]>) => Promise<any>
+    >(),
+  getMailboxMessageFlags:
+    jest.fn<
+      (...args: Parameters<StalwartJmapClient["getMailboxMessageFlags"]>) => Promise<any>
+    >(),
   getThreadMessages: jest.fn<() => Promise<any>>(),
   getIdentities: jest.fn<() => Promise<any>>(),
   sendMessage:
@@ -1835,6 +1842,51 @@ describe("MailApp", () => {
     });
   });
 
+  it("reopens a mailbox from memory and downloads only messages it has not held", async () => {
+    const from = [{ email: "bob@solace.onl", name: "Bob" }];
+    mockJmapClient.getMailboxMessages.mockImplementation(async (...args) =>
+      args[1] === "sent-1"
+        ? { messages: [{ id: "sent-a", subject: "Sent note", from, receivedAt: "2026-05-05T09:00:00.000Z" }], total: 1 }
+        : { messages: [{ id: "mail-1", subject: "Encrypted hello", from, receivedAt: "2026-05-06T21:10:00.000Z" }], total: 1 },
+    );
+    mockJmapClient.getMailboxMessageFlags.mockImplementation(async (...args) =>
+      args[1] === "sent-1"
+        ? { flags: [{ id: "sent-a", keywords: { $seen: true }, mailboxIds: { "sent-1": true } }], total: 1 }
+        : {
+            flags: [
+              { id: "mail-2", keywords: {}, mailboxIds: { "inbox-1": true } },
+              { id: "mail-1", keywords: { $seen: true }, mailboxIds: { "inbox-1": true } },
+            ],
+            total: 2,
+          },
+    );
+    mockJmapClient.getMessagesByIds.mockResolvedValue([
+      { id: "mail-2", subject: "Fresh arrival", from, receivedAt: "2026-05-07T08:00:00.000Z" },
+    ]);
+    await renderApp();
+    await waitForExpectation(() => expect(container.textContent).toContain("Encrypted hello"));
+    const clickButton = (label: string) =>
+      act(async () => {
+        Array.from(container.querySelectorAll("button"))
+          .find((button) => button.textContent === label)
+          ?.click();
+      });
+
+    await clickButton("Sent Items");
+    await waitForExpectation(() => expect(container.textContent).toContain("Sent note"));
+    // The thread prefetch already holds Sent, so opening it downloads its list only once.
+    expect(mockJmapClient.getMailboxMessages.mock.calls.filter((call) => call[1] === "sent-1")).toHaveLength(1);
+    mockJmapClient.getMailboxMessages.mockClear();
+    mockJmapClient.getMailboxMessageFlags.mockClear();
+
+    await clickButton("Inbox");
+    await waitForExpectation(() => expect(container.textContent).toContain("Fresh arrival"));
+    expect(container.textContent).toContain("Encrypted hello");
+    expect(mockJmapClient.getMailboxMessages).not.toHaveBeenCalled();
+    expect(mockJmapClient.getMailboxMessageFlags.mock.calls.map((call) => call[1]).sort()).toEqual(["inbox-1", "sent-1"]);
+    expect(mockJmapClient.getMessagesByIds).toHaveBeenCalledWith(expect.anything(), ["mail-2"], { includeBodies: false });
+  });
+
   it("does not auto-open the newest message on desktop", async () => {
     await renderApp();
 
@@ -1845,12 +1897,13 @@ describe("MailApp", () => {
     expect(container.querySelector('button[aria-label="Reply"]')).toBeNull();
   });
 
-  it("keeps the message rendered while the desktop reader slides closed", async () => {
+  it("keeps the reader beside the list on desktop and returns it to the empty state when the message closes", async () => {
     await renderApp();
 
     await waitForExpectation(() => {
       expect(container.textContent).toContain("Encrypted hello");
     });
+    expect(container.textContent).toContain("Select a conversation");
 
     const messageButton = Array.from(container.querySelectorAll("button")).find(
       (element) => element.textContent === "Encrypted hello",
@@ -1867,22 +1920,14 @@ describe("MailApp", () => {
     await waitForExpectation(() => {
       expect(findCloseButton()).not.toBeNull();
     });
-    // The slide starts a couple of frames after the reader renders.
-    await waitForExpectation(() => {
-      expect(findCloseButton()?.closest("[inert]")).toBeNull();
-    });
+    expect(container.textContent).not.toContain("Select a conversation");
 
     act(() => {
       findCloseButton()?.click();
     });
 
-    const reply = container.querySelector('button[aria-label="Reply"]');
-    expect(reply).not.toBeNull();
-    expect(reply?.closest("[inert]")).not.toBeNull();
-
-    await waitForExpectation(() => {
-      expect(container.querySelector('button[aria-label="Reply"]')).toBeNull();
-    });
+    expect(container.querySelector('button[aria-label="Reply"]')).toBeNull();
+    expect(container.textContent).toContain("Select a conversation");
   });
 
   it("does not auto-open the newest message on mobile", async () => {

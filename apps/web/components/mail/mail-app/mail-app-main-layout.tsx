@@ -5,6 +5,7 @@ import {
   SidebarInset,
 } from "@workspace/ui/components/ui/sidebar";
 import { SolaceTheme } from "@workspace/ui/solace";
+import { cn } from "@workspace/ui/lib/utils";
 import { toast } from "@workspace/ui/lib/toast";
 import { getErrorMessage } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
@@ -12,12 +13,7 @@ import { MailSidebar } from "../mail-sidebar";
 import { MobileMailHeader } from "../mail-app-mobile-header";
 import { MailAppListColumn } from "./mail-app-list-column";
 import { MailAppDetailPane } from "./mail-app-detail-pane";
-import type { CSSProperties } from "react";
 import type { MailAppContentController } from "../use-mail-app-content-controller";
-import {
-  MAIL_READER_EASING,
-  MAIL_READER_TRANSITION_MS,
-} from "./mail-reader-transition";
 
 const log = createLogger("mail-app-main-layout");
 
@@ -79,9 +75,16 @@ export function MailAppMainLayout({
         scheduledCount={scheduledSendCount}
         onOpenScheduled={handleOpenScheduledPalette}
       />
-      <SidebarInset className="min-h-0 overflow-hidden border border-[var(--border-secondary)] bg-[var(--bg-l1-solid)] shadow-[var(--shadow-l1)] lg:peer-data-[variant=inset]:rounded-xl">
+      {/* On desktop the list and the reader are their own surfaces, so the inset only holds them on the sidebar's backdrop. */}
+      <SidebarInset
+        className={
+          isMobile
+            ? "min-h-0 overflow-hidden bg-[var(--bg-l1-solid)]"
+            : "m-2 min-h-0 overflow-hidden bg-transparent"
+        }
+      >
         {activeMailbox ? (
-          <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--bg-l1-solid)]">
+          <div className={cn("flex h-full min-h-0 flex-col overflow-hidden", isMobile && "bg-[var(--bg-l1-solid)]")}>
             {isMobile && !showMobileDetailPane && (
               <MobileMailHeader
                 selectedMailboxName={selectedMailboxName}
@@ -101,15 +104,7 @@ export function MailAppMainLayout({
               />
             )}
 
-            <div
-              className="@container relative flex min-h-0 flex-1 overflow-hidden"
-              style={
-                {
-                  "--mail-reader-ms": `${MAIL_READER_TRANSITION_MS}ms`,
-                  "--mail-reader-ease": MAIL_READER_EASING,
-                } as CSSProperties
-              }
-            >
+            <div className={cn("@container relative flex min-h-0 flex-1 overflow-hidden", !isMobile && "gap-2")}>
               <MailAppListColumn controller={controller} />
               <MailAppDetailPane controller={controller} />
             </div>

@@ -190,7 +190,7 @@ export function AdvancedSearchPanel({
                 }
               }}
               placeholder={activeFieldMeta?.placeholder}
-              className="h-7 min-w-0 flex-1 border-border/50 bg-background text-xs shadow-none focus-visible:ring-1 focus-visible:ring-ring"
+              className="h-7 min-w-0 flex-1 border-border/50 bg-background text-xs shadow-none"
             />
             <Button
               type="button"

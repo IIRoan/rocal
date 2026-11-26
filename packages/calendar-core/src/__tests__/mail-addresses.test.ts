@@ -13,6 +13,8 @@ import {
   validateComposeRecipients,
   isAutomatedMailAddress,
   isReservedSystemEmail,
+  joinRecipientField,
+  splitRecipientField,
 } from "../mail-addresses";
 
 describe("mail address parsing", () => {
@@ -249,4 +251,16 @@ it("rejects hostile dotted addresses without overlapping domain matches", () => 
   expect(isValidEmailAddress(invalid)).toBe(false);
   expect(validateComposeRecipients({ to: invalid }).errors.recipients).toBeDefined();
   expect(performance.now() - start).toBeLessThan(1_000);
+});
+
+describe("recipient field chips", () => {
+  it("splits finished addresses from the one being typed and joins them back", () => {
+    const value = "Alice <alice@solace.onl>; bob@example.com, ca";
+    const field = splitRecipientField(value);
+    expect(field).toEqual({ tokens: ["Alice <alice@solace.onl>", "bob@example.com"], draft: "ca" });
+    expect(joinRecipientField(field.tokens, field.draft)).toBe("Alice <alice@solace.onl>, bob@example.com, ca");
+    expect(splitRecipientField("ali")).toEqual({ tokens: [], draft: "ali" });
+    expect(splitRecipientField("alice@solace.onl, ")).toEqual({ tokens: ["alice@solace.onl"], draft: "" });
+    expect(joinRecipientField([], "ali")).toBe("ali");
+  });
 });

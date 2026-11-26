@@ -2,10 +2,7 @@
 
 import { Separator } from "@workspace/ui/components/ui/separator";
 import {
-  Dropdown,
-  DropdownItem,
-  DropdownPanel,
-  DropdownSection,
+  Button,
   FilledVariant,
   Icon,
   IconButton,
@@ -13,14 +10,13 @@ import {
   Type,
   WarmTooltipGroup,
 } from "@workspace/ui/solace";
-import { getMailboxDisplayName } from "@/lib/mail/mail-mailbox-roles";
-import { LabelPickerPanel } from "../label-picker-panel";
 import type {
   MessageReaderController,
   MessageReaderViewModel,
 } from "../use-message-reader-controller";
 import { MessageReaderMoreActionsPopover } from "./message-reader-more-actions-popover";
 
+/** Close and previous/next on the left; Reply, Archive and Delete beside one More menu that holds everything else. */
 export function MessageReaderDesktopToolbar({
   controller,
   view,
@@ -28,35 +24,9 @@ export function MessageReaderDesktopToolbar({
   controller: MessageReaderController;
   view: MessageReaderViewModel;
 }) {
-  const {
-    hasPrev,
-    hasNext,
-    isBusy,
-    canReply,
-    labelPopoverOpen,
-    dispatchChrome,
-    message,
-    props,
-  } = controller;
-  const {
-    onClose,
-    onNavigatePrev,
-    onNavigateNext,
-    onArchive,
-    onReportSpam,
-    onNotSpam,
-    onReply,
-    onReplyAll,
-    onDelete,
-    onMove,
-    onSetLabel,
-    onCreateLabel,
-    onUpdateLabel,
-    onDeleteLabel,
-    labels,
-  } = props;
-  const { isInTrash, isInSpam, canReportSpam, canNotSpam, otherMailboxes } = view;
-  const canLabel = Boolean((onSetLabel && labels.length > 0) || onCreateLabel);
+  const { hasPrev, hasNext, isBusy, canReply, props } = controller;
+  const { onClose, onNavigatePrev, onNavigateNext, onArchive, onReply, onDelete } = props;
+  const { isInTrash, isInSpam } = view;
 
   return (
     <WarmTooltipGroup lean={8}>
@@ -94,62 +64,16 @@ export function MessageReaderDesktopToolbar({
       </div>
 
       <div className="ml-auto flex items-center gap-1.5">
-        {canLabel ? (
-          <DropdownPanel
-            open={labelPopoverOpen}
-            onOpenChange={(open) =>
-              dispatchChrome({ type: "patch", patch: { labelPopoverOpen: open } })
-            }
-            width={240}
-            trigger={
-              <IconButton
-                active={labelPopoverOpen}
-                disabled={isBusy}
-                icon={Icon.Tag}
-                size={Size.SMALL}
-                tooltip="Labels"
-                type={Type.SECONDARY}
-              />
-            }
-          >
-            <LabelPickerPanel
-              labels={labels}
-              messageKeywords={message?.keywords}
-              onToggleLabel={
-                onSetLabel
-                  ? (labelId, assigned) => onSetLabel(labelId, assigned)
-                  : undefined
-              }
-              onCreateLabel={onCreateLabel}
-              onUpdateLabel={onUpdateLabel}
-              onDeleteLabel={onDeleteLabel}
-            />
-          </DropdownPanel>
-        ) : null}
-        {otherMailboxes.length > 0 ? (
-          <Dropdown
-            width={208}
-            trigger={
-              <IconButton
-                disabled={isBusy}
-                icon={Icon.MoveMailbox}
-                size={Size.SMALL}
-                tooltip="Move to"
-                type={Type.SECONDARY}
-              />
-            }
-          >
-            <DropdownSection label="Move to">
-              {otherMailboxes.map((mailbox) => (
-                <DropdownItem
-                  key={mailbox.id}
-                  label={getMailboxDisplayName(mailbox)}
-                  onSelect={() => onMove(mailbox.id)}
-                />
-              ))}
-            </DropdownSection>
-          </Dropdown>
-        ) : null}
+        <Button
+          disabled={!canReply}
+          icon={Icon.Reply}
+          onClick={onReply}
+          size={Size.SMALL}
+          type={Type.SECONDARY}
+          className="h-8 rounded-lg px-3"
+        >
+          Reply
+        </Button>
         {onArchive && !isInSpam && !isInTrash ? (
           <IconButton
             disabled={isBusy}
@@ -160,45 +84,6 @@ export function MessageReaderDesktopToolbar({
             type={Type.SECONDARY}
           />
         ) : null}
-        {canReportSpam ? (
-          <IconButton
-            disabled={isBusy}
-            icon={Icon.Spam}
-            onClick={onReportSpam}
-            size={Size.SMALL}
-            tooltip="Report spam"
-            type={Type.SECONDARY}
-          />
-        ) : null}
-        {canNotSpam ? (
-          <IconButton
-            disabled={isBusy}
-            icon={Icon.Inbox}
-            onClick={onNotSpam}
-            size={Size.SMALL}
-            tooltip="Not spam"
-            type={Type.SECONDARY}
-          />
-        ) : null}
-        <IconButton
-          disabled={!canReply}
-          icon={Icon.Reply}
-          onClick={onReply}
-          size={Size.SMALL}
-          tooltip="Reply"
-          type={Type.SECONDARY}
-        />
-        {onReplyAll ? (
-          <IconButton
-            disabled={!canReply}
-            icon={Icon.ReplyAll}
-            onClick={onReplyAll}
-            size={Size.SMALL}
-            tooltip="Reply all"
-            type={Type.SECONDARY}
-          />
-        ) : null}
-        <MessageReaderMoreActionsPopover controller={controller} view={view} />
         <IconButton
           disabled={isBusy}
           icon={Icon.Trash}
@@ -208,6 +93,7 @@ export function MessageReaderDesktopToolbar({
           tooltip={isInTrash ? "Delete permanently" : "Move to trash"}
           type={Type.SECONDARY}
         />
+        <MessageReaderMoreActionsPopover controller={controller} view={view} />
       </div>
     </div>
     </WarmTooltipGroup>

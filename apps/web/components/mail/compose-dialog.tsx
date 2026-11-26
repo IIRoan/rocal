@@ -2,7 +2,6 @@
 
 import {
   Send,
-  ArrowLeft,
   Paperclip,
   X,
   Minus,
@@ -15,6 +14,9 @@ import {
   AlignLeft,
   Clock,
   FileSignature,
+  Lock,
+  LockOpen,
+  Trash2,
   Type,
 } from "lucide-react";
 import { useEffectEvent, useId, useRef, useState, useEffect } from "react";
@@ -51,11 +53,13 @@ import {
   getSimpleLoginComposeNotice,
   insertMailTemplateText,
   insertPlainTextSignature,
+  isValidEmailAddress,
   listComposeSignatureOptions,
   parsedAddressesToEmails,
   replaceComposePlainTextSignature,
   resolveComposeSignature,
   resolveMailTemplateSubject,
+  shouldEncryptOutgoingMail,
   validateComposeRecipients,
   pickOutgoingAttachmentFiles,
   type MailTemplate,
@@ -91,6 +95,9 @@ import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 import { ComposeSchedulePopover, type ComposeScheduling } from "./compose-schedule-popover";
 import { ComposeTemplatesPopover } from "./compose-templates-popover";
 import { ComposeSignaturePopover } from "./compose-signature-popover";
+import { ComposeFromPicker } from "./compose-from-picker";
+import { COMPOSE_TOOL_CLASS } from "./compose-menu";
+import { useComposeWindowSize, type ComposeResizeEdge } from "./use-compose-window-size";
 
 export interface ComposeDialogProps {
   identities: JmapIdentity[];
@@ -160,23 +167,32 @@ function ClearComposeButton({
   onClear: () => void;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const requestClear = () => {
+    if (hasAttachments || getMailComposeBridge()?.hasUserContent()) {
+      setConfirmOpen(true);
+      return;
+    }
+    onClear();
+  };
   return (
     <>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className={isMobile ? "h-7 px-2 text-xs text-muted-foreground" : "h-7 px-2.5 text-xs text-muted-foreground"}
-        onClick={() => {
-          if (hasAttachments || getMailComposeBridge()?.hasUserContent()) {
-            setConfirmOpen(true);
-            return;
-          }
-          onClear();
-        }}
-      >
-        Clear
-      </Button>
+      {isMobile ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2 text-xs text-muted-foreground"
+          onClick={requestClear}
+        >
+          Clear
+        </Button>
+      ) : (
+        <SimpleTooltip content="Clear message">
+          <button type="button" aria-label="Clear message" onClick={requestClear} className={COMPOSE_TOOL_CLASS}>
+            <Trash2 className="size-4" />
+          </button>
+        </SimpleTooltip>
+      )}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent
           showClose={false}
@@ -223,6 +239,58 @@ function ComposeSignedIndicator() {
       </p>
     </SimpleTooltip>
   );
+}
+
+type ComposeEncryption = "encrypted" | "external" | null;
+
+/** Mail is end-to-end encrypted only when every recipient is on Solace, the same rule the send path uses. */
+function ComposeEncryptionStatus({ state }: { state: ComposeEncryption }) {
+  if (!state) return null;
+  const encrypted = state === "encrypted";
+  const label = encrypted ? "End-to-end encrypted" : "Not end-to-end encrypted";
+  const description = encrypted
+    ? "Everyone you're writing to uses Solace, so only they can read it."
+    : "People outside Solace get this message unencrypted.";
+  return (
+    <SimpleTooltip content={description}>
+      <p className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+        {encrypted ? <Lock className="size-3.5 shrink-0" aria-hidden /> : <LockOpen className="size-3.5 shrink-0" aria-hidden />}
+        <span className="sr-only sm:not-sr-only">{label}</span>
+        <span className="sr-only">. {description}</span>
+      </p>
+    </SimpleTooltip>
+  );
+}
+
+function ComposeHeaderButton({
+  label,
+  expanded,
+  onClick,
+  children,
+}: {
+  label: string;
+  expanded?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <SimpleTooltip content={label}>
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={label}
+        aria-expanded={expanded}
+        className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-[var(--bg-overlay-tertiary)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        {children}
+      </button>
+    </SimpleTooltip>
+  );
+}
+
+function attachmentKind(name: string): string {
+  const extension = name.includes(".") ? name.slice(name.lastIndexOf(".") + 1) : "";
+  return extension && extension.length <= 4 ? extension : "file";
 }
 
 function ComposeFieldError({ id, message }: { id: string; message: string }) {
@@ -393,11 +461,6 @@ export function ComposeForm({
   }, [autoFocus]);
 
   const fromEmail = selectedIdentity?.email ?? fallbackFromEmail;
-  const fromLabel = selectedIdentity
-    ? selectedIdentity.name
-      ? `${selectedIdentity.name} <${fromEmail}>`
-      : fromEmail
-    : fallbackFromEmail;
 
   const recipientValidation = validateComposeRecipients({
     to: composeTo,
@@ -405,18 +468,43 @@ export function ComposeForm({
     bcc: composeBcc,
     subject: composeSubject,
   });
+  const recipientEmails = parsedAddressesToEmails([
+    ...recipientValidation.to,
+    ...recipientValidation.cc,
+    ...recipientValidation.bcc,
+  ]);
   const simpleLoginNotice = composeReplySource
     ? getSimpleLoginComposeNotice({
         message: composeReplySource,
         identities,
         fromEmail,
-        recipients: parsedAddressesToEmails([
-          ...recipientValidation.to,
-          ...recipientValidation.cc,
-          ...recipientValidation.bcc,
-        ]),
+        recipients: recipientEmails,
       })
     : NO_SIMPLELOGIN_NOTICE;
+  // Only finished addresses count, so the status does not flicker while an address is typed.
+  const finishedRecipients = recipientEmails.filter(isValidEmailAddress);
+  const internalDomain = scheduling?.internalDomain ?? null;
+  let encryption: ComposeEncryption = null;
+  if (internalDomain && finishedRecipients.length > 0) {
+    encryption = shouldEncryptOutgoingMail(finishedRecipients, internalDomain) ? "encrypted" : "external";
+  }
+  const savedSignatureName = (signatureId: string | null | undefined) =>
+    composeSettings.signatures.find((signature) => signature.id === signatureId)?.name ?? null;
+  const hasSavedSignatures = composeSettings.signatures.length > 0;
+  const signatureNameFor = (identityId: string) =>
+    hasSavedSignatures
+      ? (savedSignatureName(resolveComposeSignature(composeSettings, identities, identityId, signatureKind)?.id) ?? "No signature")
+      : null;
+  const defaultSignatureKey = hasSavedSignatures
+    ? (resolveComposeSignature(composeSettings, identities, selectedIdentity?.id ?? null, signatureKind)?.id ?? null)
+    : null;
+  const sendLabel = scheduledSendAt
+    ? isBusy
+      ? "Scheduling…"
+      : "Schedule"
+    : isBusy
+      ? "Sending…"
+      : "Send";
   const composeBodyText = plainTextMode
     ? composeBody
     : htmlToPlainText(composeHtmlBody);
@@ -666,7 +754,8 @@ export function ComposeForm({
 
   return (
     <div
-      className="relative flex min-h-0 flex-1 flex-col"
+      // Clips to its container's corners, since the docked window leaves its edge unclipped for the resize grips.
+      className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[inherit]"
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -681,18 +770,11 @@ export function ComposeForm({
         </div>
       )}
       <div
-        className={`flex items-center border-b border-border/50 shrink-0 ${
-          isMobile ? "h-11 gap-1.5 px-2.5" : "h-12 gap-2 px-3"
-        }`}
+        className={cn(
+          "flex shrink-0 items-center border-b border-border/50",
+          isMobile ? "h-11 gap-1.5 px-2.5" : "h-[52px] gap-2.5 pl-[18px] pr-2",
+        )}
       >
-        <button
-          type="button"
-          onClick={handleRequestClose}
-          aria-label="Close"
-          className="p-1 rounded hover:bg-muted/50 transition-colors"
-        >
-          <ArrowLeft className="size-4 text-muted-foreground" />
-        </button>
         {minimized ? (
           <button
             type="button"
@@ -702,69 +784,56 @@ export function ComposeForm({
             {composeSubject.trim() || (composeDraftId ? "Draft" : "New mail")}
           </button>
         ) : (
-          <span className="text-sm font-medium flex-1">
+          <span className="shrink-0 text-sm font-semibold">
             {composeDraftId ? "Draft" : "New mail"}
           </span>
         )}
         <DraftSaveIndicator status={draftSaveStatus} />
-        {minimized ? null : (
-          <ClearComposeButton
-            isMobile={isMobile}
-            hasAttachments={composeAttachments.length > 0}
-            onClear={clearMessage}
-          />
-        )}
-        {onMinimizedChange ? (
-          <SimpleTooltip content={minimized ? "Restore" : "Minimize"}>
-            <button
-              type="button"
+        <div className="ml-auto flex shrink-0 items-center gap-0.5">
+          {isMobile && !minimized ? (
+            <ClearComposeButton
+              isMobile
+              hasAttachments={composeAttachments.length > 0}
+              onClear={clearMessage}
+            />
+          ) : null}
+          {onMinimizedChange ? (
+            <ComposeHeaderButton
+              label={minimized ? "Restore" : "Minimize"}
+              expanded={!minimized}
               onClick={() => onMinimizedChange(!minimized)}
-              aria-label={minimized ? "Restore" : "Minimize"}
-              aria-expanded={!minimized}
-              className="p-1 rounded hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
             >
-              {minimized ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-            </button>
-          </SimpleTooltip>
-        ) : null}
-        {onExpand && (
-          <SimpleTooltip content="Open full editor">
-            <button
-              type="button"
-              onClick={onExpand}
-              aria-label="Open full editor"
-              className="p-1 rounded hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
-            >
+              {minimized ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+            </ComposeHeaderButton>
+          ) : null}
+          {onExpand && !minimized ? (
+            <ComposeHeaderButton label="Open full editor" onClick={onExpand}>
               <Maximize2 className="size-3.5" />
-            </button>
-          </SimpleTooltip>
-        )}
-        <Button
-          size="sm"
-          className={cn(
-            "aria-disabled:opacity-50",
-            isMobile ? "h-7 px-2.5 text-xs" : "h-7 text-xs",
-            minimized && "hidden",
-          )}
-          onClick={() => void requestSend()}
-          aria-disabled={isBusy || undefined}
-        >
-          {scheduledSendAt ? <Clock size={12} /> : <Send size={12} />}
-          {scheduledSendAt
-            ? isBusy
-              ? "Scheduling…"
-              : "Schedule"
-            : isBusy
-              ? "Sending…"
-              : "Send"}
-        </Button>
+            </ComposeHeaderButton>
+          ) : null}
+          {isMobile ? (
+            <Button
+              size="sm"
+              className="mx-1 h-7 px-2.5 text-xs aria-disabled:opacity-50"
+              onClick={() => void requestSend()}
+              aria-disabled={isBusy || undefined}
+            >
+              {scheduledSendAt ? <Clock size={12} /> : <Send size={12} />}
+              {sendLabel}
+            </Button>
+          ) : null}
+          <ComposeHeaderButton label="Close" onClick={handleRequestClose}>
+            <X className="size-4" />
+          </ComposeHeaderButton>
+        </div>
       </div>
 
       <div className={cn("flex min-h-0 flex-1 flex-col", minimized && "hidden")}>
       <div
-        className={`flex items-center border-b border-border/50 shrink-0 ${
-          isMobile ? "h-9 gap-2 px-3" : "h-10 gap-3 px-4"
-        }`}
+        className={cn(
+          "flex shrink-0 items-center border-b border-border/50",
+          isMobile ? "h-10 gap-2 px-3" : "h-12 gap-3 px-4",
+        )}
       >
         <label
           htmlFor={identities.length > 1 ? `${fieldId}-from` : undefined}
@@ -772,27 +841,15 @@ export function ComposeForm({
         >
           From
         </label>
-        {identities.length > 1 ? (
-          <select
-            id={`${fieldId}-from`}
-            value={selectedIdentityId ?? ""}
-            onChange={(event) => changeIdentity(event.target.value || null)}
-            disabled={isBusy}
-            className="flex-1 min-w-0 bg-transparent text-sm text-foreground border-0"
-          >
-            {identities.map((identity) => (
-              <option key={identity.id} value={identity.id}>
-                {identity.name
-                  ? `${identity.name} <${identity.email}>`
-                  : identity.email}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <span className="flex-1 text-sm text-muted-foreground truncate">
-            {fromLabel}
-          </span>
-        )}
+        <ComposeFromPicker
+          id={`${fieldId}-from`}
+          identities={identities}
+          selected={selectedIdentity}
+          fallbackEmail={fallbackFromEmail}
+          disabled={isBusy}
+          signatureNameFor={signatureNameFor}
+          onChange={changeIdentity}
+        />
       </div>
 
       {simpleLoginNotice.requiredFrom && (
@@ -806,7 +863,7 @@ export function ComposeForm({
 
       <div
         className={`flex items-center border-b shrink-0 transition-colors ${
-          isMobile ? "min-h-9 gap-2 px-3" : "min-h-10 gap-3 px-4"
+          isMobile ? "min-h-10 gap-2 px-3" : "min-h-12 gap-3 px-4"
         } ${visibleErrors.to ? "border-destructive/60" : "border-border/50"}`}
       >
         <label
@@ -826,6 +883,8 @@ export function ComposeForm({
           }
           placeholder="recipient@example.com"
           disabled={isBusy}
+          internalDomain={internalDomain}
+          encrypted={encryption === "encrypted"}
         />
         {visibleErrors.to ? (
           <ComposeFieldError id={errorId("to")} message={visibleErrors.to} />
@@ -837,7 +896,7 @@ export function ComposeForm({
                 onClick={() =>
                   setCcBccVisible((current) => ({ ...current, cc: true }))
                 }
-                className="text-[11px] text-muted-foreground hover:text-foreground transition-colors px-1"
+                className="cursor-pointer rounded px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
               >
                 CC
               </button>
@@ -848,7 +907,7 @@ export function ComposeForm({
                 onClick={() =>
                   setCcBccVisible((current) => ({ ...current, bcc: true }))
                 }
-                className="text-[11px] text-muted-foreground hover:text-foreground transition-colors px-1"
+                className="cursor-pointer rounded px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
               >
                 BCC
               </button>
@@ -860,7 +919,7 @@ export function ComposeForm({
       {showCc && (
         <div
           className={`flex items-center border-b border-border/50 shrink-0 ${
-            isMobile ? "min-h-9 gap-2 px-3" : "min-h-10 gap-3 px-4"
+            isMobile ? "min-h-10 gap-2 px-3" : "min-h-12 gap-3 px-4"
           }`}
         >
           <label htmlFor={`${fieldId}-cc`} className={labelClass}>
@@ -874,6 +933,8 @@ export function ComposeForm({
             onChange={setComposeCc}
             placeholder="cc@example.com"
             disabled={isBusy}
+            internalDomain={internalDomain}
+            encrypted={encryption === "encrypted"}
           />
           {visibleErrors.cc ? (
             <ComposeFieldError id={errorId("cc")} message={visibleErrors.cc} />
@@ -895,7 +956,7 @@ export function ComposeForm({
       {showBcc && (
         <div
           className={`flex items-center border-b border-border/50 shrink-0 ${
-            isMobile ? "min-h-9 gap-2 px-3" : "min-h-10 gap-3 px-4"
+            isMobile ? "min-h-10 gap-2 px-3" : "min-h-12 gap-3 px-4"
           }`}
         >
           <label htmlFor={`${fieldId}-bcc`} className={labelClass}>
@@ -909,6 +970,8 @@ export function ComposeForm({
             onChange={setComposeBcc}
             placeholder="bcc@example.com"
             disabled={isBusy}
+            internalDomain={internalDomain}
+            encrypted={encryption === "encrypted"}
           />
           {visibleErrors.bcc ? (
             <ComposeFieldError id={errorId("bcc")} message={visibleErrors.bcc} />
@@ -932,11 +995,12 @@ export function ComposeForm({
       )}
 
       <div
-        className={`flex items-center border-b border-border/50 shrink-0 ${
-          isMobile ? "min-h-9 gap-2 px-3" : "min-h-10 gap-3 px-4"
-        }`}
+        className={cn(
+          "flex shrink-0 items-center border-b border-border/50",
+          isMobile ? "min-h-11 gap-2 px-3" : "min-h-14 gap-3 px-4",
+        )}
       >
-        <label htmlFor={`${fieldId}-subject`} className={labelClass}>
+        <label htmlFor={`${fieldId}-subject`} className="sr-only">
           Subject
         </label>
         <input
@@ -944,21 +1008,29 @@ export function ComposeForm({
           type="text"
           value={composeSubject}
           onChange={(e) => setComposeSubject(e.target.value)}
-          placeholder="What's this about?"
+          placeholder="Subject"
           disabled={isBusy}
-          aria-label="Subject"
           aria-invalid={visibleErrors.subject ? true : undefined}
           aria-describedby={visibleErrors.subject ? errorId("subject") : undefined}
-          className="min-w-0 flex-1 h-8 bg-transparent border-0 text-sm placeholder:text-muted-foreground"
+          className="-ml-2 h-9 min-w-0 flex-1 rounded-lg border-0 bg-transparent px-2 text-[17px] font-semibold tracking-[-0.01em] placeholder:font-normal placeholder:text-muted-foreground"
         />
         {visibleErrors.subject ? (
           <ComposeFieldError id={errorId("subject")} message={visibleErrors.subject} />
         ) : null}
       </div>
 
+      {formatOpen && formatEditor && !plainTextMode ? (
+        <RichTextEditorToolbar
+          editor={formatEditor}
+          disabled={isBusy}
+          onImageUpload={onImageUpload}
+          onClose={() => setFormatOpen(false)}
+        />
+      ) : null}
+
       <div
         className={`flex min-h-0 flex-1 flex-col overflow-hidden ${
-          isMobile ? "px-1 pb-1.5 pt-1" : "px-2 pb-2 pt-2"
+          isMobile ? "px-1 pb-1.5 pt-1" : "px-3 pb-2 pt-3"
         }`}
         role="presentation"
         onKeyDown={(event) => {
@@ -978,7 +1050,7 @@ export function ComposeForm({
             aria-label="Message body"
             aria-invalid={visibleErrors.body ? true : undefined}
             aria-describedby={visibleErrors.body ? errorId("body") : undefined}
-            className="min-h-0 flex-1 resize-none rounded-sm bg-transparent p-2 font-mono text-sm leading-relaxed text-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring placeholder:text-muted-foreground"
+            className="min-h-0 flex-1 resize-none rounded-lg bg-transparent p-2 font-mono text-sm leading-relaxed text-foreground placeholder:text-muted-foreground"
           />
         ) : (
           <RichTextEditor
@@ -1003,25 +1075,32 @@ export function ComposeForm({
 
       {composeAttachments.length > 0 && (
         <div
-          className={`flex flex-wrap gap-1.5 border-t border-border/50 shrink-0 ${
-            isMobile ? "px-3 pb-1 pt-1.5" : "px-4 pb-1 pt-2"
+          className={`flex flex-wrap gap-2 shrink-0 ${
+            isMobile ? "px-3 pb-2 pt-1" : "px-4 pb-3 pt-1"
           }`}
         >
           {composeAttachments.map((file) => (
             <div
               key={`${file.name}-${file.size}-${file.lastModified}`}
-              className="flex min-w-0 max-w-full items-center gap-1 bg-muted/60 rounded px-2 py-1 text-xs"
+              className="flex h-10 min-w-0 max-w-full items-center gap-2.5 rounded-[10px] border border-[var(--border-secondary)] pl-2 pr-1.5"
             >
-              <Paperclip className="size-3 shrink-0 text-muted-foreground" />
-              <span className="min-w-0 break-words text-foreground/80">{file.name}</span>
-              <span className="text-muted-foreground shrink-0">
-                {formatFileSize(file.size)}
+              <span
+                aria-hidden
+                className="flex size-[26px] shrink-0 items-center justify-center rounded-md bg-[var(--bg-overlay-tertiary)] text-[9px] font-bold uppercase text-muted-foreground"
+              >
+                {attachmentKind(file.name)}
+              </span>
+              <span className="flex min-w-0 flex-col leading-tight">
+                <span className="truncate text-[12.5px] text-foreground/90">{file.name}</span>
+                <span className="text-[11px] text-muted-foreground">
+                  {formatFileSize(file.size)}
+                </span>
               </span>
               <button
                 type="button"
                 onClick={() => removeAttachment(file)}
                 aria-label={`Remove ${file.name}`}
-                className="shrink-0 ml-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                className="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-[var(--bg-overlay-tertiary)] hover:text-foreground"
               >
                 <X className="size-3" />
               </button>
@@ -1030,22 +1109,36 @@ export function ComposeForm({
         </div>
       )}
 
-      {formatOpen && formatEditor && !plainTextMode ? (
-        <RichTextEditorToolbar
-          editor={formatEditor}
-          disabled={isBusy}
-          onImageUpload={onImageUpload}
-          onClose={() => setFormatOpen(false)}
-        />
-      ) : null}
-
-      <div
-        className={`flex items-center justify-between shrink-0 ${
-          formatOpen && !plainTextMode ? "" : "border-t border-[var(--border-tertiary)]"
-        } ${isMobile ? "px-3 py-1.5" : "px-2 py-1.5"}`}
-      >
-        <div className="flex items-center gap-1">
-          {!plainTextMode ? (
+      <div className="@container flex shrink-0 items-center gap-1 border-t border-[var(--border-tertiary)] px-3 py-2.5">
+        {isMobile ? null : (
+          <>
+            <div className="flex shrink-0 items-center">
+              <Button
+                size="sm"
+                className={cn("h-9 gap-1.5 px-3.5 text-[13.5px] aria-disabled:opacity-50", scheduling && "rounded-r-none")}
+                onClick={() => void requestSend()}
+                aria-disabled={isBusy || undefined}
+              >
+                {scheduledSendAt ? <Clock size={14} /> : <Send size={14} />}
+                {sendLabel}
+              </Button>
+              {scheduling ? (
+                <ComposeSchedulePopover
+                  split
+                  scheduling={scheduling}
+                  recipients={recipientEmails}
+                  disabled={isBusy}
+                  scheduledSendAt={scheduledSendAt}
+                  onSchedule={setScheduledSendAt}
+                  onClear={() => setScheduledSendAt(null)}
+                />
+              ) : null}
+            </div>
+            <span aria-hidden className="mx-1.5 h-5 w-px shrink-0 bg-[var(--border-secondary)]" />
+          </>
+        )}
+        {!plainTextMode ? (
+          <SimpleTooltip content="Formatting">
             <button
               type="button"
               aria-label="Formatting options"
@@ -1053,90 +1146,97 @@ export function ComposeForm({
               disabled={isBusy}
               onClick={() => setFormatOpen((open) => !open)}
               className={cn(
-                "inline-flex size-[30px] cursor-pointer items-center justify-center rounded-md text-[var(--icon-secondary)] hover:bg-[var(--bg-overlay-tertiary)] disabled:opacity-40",
+                COMPOSE_TOOL_CLASS,
                 formatOpen && "bg-[var(--bg-overlay-tertiary)] text-[var(--icon-primary)]",
               )}
             >
-              <Type className="size-4" strokeWidth={2} />
+              <Type className="size-[17px]" strokeWidth={2} />
             </button>
-          ) : null}
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            className="hidden"
-            onChange={handleFileChange}
-            aria-label="Attach files"
-          />
+          </SimpleTooltip>
+        ) : null}
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={handleFileChange}
+          aria-label="Attach files"
+        />
+        <SimpleTooltip content="Attach files">
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={isBusy}
-            className="p-1.5 rounded hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground disabled:opacity-40"
+            className={COMPOSE_TOOL_CLASS}
             aria-label="Attach files"
           >
-            <Paperclip className="size-4" />
+            <Paperclip className="size-[17px]" />
           </button>
-          <ComposeTemplatesPopover
-            templates={composeSettings.templates}
+        </SimpleTooltip>
+        <ComposeTemplatesPopover
+          templates={composeSettings.templates}
+          disabled={isBusy}
+          onInsert={insertTemplate}
+        />
+        <ComposeSignaturePopover
+          options={listComposeSignatureOptions(
+            composeSettings,
+            identities,
+            selectedIdentity?.id ?? null,
+            signatureKind,
+            signatureChoice,
+          )}
+          defaultKey={defaultSignatureKey}
+          noneSelected={!hasActiveSignature}
+          disabled={isBusy}
+          onChoose={chooseSignature}
+        />
+        {isMobile && scheduling ? (
+          <ComposeSchedulePopover
+            scheduling={scheduling}
+            recipients={recipientEmails}
             disabled={isBusy}
-            onInsert={insertTemplate}
+            scheduledSendAt={scheduledSendAt}
+            onSchedule={setScheduledSendAt}
+            onClear={() => setScheduledSendAt(null)}
           />
-          <ComposeSignaturePopover
-            options={listComposeSignatureOptions(
-              composeSettings,
-              identities,
-              selectedIdentity?.id ?? null,
-              signatureKind,
-              signatureChoice,
+        ) : null}
+        <SimpleTooltip content={plainTextMode ? "Write this message as rich text" : "Write this message as plain text"}>
+          <button
+            type="button"
+            onClick={() => setPlainTextMode(!plainTextMode)}
+            disabled={isBusy}
+            aria-pressed={plainTextMode}
+            className={cn(
+              "ml-0.5 inline-flex h-[34px] cursor-pointer items-center gap-1.5 rounded-[9px] px-2.5 text-xs transition-colors disabled:opacity-40",
+              plainTextMode
+                ? "bg-accent/15 text-accent"
+                : "text-muted-foreground hover:bg-[var(--bg-overlay-tertiary)] hover:text-foreground",
             )}
-            noneSelected={!hasActiveSignature}
-            disabled={isBusy}
-            onChoose={chooseSignature}
-          />
-          {scheduling ? (
-            <ComposeSchedulePopover
-              scheduling={scheduling}
-              recipients={parsedAddressesToEmails([
-                ...recipientValidation.to,
-                ...recipientValidation.cc,
-                ...recipientValidation.bcc,
-              ])}
-              disabled={isBusy}
-              scheduledSendAt={scheduledSendAt}
-              onSchedule={setScheduledSendAt}
-              onClear={() => setScheduledSendAt(null)}
-            />
-          ) : null}
-          <SimpleTooltip content={plainTextMode ? "Write this message as rich text" : "Write this message as plain text"}>
-            <button
-              type="button"
-              onClick={() => setPlainTextMode(!plainTextMode)}
-              disabled={isBusy}
-              aria-pressed={plainTextMode}
-              className={cn(
-                "inline-flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors disabled:opacity-40",
-                plainTextMode
-                  ? "bg-accent/15 text-accent"
-                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-              )}
-            >
-              <AlignLeft className="size-3.5" />
-              Plain text
-            </button>
-          </SimpleTooltip>
-        </div>
-        <div className="flex min-w-0 items-center gap-3">
+          >
+            <AlignLeft className="size-3.5" />
+            Plain text
+          </button>
+        </SimpleTooltip>
+        <div className="ml-auto flex min-w-0 items-center gap-3.5 pl-2">
+          <ComposeEncryptionStatus state={encryption} />
           {composeSettings.signOutgoingMail ? <ComposeSignedIndicator /> : null}
           {visibleErrors.body ? (
             <ComposeFieldError id={errorId("body")} message={visibleErrors.body} />
           ) : (
-            <span className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="hidden items-center gap-2 text-xs text-muted-foreground @[52rem]:flex">
               <kbd className="px-1.5 py-0.5 bg-muted rounded text-[11px] font-medium">
                 {sendShortcut}
               </kbd>
               {scheduledSendAt ? "to schedule" : "to send"}
             </span>
+          )}
+          {isMobile ? null : (
+            <ClearComposeButton
+              isMobile={false}
+              hasAttachments={composeAttachments.length > 0}
+              onClear={clearMessage}
+            />
           )}
         </div>
       </div>
@@ -1186,6 +1286,21 @@ export function ComposeForm({
   );
 }
 
+/** Invisible grips on the docked window's free edges; Open full editor is the way to a bigger composer without dragging. */
+function ComposeResizeHandles({
+  handleProps,
+}: {
+  handleProps: (edge: ComposeResizeEdge) => React.HTMLAttributes<HTMLElement>;
+}) {
+  return (
+    <>
+      <div aria-hidden {...handleProps("top")} className="absolute inset-x-5 -top-1 z-10 h-2 cursor-ns-resize touch-none" />
+      <div aria-hidden {...handleProps("left")} className="absolute inset-y-5 -left-1 z-10 w-2 cursor-ew-resize touch-none" />
+      <div aria-hidden {...handleProps("corner")} className="absolute -top-1.5 -left-1.5 z-10 size-6 cursor-nwse-resize touch-none" />
+    </>
+  );
+}
+
 export function ComposeDialog({
   identities,
   fallbackFromEmail,
@@ -1201,6 +1316,7 @@ export function ComposeDialog({
   const { requestComposeClose } = useMailCompose();
   const isMobile = useIsMobile();
   const open = isComposeOpen;
+  const { size, windowRef, handleProps } = useComposeWindowSize();
 
   function handleDismiss() {
     if (requestComposeClose()) {
@@ -1259,13 +1375,16 @@ export function ComposeDialog({
       }}
     >
       <DialogContent
+        ref={windowRef}
         variant="bottom"
         showClose={false}
         showOverlay={false}
         aria-describedby={undefined}
+        style={minimized ? undefined : { width: size.width, height: size.height }}
         className={cn(
-          "left-auto right-2 bottom-2 translate-x-0 overflow-hidden p-0 flex flex-col max-h-[min(920px,calc(100dvh-16px))] rounded-[20px] bg-[var(--bg-l2-solid)] border-[var(--border-secondary)] shadow-[var(--shadow-l3)]",
-          minimized ? "w-[min(100%,360px)]" : "min-h-[500px] w-[min(50vw,800px)] min-w-[min(100%,680px)]",
+          // Grips sit just outside the rounded edge, so the window does not clip, and without a transition a resize follows the pointer.
+          "left-auto right-2 bottom-2 translate-x-0 transition-none overflow-visible p-0 flex flex-col max-w-[calc(100dvw-1rem)] max-h-[calc(100dvh-1rem)] rounded-[20px] bg-[var(--bg-l2-solid)] border-[var(--border-secondary)] shadow-[var(--shadow-l3)]",
+          minimized && "w-[min(100%,360px)]",
         )}
         // ComposeForm focuses To, or the body when replying, instead of the first header button.
         onOpenAutoFocus={(event) => event.preventDefault()}
@@ -1276,6 +1395,7 @@ export function ComposeDialog({
         <VisuallyHidden>
           <DialogTitle>New mail</DialogTitle>
         </VisuallyHidden>
+        {minimized ? null : <ComposeResizeHandles handleProps={handleProps} />}
         <ComposeForm
           {...formProps}
           autoFocus

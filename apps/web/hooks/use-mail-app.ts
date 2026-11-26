@@ -50,6 +50,8 @@ import {
   formatQuotedMailDate,
   buildReplyContext,
   type QuotedDateOptions,
+  mergeMailboxRefresh,
+  missingMailboxMessageIds,
 } from "@workspace/calendar-core";
 import { useSettings } from "@/hooks/use-settings";
 import { useUserTimeFormat } from "@/hooks/use-user-time-format";
@@ -108,7 +110,7 @@ import {
   isSpamMailboxRole,
   isTrashMailboxRole,
 } from "@/lib/mail/mail-mailbox-roles";
-import { mailQueryKeys } from "@/lib/mail/mail-query-keys";
+import { mailQueryKeys, type MailMailboxMessagesCache } from "@/lib/mail/mail-query-keys";
 import { getMailComposeBridge, settleComposeDraftSave } from "@/components/mail/mail-compose-bridge";
 import { assertMailVerificationContext, captureMailVerificationContext, resolveMailSenderVerification } from "@/lib/mail/mail-sender-verification";
 import { decryptMessageForCompose } from "@/lib/mail/decrypt-message-for-compose";
@@ -269,6 +271,26 @@ function bumpAutoReadNonce(
   return next;
 }
 
+/** Rechecks a mailbox page held in memory by its flags and downloads only the messages it does not hold. */
+async function refreshHeldMailboxPage(
+  client: StalwartJmapClient,
+  session: JmapSession,
+  mailboxId: string,
+  held: MailMailboxMessagesCache,
+  limit: number,
+): Promise<MailMailboxMessagesCache> {
+  const { flags, total } = await client.getMailboxMessageFlags(session, mailboxId, {
+    limit: Math.max(limit, held.messages.length),
+  });
+  const heldById = new Map(held.messages.map((message) => [message.id, message]));
+  const fetched = await client.getMessagesByIds(
+    session,
+    missingMailboxMessageIds(flags, heldById),
+    { includeBodies: false },
+  );
+  return { messages: mergeMailboxRefresh(flags, heldById, fetched), total };
+}
+
 /** The open conversation, or just the selected message while it has no loaded thread. */
 function conversationOrMessage(
   conversation: JmapEmailMessage[],
@@ -276,6 +298,8 @@ function conversationOrMessage(
 ): JmapEmailMessage[] {
   return conversation.length > 0 || !message ? conversation : [message];
 }
+
+const SENT_THREAD_PREFETCH_LIMIT = 50;
 
 const PROTECTED_ROLES = new Set([
   "inbox",
@@ -914,27 +938,13 @@ export function useMailApp() {
     };
   }, [queryClient, selectedMessageId]);
 
-  // Fetch sent messages once per mailbox to augment thread grouping without hitting rate limits.
+  // Sent replies join the list's threads; once held, the Sent page shows at once on every switch and only its new messages download.
   useEffect(() => {
     const mailbox = activeMailboxRef.current;
     if (!mailbox || !mailbox.selectedMailboxId) {
       setListThreadRelatedMessages([]);
       return;
     }
-
-    if (threadPrefetchedMailboxRef.current === mailbox.selectedMailboxId)
-      return;
-    threadPrefetchedMailboxRef.current = mailbox.selectedMailboxId;
-
-    const currentMailbox = mailbox.mailboxes.find(
-      (m) => m.id === mailbox.selectedMailboxId,
-    );
-    if (currentMailbox?.role?.toLowerCase() === "sent") {
-      setListThreadRelatedMessages([]);
-      return;
-    }
-
-    let cancelled = false;
     const sentMailbox = mailbox.mailboxes.find(
       (m) => m.role?.toLowerCase() === "sent",
     );
@@ -942,24 +952,33 @@ export function useMailApp() {
       setListThreadRelatedMessages([]);
       return;
     }
+    // Sent's own list already holds these messages, and the open Sent view refreshes its cache.
+    if (sentMailbox.id === mailbox.selectedMailboxId) return;
+    if (threadPrefetchedMailboxRef.current === sentMailbox.id) return;
+    threadPrefetchedMailboxRef.current = sentMailbox.id;
 
-    void mailbox.client
-      .getMailboxMessages(mailbox.session, sentMailbox.id, {
-        limit: 50,
+    const { client, session } = mailbox;
+    const held = queryClient.getQueryData<MailMailboxMessagesCache>(
+      mailQueryKeys.mailboxMessages(sentMailbox.id),
+    );
+    if (held) setListThreadRelatedMessages(held.messages);
+    const load = held
+      ? refreshHeldMailboxPage(client, session, sentMailbox.id, held, SENT_THREAD_PREFETCH_LIMIT)
+      : client.getMailboxMessages(session, sentMailbox.id, { limit: SENT_THREAD_PREFETCH_LIMIT });
+    void load
+      .then(({ messages, total }) => {
+        if (activeMailboxRef.current?.session !== session) return;
+        seedMailMessageCache(queryClient, sentMailbox.id, messages, total);
+        setListThreadRelatedMessages(messages);
       })
-      .then(({ messages: sentMessages }) => {
-        if (cancelled) return;
-        setListThreadRelatedMessages(sentMessages);
-      })
-      .catch((error) => {
+      .catch((error: unknown) => {
         // Non-critical — thread grouping still works with mailbox-only messages
         log.warn("Failed to prefetch sent messages for thread grouping", error);
+      })
+      .finally(() => {
+        threadPrefetchedMailboxRef.current = null;
       });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeMailbox?.selectedMailboxId]);
+  }, [activeMailbox?.selectedMailboxId, queryClient]);
 
   // Only re-decrypt on message identity or E2EE config changes; keyword updates never change encryption state.
   const syncSelectedMessageDecryption = useEffectEvent(
@@ -1293,19 +1312,18 @@ export function useMailApp() {
     };
   }, [queryClient, selectedMessageId]);
 
+  const requestedMailboxRef = useRef<string | null>(null);
+
   const refreshMailboxMessages = async (mailboxId: string) => {
     if (!activeMailbox) return;
-    setIsBusy(true);
-    try {
-      const pageSize = resolveMailboxMessagesPageSize(
-        activeMailbox.mailServerPolicy,
-        MAILBOX_MESSAGES_PAGE_SIZE,
-      );
-      const { messages, total } = await activeMailbox.client.getMailboxMessages(
-        activeMailbox.session,
-        mailboxId,
-        { limit: pageSize, position: 0 },
-      );
+    requestedMailboxRef.current = mailboxId;
+    const { client, session } = activeMailbox;
+    const held = queryClient.getQueryData<MailMailboxMessagesCache>(
+      mailQueryKeys.mailboxMessages(mailboxId),
+    );
+    // A late answer for a mailbox the user has already left must not replace the one on screen.
+    const show = (messages: JmapEmailMessage[], total: number) => {
+      if (requestedMailboxRef.current !== mailboxId) return;
       setTotalMessages(total);
       seedMailMessageCache(queryClient, mailboxId, messages, total);
       setActiveMailbox((cur) =>
@@ -1317,11 +1335,34 @@ export function useMailApp() {
         if (findCachedMailMessage(queryClient, curId)) return curId;
         return null;
       });
-    } catch (error) {
-      log.error("Failed to load mailbox messages", error);
-      toast.error(getErrorMessage(error, "Could not load messages."));
-    }
-    setIsBusy(false);
+    };
+    const pageSize = resolveMailboxMessagesPageSize(
+      activeMailbox.mailServerPolicy,
+      MAILBOX_MESSAGES_PAGE_SIZE,
+    );
+    const refresh = async () => {
+      if (!held) {
+        const { messages, total } = await client.getMailboxMessages(session, mailboxId, {
+          limit: pageSize,
+          position: 0,
+        });
+        show(messages, total);
+        return;
+      }
+      // A mailbox opened before shows at once from memory; only its flags are checked and only new messages downloaded.
+      show(held.messages, held.total);
+      const refreshed = await refreshHeldMailboxPage(client, session, mailboxId, held, pageSize);
+      show(refreshed.messages, refreshed.total);
+    };
+    if (!held) setIsBusy(true);
+    await refresh()
+      .catch((error: unknown) => {
+        log.error("Failed to load mailbox messages", error);
+        toast.error(getErrorMessage(error, "Could not load messages."));
+      })
+      .finally(() => {
+        if (!held) setIsBusy(false);
+      });
   };
 
   const loadMoreMessages = async () => {
@@ -3540,6 +3581,16 @@ export function useMailApp() {
       }
     : null;
 
+  const cachedThreadMessages = (threadId: string) =>
+    queryClient.getQueryData<JmapEmailMessage[]>(mailQueryKeys.threadMessages(threadId));
+  const loadThreadMessages = async (threadId: string) => {
+    const mailbox = activeMailboxRef.current;
+    if (!mailbox) return [];
+    const messages = await mailbox.client.getThreadMessages(mailbox.session, threadId);
+    queryClient.setQueryData(mailQueryKeys.threadMessages(threadId), messages);
+    return messages;
+  };
+
   let selectedMessageReadState: MailReadState = "pending";
   if (
     !isMessageBodyLoading &&
@@ -3563,6 +3614,8 @@ export function useMailApp() {
     composeMailPolicy,
     composeScheduling,
     listThreadRelatedMessages,
+    cachedThreadMessages,
+    loadThreadMessages,
     selectedMessage,
     selectedMessageId,
     setSelectedMessageId: handleSelectMessageId,

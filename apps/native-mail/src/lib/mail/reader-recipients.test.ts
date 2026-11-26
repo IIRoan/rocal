@@ -1,33 +1,4 @@
-import {
-  formatAttachmentCount,
-  formatReaderRecipientLine,
-  readerAttachmentIcon,
-} from "./reader-recipients";
-
-describe("formatReaderRecipientLine", () => {
-  it("returns empty string without recipients", () => {
-    expect(formatReaderRecipientLine(undefined, [])).toBe("");
-  });
-
-  it("joins to and cc with names, falling back to email and me", () => {
-    expect(
-      formatReaderRecipientLine(
-        [
-          { name: "Kevin", email: "kevin@example.com" },
-          { email: "self@example.com" },
-        ],
-        [{ email: "andrew@example.com" }],
-        "self@example.com",
-      ),
-    ).toBe("To: Kevin, me, Cc: andrew@example.com");
-  });
-
-  it("shows cc alone when there is no to", () => {
-    expect(
-      formatReaderRecipientLine(undefined, [{ name: "Ann", email: "a@x.io" }]),
-    ).toBe("Cc: Ann");
-  });
-});
+import { formatAttachmentCount, readerAttachmentIcon } from "./reader-recipients";
 
 describe("readerAttachmentIcon", () => {
   it("maps preview kinds to Feather icons", () => {

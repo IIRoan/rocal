@@ -37,6 +37,7 @@ import {
   buildEmailRestoreMailboxesMethodCall,
   buildEmailMarkReadMethodCall,
   buildUnreadMailboxQueryMethodCall,
+  withDraftsSeen,
   destroyMailboxMessagesInBatches,
   markMailboxMessagesReadInBatches,
   type MailMailboxRestore,
@@ -1665,6 +1666,11 @@ export class StalwartJmapClient {
       throw new Error(`JMAP response did not include ${methodName}.`);
     }
 
+    // Every message fetch passes here, so drafts read as seen everywhere they are listed.
+    const response = tuple[1] as { list?: unknown };
+    if (methodName === "Email/get" && Array.isArray(response.list)) {
+      return { ...response, list: withDraftsSeen(response.list as JmapEmailMessage[]) } as T;
+    }
     return tuple[1] as T;
   }
 }

@@ -14,16 +14,13 @@ import { useDropdownShortcuts } from "../../hooks/use-keyboard-shortcuts";
 import { useShortcutLabel } from "../../hooks/use-shortcut-label";
 import { User } from "../calendar/types";
 
+/** The account avatar at the foot of the sidebar rail, opening Settings and Sign out. */
 export function NavUser({
   user,
-  appName,
-  isCollapsed = false,
   onLogout,
   onOpenSettings,
 }: {
   user: User;
-  appName: string;
-  isCollapsed?: boolean;
   onLogout?: () => void;
   onOpenSettings?: () => void;
 }) {
@@ -38,12 +35,8 @@ export function NavUser({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label={
-            isCollapsed
-              ? "Account menu"
-              : `${appName}, ${user.name || user.email}, account menu`
-          }
-          className="flex min-w-0 cursor-pointer items-center gap-2 rounded-md p-1 outline-none transition-colors hover:bg-muted data-[state=open]:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label={`Account menu, ${user.name || user.email}`}
+          className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg outline-none transition-colors hover:bg-muted data-[state=open]:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
         >
           <BlobatarAvatar
             email={user.email}
@@ -53,24 +46,9 @@ export function NavUser({
             title={user.name}
             animate="hover"
           />
-          {isCollapsed ? null : (
-            <span className="grid min-w-0 text-left leading-[130%]">
-              <span className="truncate text-[13px] font-medium text-foreground">
-                {appName}
-              </span>{" "}
-              <span className="truncate text-xs text-muted-foreground">
-                {user.name || user.email}
-              </span>
-            </span>
-          )}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent
-        className="w-60"
-        side="bottom"
-        align="start"
-        sideOffset={6}
-      >
+      <DropdownMenuContent className="w-60" side="right" align="end" sideOffset={8}>
         <div className="flex items-center gap-2 px-2 py-1.5">
           <BlobatarAvatar
             email={user.email}

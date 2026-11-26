@@ -1,12 +1,10 @@
 "use client";
 
-import { cn } from "@workspace/ui/lib/utils";
+import { useLayoutEffect, useRef } from "react";
 import { createLogger } from "@workspace/logger";
-import { Typography, TypographySize } from "@workspace/ui/solace";
-import {
-  MAIL_READER_MOTION_CLASS,
-  MAIL_READER_WIDTH_CLASS,
-} from "./mail-reader-transition";
+import { MOTION_EASING, revealSequence } from "@workspace/ui/lib/motion";
+import { Logo } from "@workspace/ui/components/layout";
+import { Typography, TypographySize, TypographyWeight } from "@workspace/ui/solace";
 import { ComposeForm } from "../compose-dialog";
 import { MessageReader } from "../message-reader";
 import type { MailAppContentController } from "../use-mail-app-content-controller";
@@ -21,9 +19,6 @@ export function MailAppDetailPane({
   const {
     isMobile,
     showMobileDetailPane,
-    showDesktopDetailPane,
-    desktopDetailPanePending,
-    desktopDetailPaneActive,
     isFullCompose,
     selectedMessage,
     selectedIsDraft,
@@ -229,14 +224,7 @@ export function MailAppDetailPane({
           />
         </div>
       ) : !isFullCompose ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 p-8">
-          <Typography color="secondary" size={TypographySize.H4}>
-            Select a conversation
-          </Typography>
-          <Typography color="tertiary" size={TypographySize.SMALL}>
-            Choose a message from the list to read it
-          </Typography>
-        </div>
+        <MailReaderEmptyState />
       ) : null}
 
       <div
@@ -283,21 +271,48 @@ export function MailAppDetailPane({
     );
   }
 
-  // Translate-only slide on the compositor; while pending it stays visible off-screen so Firefox can raster it before the slide starts; inert as soon as a close is requested.
+  // The reader is always beside the list on desktop, so opening a message never moves the list.
   return (
-    <div
-      data-mail-reader-pane=""
-      inert={!desktopDetailPaneActive}
-      className={cn(
-        "absolute inset-y-0 right-0 z-10 overflow-hidden border-l border-[var(--border-secondary)] bg-[var(--bg-l2-solid)] contain-strict transition-[translate,visibility] will-change-[translate]",
-        MAIL_READER_WIDTH_CLASS,
-        MAIL_READER_MOTION_CLASS,
-        showDesktopDetailPane
-          ? "translate-x-0"
-          : cn("translate-x-full", !desktopDetailPanePending && "invisible"),
-      )}
-    >
+    <div className="relative min-w-0 flex-1 overflow-hidden rounded-xl border border-[var(--border-secondary)] bg-[var(--bg-l2-solid)]">
       {panes}
+    </div>
+  );
+}
+
+/** What the reader shows with nothing open: a small stack of envelopes sealed with the Solace mark. */
+function MailReaderEmptyState() {
+  const rootRef = useRef<HTMLDivElement>(null);
+  // The envelopes, then the words, lift in once painted; each time a message closes the empty pane arrives the same way.
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    return revealSequence(root, [
+      { selector: "[data-empty-reveal]", offset: { y: 6 }, duration: 260, stagger: 60, easing: MOTION_EASING.soft },
+    ]);
+  }, []);
+
+  return (
+    <div ref={rootRef} className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
+      <div data-empty-reveal aria-hidden className="relative h-[104px] w-[150px]">
+        <span className="absolute top-1.5 left-4 h-[78px] w-[118px] -rotate-8 rounded-[10px] border-[1.5px] border-[var(--border-secondary)] bg-[var(--bg-l2-solid)]" />
+        <span className="absolute top-1.5 left-4 h-[78px] w-[118px] rotate-6 rounded-[10px] border-[1.5px] border-[var(--border-secondary)] bg-[var(--bg-l2-solid)]" />
+        <span className="absolute top-3.5 left-3 h-[84px] w-[126px] overflow-hidden rounded-[11px] border-[1.5px] border-[var(--border-primary)] bg-[var(--bg-l3-solid)]">
+          <svg viewBox="0 0 126 84" className="absolute inset-0 size-full text-[var(--border-primary)]">
+            <path d="M2 4 L63 46 L124 4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+          </svg>
+          <span className="absolute top-10 left-1/2 flex size-[26px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-accent">
+            <Logo width="15" height="15" className="text-accent-foreground" />
+          </span>
+        </span>
+      </div>
+      <div data-empty-reveal className="mt-6 flex flex-col items-center gap-1">
+        <Typography size={TypographySize.MEDIUM} weight={TypographyWeight.MEDIUM}>
+          Select a conversation
+        </Typography>
+        <Typography color="tertiary" size={TypographySize.SMALL}>
+          Messages you open will appear here
+        </Typography>
+      </div>
     </div>
   );
 }

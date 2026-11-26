@@ -64,7 +64,8 @@ export function MessageReaderReplyBar({
       {isReplyExpanded ? (
         <div
           ref={expandedWrapRef}
-          className="flex flex-col rounded-xl border border-[var(--border-secondary)] px-3 pt-2.5 pb-2 focus-within:border-ring"
+          data-field
+          className="flex flex-col rounded-xl border border-[var(--border-secondary)] px-3 pt-2.5 pb-2"
           onBlur={(e) => {
             // Emoji picker is portalled outside this container.
             if (emojiPickerOpen) return;
@@ -119,7 +120,7 @@ export function MessageReaderReplyBar({
             placeholder="Write your reply…"
             rows={3}
             style={{ minHeight: "4.5rem" }}
-            className="w-full resize-none appearance-none border-0 bg-transparent py-1 text-sm text-[var(--text-primary)] outline-none ring-0 placeholder:text-[var(--text-tertiary)] focus:border-0 focus:outline-none focus:ring-0"
+            className="w-full resize-none appearance-none border-0 bg-transparent py-1 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
             aria-label={`Reply to ${senderName || senderEmail}`}
             disabled={isBusy || isSendingReply}
           />

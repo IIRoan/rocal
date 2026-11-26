@@ -368,7 +368,7 @@ export function CalendarShell({ children }: { children: ReactNode }) {
 
                   <SidebarProvider>
                     <SidebarWithContext />
-                    <SidebarInset>{children}</SidebarInset>
+                    <SidebarInset className="lg:m-2 lg:overflow-hidden lg:rounded-xl lg:border lg:border-sidebar-border">{children}</SidebarInset>
                   </SidebarProvider>
                 </CommandPaletteProvider>
 

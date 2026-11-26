@@ -1,12 +1,12 @@
 "use client";
 
-import type { KeyboardEvent, Ref } from "react";
+import { useLayoutEffect, useRef, type KeyboardEvent, type Ref } from "react";
 import { RotateCcw, Search, X } from "lucide-react";
 import { Input } from "@workspace/ui/components/ui/input";
+import { MOTION_EASING, slideFadeIn } from "@workspace/ui/lib/motion";
 import {
   Dropdown,
   DropdownItem,
-  FilledVariant,
   Icon,
   Icons,
   IconText,
@@ -60,6 +60,14 @@ export function MailMailboxHeader({
   emptyFolder?: { label: string; onClick: () => void };
   onMarkAllRead?: () => void;
 }) {
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  // The folder or label name crossfades when it changes; the buttons beside it stay put.
+  useLayoutEffect(() => {
+    const heading = titleRef.current;
+    if (!heading) return;
+    const enter = slideFadeIn(heading, null, { duration: 180, easing: MOTION_EASING.soft });
+    return () => enter?.cancel();
+  }, [title]);
   const filterLabel =
     MAIL_LIST_VIEW_FILTERS.find((option) => option.value === filter.value)
       ?.label ?? "All";
@@ -90,7 +98,7 @@ export function MailMailboxHeader({
               onKeyDown={onSearchKeyDown}
               aria-label="Search messages"
               placeholder={`Search ${title}…`}
-              className="h-8 w-full rounded-md border-0 bg-[var(--bg-overlay-tertiary)] pl-7 pr-8 text-[13px] shadow-none placeholder:text-[var(--text-tertiary)] focus-visible:ring-1 focus-visible:ring-ring"
+              className="h-8 w-full rounded-md border-0 bg-[var(--bg-overlay-tertiary)] pl-7 pr-8 text-[13px] shadow-none placeholder:text-[var(--text-tertiary)]"
             />
             {searchBusy ? (
               <RotateCcw
@@ -115,22 +123,22 @@ export function MailMailboxHeader({
         </div>
       ) : null}
 
-      <div className="flex min-h-12 items-center gap-2 px-5 py-1.5">
-        <div className="flex min-w-0 flex-1 items-center gap-1">
-          <h1 className="flex min-w-0 tracking-normal">
-            <Typography weight={TypographyWeight.MEDIUM} wrap>
+      <div className="flex min-h-12 items-center gap-2 px-4 py-1.5">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          <h1 ref={titleRef} className="flex min-w-0 tracking-normal" title={title}>
+            <Typography weight={TypographyWeight.MEDIUM}>
               {title}
             </Typography>
           </h1>
           {unreadCount > 0 ? (
-            <Typography color="link" selectable={false}>
+            <Typography color="link" selectable={false} className="shrink-0">
               {unreadCount.toLocaleString()}
               <span className="sr-only"> unread</span>
             </Typography>
           ) : null}
         </div>
         <WarmTooltipGroup lean={8}>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-0.5">
           {searchOpen ? (
             <AdvancedSearchToggle
               expanded={advanced.expanded}
@@ -144,12 +152,12 @@ export function MailMailboxHeader({
                 trigger={
                   <button
                     type="button"
-                    className="inline-flex h-[27px] cursor-pointer items-center gap-1.5 rounded border border-[var(--border-secondary)] bg-[var(--cta-secondary-default)] px-2 text-[13px] text-[var(--text-primary)] hover:bg-[var(--bg-overlay-tertiary)]"
+                    className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-md px-2 text-[13px] text-[var(--text-secondary)] outline-none transition-colors hover:bg-[var(--bg-overlay-tertiary)] hover:text-[var(--text-primary)] focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-[var(--bg-overlay-tertiary)]"
                   >
                     <span className="sr-only">Filter: </span>
                     {filterLabel}
                     <Icons
-                      color="primary"
+                      color="secondary"
                       icon={Icon.ChevronDown}
                       size={Size.SMALL}
                     />
@@ -166,11 +174,11 @@ export function MailMailboxHeader({
                 ))}
               </Dropdown>
               <IconText
+                color="secondary"
                 dataTest="mailbox-search"
                 onClick={() => onSearchOpenChange(true)}
                 startIcon={Icon.Search}
                 tooltip="Search"
-                variant={FilledVariant.FILLED}
               />
               <IconText
                 onClick={refresh.disabled ? undefined : refresh.onClick}
@@ -182,25 +190,22 @@ export function MailMailboxHeader({
                   />
                 }
                 tooltip="Refresh"
-                variant={FilledVariant.FILLED}
               />
               {onMarkAllRead ? (
                 <IconText
+                  color="secondary"
                   dataTest="mailbox-mark-all-read"
                   onClick={onMarkAllRead}
                   startIcon={Icon.EnvelopeRead}
                   tooltip="Mark all as read"
-                  variant={FilledVariant.FILLED}
                 />
               ) : null}
               {emptyFolder ? (
                 <IconText
                   color="destructive"
-                  label={emptyFolder.label}
                   onClick={emptyFolder.onClick}
                   startIcon={Icon.Trash}
-                  variant={FilledVariant.FILLED}
-                  weight={TypographyWeight.REGULAR}
+                  tooltip={emptyFolder.label}
                 />
               ) : null}
             </>

@@ -42,6 +42,8 @@ import {
   buildEmailDestroyMethodCall,
   buildEmailMarkReadMethodCall,
   buildUnreadMailboxQueryMethodCall,
+  withDraftsSeen,
+  type MailMessageFlags,
   destroyMailboxMessagesInBatches,
   markMailboxMessagesReadInBatches,
   assertSuccessfulJmapResponses,
@@ -1305,6 +1307,50 @@ export class StalwartJmapClient {
     };
   }
 
+  /** A mailbox's newest ids with only their read, flag and folder state, so a list already held refreshes without downloading it again. */
+  async getMailboxMessageFlags(
+    session: JmapSession,
+    mailboxId: string,
+    options: { limit: number },
+  ): Promise<{ flags: MailMessageFlags[]; total: number }> {
+    const accountId = this.requirePrimaryAccountId(session);
+    const limit = Math.min(options.limit, this.getEmailGetChunkSize());
+    const envelope = await this.call(
+      session,
+      ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+      [
+        [
+          "Email/query",
+          {
+            accountId,
+            filter: { inMailbox: mailboxId },
+            sort: [{ property: "receivedAt", isAscending: false }],
+            limit,
+            position: 0,
+          },
+          "q1",
+        ],
+        [
+          "Email/get",
+          {
+            accountId,
+            "#ids": { resultOf: "q1", name: "Email/query", path: "/ids" },
+            properties: ["id", "keywords", "mailboxIds"],
+          },
+          "g1",
+        ],
+      ],
+    );
+    const query = this.getMethodResult<{ ids?: string[]; total?: number }>(envelope, "Email/query");
+    const got = this.getMethodResult<{ list?: MailMessageFlags[] }>(envelope, "Email/get");
+    const byId = new Map((got.list ?? []).map((entry) => [entry.id, entry]));
+    const flags = (query.ids ?? []).flatMap((id) => {
+      const entry = byId.get(id);
+      return entry ? [entry] : [];
+    });
+    return { flags, total: query.total ?? 0 };
+  }
+
   async getMessagesByIds(
     session: JmapSession,
     ids: string[],
@@ -2156,6 +2202,11 @@ export class StalwartJmapClient {
       throw new Error(`JMAP response did not include ${methodName}.`);
     }
 
+    // Every message fetch passes here, so drafts read as seen everywhere they are listed.
+    const response = tuple[1] as { list?: unknown };
+    if (methodName === "Email/get" && Array.isArray(response.list)) {
+      return { ...response, list: withDraftsSeen(response.list as JmapEmailMessage[]) } as T;
+    }
     return tuple[1] as T;
   }
 

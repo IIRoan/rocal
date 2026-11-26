@@ -19,7 +19,7 @@ import { useAutocompleteTimepicker } from "@workspace/ui/hooks/use-autocomplete-
 const currentTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const INPUT_STYLES =
-  "w-7 bg-transparent text-center text-sm font-medium border-none shadow-none outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:text-accent " +
+  "w-7 bg-transparent text-center text-sm font-medium border-none shadow-none focus-visible:text-accent " +
   "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
 interface TimePickerProps {
@@ -242,7 +242,7 @@ function TimeInput({
   };
 
   return (
-    <div className="flex items-center gap-1 bg-muted/30 rounded-lg px-3 py-2">
+    <div data-field className="flex items-center gap-1 bg-muted/30 rounded-lg px-3 py-2">
       <input
         ref={hhRef}
         type="text"

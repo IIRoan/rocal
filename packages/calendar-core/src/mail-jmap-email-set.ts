@@ -348,13 +348,22 @@ export function buildSendMessageMethodCalls(
   ];
 }
 
+/** A draft is the user's own writing, so it reads as seen whatever keywords an older save or another client left on it. */
+export function withDraftsSeen<T extends { keywords?: Record<string, boolean> | null }>(emails: T[]): T[] {
+  return emails.map((email) =>
+    email.keywords?.$draft && !email.keywords.$seen
+      ? { ...email, keywords: { ...email.keywords, $seen: true } }
+      : email,
+  );
+}
+
 /** Drafts are stored only as PGP/MIME encrypted to the account's own key; the headers stay readable. */
 export function buildDraftMethodCalls(input: JmapDraft): JmapMethodCallLike[] {
   const emailSetArgs: Record<string, unknown> = {
     create: {
       draft1: {
         mailboxIds: { [input.draftsMailboxId]: true },
-        keywords: { $draft: true },
+        keywords: { $seen: true, $draft: true },
         ...buildEmailHeaders(input),
         ...buildPgpMimeContentFields(input.ciphertext),
       },

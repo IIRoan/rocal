@@ -1,18 +1,13 @@
 "use client";
 
 import { useLayoutEffect, useRef } from "react";
-import { usePrefersReducedMotion } from "@workspace/ui/hooks";
 import { cn } from "@workspace/ui/lib/utils";
-import { playAfterPaint } from "@workspace/ui/lib/motion";
+import { MOTION_EASING, slideFadeIn } from "@workspace/ui/lib/motion";
 import { toast } from "@workspace/ui/lib/toast";
 import { getErrorMessage } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
 import {
   MAIL_LIST_NARROW_WIDTH_CLASS,
-  MAIL_LIST_OPEN_FADE_OPTIONS,
-  MAIL_LIST_SWAP_KEYFRAMES,
-  MAIL_READER_ANIMATION_OPTIONS,
-  MAIL_READER_MOTION_CLASS,
 } from "./mail-reader-transition";
 import { MessageList } from "../message-list";
 import { MailMailboxHeader } from "../mail-mailbox-header";
@@ -128,7 +123,6 @@ export function MailAppListColumn({
   const {
     isMobile,
     showMobileDetailPane,
-    desktopDetailPaneActive,
     selectedMailboxName,
     mailListSearch,
     listViewFilter,
@@ -140,6 +134,8 @@ export function MailAppListColumn({
     activeMailbox,
     filteredListMessages,
     listThreadRelatedMessages,
+    cachedThreadMessages,
+    loadThreadMessages,
     selectedMessageId,
     handleSelectMessage,
     handleDeleteMessage,
@@ -164,25 +160,16 @@ export function MailAppListColumn({
     listSettings,
     scheduledSendAtById,
   } = controller;
+  const listBodyRef = useRef<HTMLDivElement>(null);
+  const listSource = `${activeMailbox?.selectedMailboxId}|${activeLabelId}|${listViewFilter}`;
 
-  const contentRef = useRef<HTMLDivElement>(null);
-  const renderedDetailPaneRef = useRef(desktopDetailPaneActive);
-  const prefersReducedMotion = usePrefersReducedMotion();
-
+  // A new mailbox, label or filter lifts its rows in once painted, so the switch reads as fresh content in a fixed frame.
   useLayoutEffect(() => {
-    if (renderedDetailPaneRef.current === desktopDetailPaneActive) return;
-    renderedDetailPaneRef.current = desktopDetailPaneActive;
-    const content = contentRef.current;
-    if (!content || prefersReducedMotion || typeof content.animate !== "function") return;
-    // Open fade is half-length: Firefox re-composites the opacity group every frame while the stacked rows reflow.
-    // repo-rules-allow motion-shared-helpers: partial 0.4→1 fade with pane-scoped durations; slideFadeIn's 0→1 keyframes and visibility don't fit.
-    const fade = content.animate(
-      MAIL_LIST_SWAP_KEYFRAMES,
-      desktopDetailPaneActive ? MAIL_LIST_OPEN_FADE_OPTIONS : MAIL_READER_ANIMATION_OPTIONS,
-    );
-    if (!desktopDetailPaneActive) playAfterPaint(fade);
-    return () => fade.cancel();
-  }, [desktopDetailPaneActive, prefersReducedMotion]);
+    const body = listBodyRef.current;
+    if (!body) return;
+    const enter = slideFadeIn(body, { y: 6 }, { duration: 220, easing: MOTION_EASING.soft });
+    return () => enter?.cancel();
+  }, [listSource]);
 
   if (!activeMailbox) {
     return null;
@@ -215,20 +202,12 @@ export function MailAppListColumn({
             ? "hidden"
             : "flex h-full min-h-0 flex-1 flex-col overflow-hidden"
           : cn(
-              "flex h-full min-h-0 shrink-0 flex-col overflow-hidden bg-[var(--bg-l2-solid)]",
-              // Only narrowing animates (stacked rows follow the edge under the sliding reader); on close the list is already full width beneath it.
-              desktopDetailPaneActive
-                ? cn(
-                    MAIL_LIST_NARROW_WIDTH_CLASS,
-                    // repo-rules-allow motion-compositor-only: width narrows under the covering reader pane (READER-TRANSITION.md); a transform-only swap would reintroduce the Firefox stutter.
-                    "transition-[width]",
-                    MAIL_READER_MOTION_CLASS,
-                  )
-                : "w-full",
+              "flex h-full min-h-0 shrink-0 flex-col overflow-hidden rounded-xl border border-[var(--border-secondary)] bg-[var(--bg-l2-solid)]",
+              MAIL_LIST_NARROW_WIDTH_CLASS,
             )
       }
     >
-      <div ref={contentRef} className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col">
         {searchCoverageText ? (
           <p role="status" className="px-3 py-2 text-xs text-muted-foreground">
             {searchCoverageText}
@@ -247,7 +226,7 @@ export function MailAppListColumn({
         <p role="status" className="sr-only">
           {listStatus}
         </p>
-        <div className="flex min-h-0 flex-1 flex-col">
+        <div ref={listBodyRef} className="flex min-h-0 flex-1 flex-col">
           {showSearchLoadingState || (searchActive && shownCount === 0) ? (
             <MailSearchState loading={showSearchLoadingState} query={searchQuery} mailbox={listTitle} />
           ) : (
@@ -342,23 +321,9 @@ export function MailAppListColumn({
               showLabelChips={listSettings.showLabelChipsInList}
               threadExpandEnabled={listSettings.threadExpandInList}
               preserveMessageOrder={searchActive}
-              narrow={desktopDetailPaneActive}
-              onExpandThread={
-                activeMailbox
-                  ? async (threadId: string) => {
-                      try {
-                        const messages =
-                          await activeMailbox.client.getThreadMessages(
-                            activeMailbox.session,
-                            threadId,
-                          );
-                        return messages;
-                      } catch {
-                        return [];
-                      }
-                    }
-                  : undefined
-              }
+              narrow={!isMobile}
+              cachedThreadMessages={cachedThreadMessages}
+              onExpandThread={activeMailbox ? loadThreadMessages : undefined}
             />
           )}
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Signature } from "lucide-react";
+import { Signature } from "lucide-react";
 import type { ComposeSignatureOption } from "@workspace/calendar-core";
 import {
   Popover,
@@ -9,14 +9,24 @@ import {
   PopoverTrigger,
 } from "@workspace/ui/components/ui/popover";
 import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
+import { cn } from "@workspace/ui/lib/utils";
+import {
+  COMPOSE_MENU_CLASS,
+  COMPOSE_TOOL_CLASS,
+  ComposeMenuHeading,
+  ComposeMenuNote,
+} from "./compose-menu";
 
 export function ComposeSignaturePopover({
   options,
+  defaultKey,
   noneSelected,
   disabled,
   onChoose,
 }: {
   options: ComposeSignatureOption[];
+  /** The sender's default signature, marked so picking another is a visible choice. */
+  defaultKey: string | null;
   noneSelected: boolean;
   disabled: boolean;
   onChoose: (choice: string | null | undefined) => void;
@@ -35,27 +45,26 @@ export function ComposeSignaturePopover({
             type="button"
             disabled={disabled}
             aria-label="Signature"
-            className="cursor-pointer rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+            className={cn(COMPOSE_TOOL_CLASS, open && "bg-[var(--bg-overlay-tertiary)] text-[var(--icon-primary)]")}
           >
-            <Signature className="size-4" />
+            <Signature className="size-[17px]" />
           </button>
         </PopoverTrigger>
       </SimpleTooltip>
       <PopoverContent
         align="start"
         side="top"
-        sideOffset={6}
+        sideOffset={8}
         // Focus returns to the body editor on insert, not to this trigger.
         onCloseAutoFocus={(event) => event.preventDefault()}
-        className="z-[100] flex max-h-80 w-72 max-w-[calc(100dvw-2rem)] flex-col gap-1 overflow-y-auto p-2"
+        className={cn(COMPOSE_MENU_CLASS, "w-[19rem]")}
       >
-        <p className="px-2 pt-1 pb-1 text-xs font-medium text-muted-foreground">
-          Signature
-        </p>
+        <ComposeMenuHeading>Signature</ComposeMenuHeading>
         {options.map((option) => (
           <SignatureOptionButton
             key={option.key}
             label={option.name}
+            note={option.key === defaultKey ? "Default" : undefined}
             detail={option.preview}
             selected={option.selected}
             onClick={() => choose(option.choice)}
@@ -67,10 +76,12 @@ export function ComposeSignaturePopover({
           onClick={() => choose(null)}
         />
         {options.length === 0 ? (
-          <p className="px-2 pb-2 text-sm leading-snug text-muted-foreground">
+          <p className="px-2.5 pb-2 text-sm leading-snug text-muted-foreground">
             No signatures yet. Add one in Mail settings under Signatures.
           </p>
-        ) : null}
+        ) : (
+          <ComposeMenuNote>Edit signatures in Mail settings.</ComposeMenuNote>
+        )}
       </PopoverContent>
     </Popover>
   );
@@ -78,11 +89,13 @@ export function ComposeSignaturePopover({
 
 function SignatureOptionButton({
   label,
+  note,
   detail,
   selected,
   onClick,
 }: {
   label: string;
+  note?: string;
   detail?: string;
   selected: boolean;
   onClick: () => void;
@@ -92,15 +105,24 @@ function SignatureOptionButton({
       type="button"
       aria-pressed={selected}
       onClick={onClick}
-      className="flex min-h-9 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex min-h-10 w-full cursor-pointer items-center gap-3 rounded-lg px-2.5 py-1.5 text-left hover:bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-sm text-foreground">{label}</span>
+      <span
+        aria-hidden
+        className={cn(
+          "size-4 shrink-0 rounded-full border-[1.5px] border-input-border",
+          selected && "border-[5px] border-accent",
+        )}
+      />
+      <span className="flex min-w-0 flex-1 flex-col leading-[1.35]">
+        <span className="truncate text-sm text-foreground">
+          {label}
+          {note ? <span className="ml-1.5 text-xs text-muted-foreground">{note}</span> : null}
+        </span>
         {detail ? (
           <span className="truncate text-xs text-muted-foreground">{detail}</span>
         ) : null}
       </span>
-      {selected ? <Check className="size-4 shrink-0 text-accent" aria-hidden /> : null}
     </button>
   );
 }

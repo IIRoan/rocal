@@ -492,13 +492,14 @@
     }
   }
 
-  input:focus,
-  textarea:focus,
-  select:focus {
-    @apply ring-2 ring-ring border-ring;
-    box-shadow:
-      0 0 0 2px color-mix(in oklch, var(--ring) 25%, transparent),
-      inset 0 1px 0 color-mix(in oklch, var(--background) 70%, transparent);
+  /* Text fields focus like every other control, with the outline below; a field box ([data-field]) draws it around its icons, chips and buttons too. */
+  [data-field]:has(:is(input, textarea, select):focus-visible) {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  [data-field] :is(input, textarea, select):focus-visible {
+    outline: none;
   }
 
   /* Buttons: color/surface feedback only, never press-scale or indent. */

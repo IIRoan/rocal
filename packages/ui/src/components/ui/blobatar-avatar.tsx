@@ -57,7 +57,8 @@ export function BlobatarAvatar({
           {...(crossOrigin ? { crossOrigin } : {})}
         />
       ) : null}
-      <AvatarFallback className="bg-transparent">
+      {/* A remounted row's cached picture loads within the delay, so it never flashes the blob first. */}
+      <AvatarFallback className="bg-transparent" delayMs={src ? 300 : undefined}>
         <Blobatar
           name={seed}
           traits={EMAIL_BLOBATAR_TRAITS}

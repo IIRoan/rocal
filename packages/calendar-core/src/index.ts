@@ -97,6 +97,7 @@ export * from "./mail-search-filter";
 export * from "./mail-search-operators";
 export * from "./mail-local-search";
 export * from "./mail-jmap-email-set";
+export * from "./mail-mailbox-refresh";
 export * from "./mail-outgoing-crypto";
 export * from "./calendar-view-days";
 export * from "./after-paint";

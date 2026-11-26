@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, Clock } from "lucide-react";
+import { CalendarDays, ChevronDown, Clock } from "lucide-react";
 import { useId, useState, type ComponentProps } from "react";
 import {
   formatCalendarDayKey,
@@ -27,6 +27,7 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 import { pickerTimeToWallClock, wallClockToPickerTime } from "@/lib/picker-time";
 import { PALETTE_INPUT_CLASS } from "../command-palette/palette-styles";
+import { COMPOSE_MENU_CLASS, ComposeMenuHeading } from "./compose-menu";
 
 export type ComposeScheduling = {
   maxDelayedSendSeconds: number;
@@ -43,17 +44,32 @@ const PICKER_FIELD_CLASS = cn(
   "flex cursor-pointer items-center gap-2 text-left font-normal",
 );
 
-type ScheduleTriggerProps = ComponentProps<typeof Button> & { scheduledLabel: string | null };
+type ScheduleTriggerProps = ComponentProps<typeof Button> & { scheduledLabel: string | null; split: boolean };
 
-/** The clock opens the picker; once a time is set it shows that time, so the armed Schedule button is never a surprise. */
-function ScheduleTrigger({ scheduledLabel, className, ...props }: ScheduleTriggerProps) {
+/** Opens the picker; once a time is set it shows that time, so the armed Schedule button is never a surprise. */
+function ScheduleTrigger({ scheduledLabel, split, className, ...props }: ScheduleTriggerProps) {
+  const label = scheduledLabel ? `Scheduled for ${scheduledLabel}, change schedule` : "Schedule send";
+  if (split) {
+    // The right half of the Send button, so scheduling reads as another way to send.
+    return (
+      <Button
+        {...props}
+        size="sm"
+        className={cn("h-9 gap-1 rounded-l-none border-l border-accent-foreground/20 px-2 aria-disabled:opacity-50", className)}
+        aria-label={label}
+      >
+        {scheduledLabel ? <span className="whitespace-nowrap text-xs tabular-nums">{scheduledLabel}</span> : null}
+        <ChevronDown aria-hidden />
+      </Button>
+    );
+  }
   return (
     <Button
       {...props}
       size={scheduledLabel ? "xs" : "icon-xs"}
       variant="ghost"
       className={cn("h-7 aria-disabled:opacity-50", scheduledLabel ? "px-2 text-accent" : "w-7", className)}
-      aria-label={scheduledLabel ? `Scheduled for ${scheduledLabel}, change schedule` : "Schedule send"}
+      aria-label={label}
     >
       <Clock aria-hidden />
       {scheduledLabel ? <span className="whitespace-nowrap tabular-nums">{scheduledLabel}</span> : null}
@@ -62,12 +78,12 @@ function ScheduleTrigger({ scheduledLabel, className, ...props }: ScheduleTrigge
 }
 
 const ROW_CLASS =
-  "flex cursor-pointer items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-sm hover:bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "flex min-h-10 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm hover:bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 function ClearScheduleRow({ onClear }: { onClear: () => void }) {
   return (
     <button type="button" onClick={onClear} className={ROW_CLASS}>
-      <span className="whitespace-nowrap">Don&apos;t schedule</span>
+      <span className="flex-1 whitespace-nowrap">Don&apos;t schedule</span>
       <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">Send right away</span>
     </button>
   );
@@ -136,6 +152,7 @@ export function ComposeSchedulePopover({
   scheduledSendAt,
   onSchedule,
   onClear,
+  split = false,
 }: {
   scheduling: ComposeScheduling;
   recipients: string[];
@@ -144,6 +161,8 @@ export function ComposeSchedulePopover({
   scheduledSendAt: string | null;
   onSchedule: (sendAt: string) => void;
   onClear: () => void;
+  /** Render the trigger as the chevron half of the Send button. */
+  split?: boolean;
 }) {
   const id = useId();
   const [open, setOpen] = useState(false);
@@ -186,12 +205,13 @@ export function ComposeSchedulePopover({
       <PopoverTrigger asChild>
         <ScheduleTrigger
           scheduledLabel={scheduledLabel}
+          split={split}
           aria-disabled={disabled || undefined}
           disabled={scheduling.maxDelayedSendSeconds <= 0}
         />
       </PopoverTrigger>
-      <PopoverContent align="start" side="top" sideOffset={6} className="z-[100] flex w-80 max-w-[calc(100dvw-2rem)] flex-col gap-1 p-2">
-        <p className="px-2 pt-1 pb-1 text-xs font-medium text-muted-foreground">Schedule send</p>
+      <PopoverContent align="start" side="top" sideOffset={8} className={cn(COMPOSE_MENU_CLASS, "w-80")}>
+        <ComposeMenuHeading>Schedule send</ComposeMenuHeading>
         {scheduledLabel ? (
           <ClearScheduleRow
             onClear={() => {
@@ -208,7 +228,8 @@ export function ComposeSchedulePopover({
             onClick={() => choose(preset.sendAt, Date.now())}
             className={ROW_CLASS}
           >
-            <span className="min-w-0 truncate whitespace-nowrap">{preset.label}</span>
+            <Clock aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 truncate whitespace-nowrap">{preset.label}</span>
             <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
               {formatScheduledSendShortTime(preset.sendAt, scheduling.timezone, scheduling.timeFormat)}
             </span>

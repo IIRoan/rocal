@@ -33,8 +33,6 @@ import {
   Mail,
   GripVertical,
   Settings2,
-  Search,
-  Settings,
   SquarePen,
   Clock,
 } from "lucide-react";
@@ -137,7 +135,7 @@ function SortableMailboxItem({
     >
       <button
         type="button"
-        className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-8 flex items-center justify-center opacity-0 group-hover/item:opacity-100 focus-visible:opacity-100 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-[opacity,color] z-10"
+        className="absolute right-1 top-1/2 z-10 flex h-8 w-5 -translate-y-1/2 cursor-grab items-center justify-center rounded text-muted-foreground opacity-0 outline-none transition-[opacity,color] group-hover/item:opacity-100 hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
         {...attributes}
         {...listeners}
         aria-label={`Reorder ${name}`}
@@ -150,6 +148,7 @@ function SortableMailboxItem({
           isActive={isSelected}
           aria-current={isSelected ? "page" : undefined}
           onClick={onSelect}
+          className="pr-7"
         >
           <MailboxIcon role={mailbox.role} isSelected={isSelected} />
           <span data-sidebar-name className="truncate">
@@ -210,7 +209,7 @@ function ExpandedMailboxNav({
   return (
     <>
       <div data-sidebar-heading className="justify-between">
-        <h2 className="font-medium tracking-normal">General</h2>
+        <h2 className="font-medium tracking-normal">Mailboxes</h2>
         <Tooltip>
           <TooltipTrigger asChild>
             <button
@@ -279,60 +278,6 @@ function ExpandedMailboxNav({
   );
 }
 
-function MailPrimaryActions({
-  isCollapsed,
-  onCompose,
-  onOpenSearch,
-  onOpenSettings,
-}: {
-  isCollapsed: boolean;
-  onCompose: () => void;
-  onOpenSearch?: () => void;
-  onOpenSettings: () => void;
-}) {
-  if (isCollapsed) {
-    return (
-      <SidebarGroup className="shrink-0 items-center gap-1 px-2 pt-2">
-        <SidebarIconButton label="Compose" onClick={onCompose}>
-          <SquarePen size={16} strokeWidth={2} />
-        </SidebarIconButton>
-        {onOpenSearch ? (
-          <SidebarIconButton label="Search" onClick={onOpenSearch}>
-            <Search size={16} strokeWidth={2} />
-          </SidebarIconButton>
-        ) : null}
-      </SidebarGroup>
-    );
-  }
-
-  return (
-    <SidebarGroup className="shrink-0 px-2 pt-1">
-      <SidebarMenu className="gap-1">
-        <SidebarMenuItem>
-          <SidebarMenuButton onClick={onCompose}>
-            <SquarePen size={16} strokeWidth={2} />
-            <span>Compose</span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-        {onOpenSearch ? (
-          <SidebarMenuItem>
-            <SidebarMenuButton onClick={onOpenSearch}>
-              <Search size={16} strokeWidth={2} />
-              <span>Search</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        ) : null}
-        <SidebarMenuItem>
-          <SidebarMenuButton onClick={onOpenSettings}>
-            <Settings size={16} strokeWidth={2} />
-            <span>Settings</span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-      </SidebarMenu>
-    </SidebarGroup>
-  );
-}
-
 export interface MailSidebarProps {
   user: { name: string; email: string; avatar?: string };
   activeMailbox: ActiveMailboxState | null;
@@ -397,23 +342,17 @@ export function MailSidebar({
   return (
     <SidebarShell
       activeApp="mail"
-      variant="sidebar"
       user={user}
       onLogout={onSignOut}
       onOpenSettings={onOpenPalette}
+      onOpenSearch={onOpenSearch}
+      primaryAction={{ label: "Compose", icon: <SquarePen size={15} strokeWidth={2.25} />, onClick: onCompose }}
     >
       {({ isCollapsed }) => (
         <>
-          <MailPrimaryActions
-            isCollapsed={isCollapsed}
-            onCompose={onCompose}
-            onOpenSearch={onOpenSearch}
-            onOpenSettings={onOpenPalette}
-          />
-
           {activeMailbox && (
             <SidebarGroup
-              className={`px-2 flex-1 overflow-y-auto ${isCollapsed ? "pt-2" : "pt-4"}`}
+              className="flex-1 overflow-y-auto px-2 pt-1"
             >
             <nav aria-label="Mailboxes">
             {isCollapsed ? (

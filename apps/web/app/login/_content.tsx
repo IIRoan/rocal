@@ -1012,6 +1012,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                       Solace email
                     </Label>
                     <div
+                      data-field
                       className={`flex h-11 overflow-hidden rounded-lg border bg-background transition-colors ${
                         emailAvailability === null
                           ? "border-input-border"
@@ -1037,7 +1038,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                         }
                         required={isSignUp}
                         readOnly={emailLoading}
-                        className="h-full flex-1 rounded-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                        className="h-full flex-1 rounded-none border-0 bg-transparent"
                         {...fieldErrorProps(
                           "desired-email",
                           "desired-email-hint",

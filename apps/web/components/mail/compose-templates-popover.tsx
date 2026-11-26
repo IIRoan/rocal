@@ -9,6 +9,13 @@ import {
   PopoverTrigger,
 } from "@workspace/ui/components/ui/popover";
 import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
+import { cn } from "@workspace/ui/lib/utils";
+import {
+  COMPOSE_MENU_CLASS,
+  COMPOSE_TOOL_CLASS,
+  ComposeMenuHeading,
+  ComposeMenuNote,
+} from "./compose-menu";
 
 export function ComposeTemplatesPopover({
   templates,
@@ -29,25 +36,23 @@ export function ComposeTemplatesPopover({
             type="button"
             disabled={disabled}
             aria-label="Insert template"
-            className="cursor-pointer rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
+            className={cn(COMPOSE_TOOL_CLASS, open && "bg-[var(--bg-overlay-tertiary)] text-[var(--icon-primary)]")}
           >
-            <FileText className="size-4" />
+            <FileText className="size-[17px]" />
           </button>
         </PopoverTrigger>
       </SimpleTooltip>
       <PopoverContent
         align="start"
         side="top"
-        sideOffset={6}
+        sideOffset={8}
         // Focus returns to the body editor on insert, not to this trigger.
         onCloseAutoFocus={(event) => event.preventDefault()}
-        className="z-[100] flex max-h-80 w-72 max-w-[calc(100dvw-2rem)] flex-col gap-1 overflow-y-auto p-2"
+        className={cn(COMPOSE_MENU_CLASS, "w-[21rem]")}
       >
-        <p className="px-2 pt-1 pb-1 text-xs font-medium text-muted-foreground">
-          Templates
-        </p>
+        <ComposeMenuHeading>Insert template</ComposeMenuHeading>
         {templates.length === 0 ? (
-          <p className="px-2 pb-2 text-sm leading-snug text-muted-foreground">
+          <p className="px-2.5 pb-2 text-sm leading-snug text-muted-foreground">
             No templates yet. Add one in Mail settings under Templates.
           </p>
         ) : (
@@ -59,15 +64,19 @@ export function ComposeTemplatesPopover({
                 setOpen(false);
                 onInsert(template);
               }}
-              className="flex min-h-9 cursor-pointer flex-col rounded-md px-2 py-1.5 text-left hover:bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex w-full cursor-pointer items-start gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <span className="truncate text-sm text-foreground">{template.name}</span>
-              <span className="truncate text-xs text-muted-foreground">
-                {template.subject || template.body.replace(/\s+/g, " ").trim()}
+              <FileText aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="truncate text-sm font-medium text-foreground">{template.name}</span>
+                <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">
+                  {template.subject || template.body.replace(/\s+/g, " ").trim()}
+                </span>
               </span>
             </button>
           ))
         )}
+        {templates.length > 0 ? <ComposeMenuNote>Manage templates in Mail settings.</ComposeMenuNote> : null}
       </PopoverContent>
     </Popover>
   );

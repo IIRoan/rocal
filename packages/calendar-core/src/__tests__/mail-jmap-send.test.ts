@@ -21,6 +21,7 @@ import {
   listScheduledJmapSends,
   type JmapRequest,
   type OutgoingJmapMessage,
+  withDraftsSeen,
 } from "../mail-jmap-email-set";
 import type { JmapMethodCallLike } from "../mail-server-policy";
 
@@ -299,7 +300,7 @@ describe("buildDraftMethodCalls", () => {
           create: {
             draft1: {
               mailboxIds: { drafts: true },
-              keywords: { $draft: true },
+              keywords: { $seen: true, $draft: true },
               from: [{ email: "alice@solace.onl", name: "Alice" }],
               to: [{ email: "bob@example.com" }],
               bcc: [{ email: "eve@example.com" }],
@@ -1260,5 +1261,18 @@ describe("held sends", () => {
     expect(request.mock.calls[1][1][0][1]).toMatchObject({
       filter: { operator: "OR", conditions: [{ hasKeyword: keyword }, { hasKeyword: `$solace-scheduled-${other}` }] },
     });
+  });
+});
+
+describe("withDraftsSeen", () => {
+  it("reads every draft as seen and leaves other messages alone", () => {
+    const unreadDraft = { id: "d1", keywords: { $draft: true } };
+    const readDraft = { id: "d2", keywords: { $draft: true, $seen: true } };
+    const unreadMail = { id: "m1", keywords: {} };
+    const partial = { id: "p1" };
+    const [draft, ...rest] = withDraftsSeen([unreadDraft, readDraft, unreadMail, partial]);
+    expect(draft?.keywords).toEqual({ $draft: true, $seen: true });
+    expect(rest).toEqual([readDraft, unreadMail, partial]);
+    expect(rest[0]).toBe(readDraft);
   });
 });

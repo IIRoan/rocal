@@ -62,6 +62,8 @@ export interface MessageListProps {
   showLabelChips?: boolean;
   threadExpandEnabled?: boolean;
   onExpandThread?: (threadId: string) => Promise<JmapEmailMessage[]> | void;
+  /** Messages of a thread expanded before, shown at once while `onExpandThread` refreshes them. */
+  cachedThreadMessages?: (threadId: string) => JmapEmailMessage[] | undefined;
   /** Keep search relevance order instead of re-sorting threads by date. */
   preserveMessageOrder?: boolean;
   /** Stack rows and collapse hover actions into a menu when the reader is open beside the list. */
@@ -99,6 +101,7 @@ export function MessageList({
   showLabelChips = true,
   threadExpandEnabled = true,
   onExpandThread,
+  cachedThreadMessages,
   preserveMessageOrder = false,
   narrow = false,
 }: MessageListProps) {
@@ -175,7 +178,12 @@ export function MessageList({
       onExpandThread &&
       !state.expandedThreadMessages[threadId]
     ) {
-      dispatch({ type: "setThreadLoading", threadId, loading: true });
+      const held = cachedThreadMessages?.(threadId);
+      if (held?.length) {
+        dispatch({ type: "setThreadMessages", threadId, messages: held });
+      } else {
+        dispatch({ type: "setThreadLoading", threadId, loading: true });
+      }
       void Promise.resolve(onExpandThread(threadId))
         .then((threadMessages) => {
           if (threadMessages && threadMessages.length > 0) {
