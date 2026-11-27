@@ -1,3 +1,4 @@
+import { trimTrailingSlashes } from "@workspace/runtime";
 import type { JmapSession } from "./mail-jmap-types";
 
 function rewriteOrigin(
@@ -11,7 +12,7 @@ function rewriteOrigin(
   try {
     const original = new URL(urlString);
     const replacement = new URL(baseUrl);
-    const replacementPath = replacement.pathname.replace(/\/+$/, "");
+    const replacementPath = trimTrailingSlashes(replacement.pathname);
     return `${replacement.origin}${replacementPath}${urlString.slice(original.origin.length)}`;
   } catch {
     return urlString;
@@ -26,7 +27,7 @@ export function normalizeJmapSession(
   session: JmapSession,
   discoveryBaseUrl: string,
 ): JmapSession {
-  const normalizedBaseUrl = discoveryBaseUrl.replace(/\/+$/, "");
+  const normalizedBaseUrl = trimTrailingSlashes(discoveryBaseUrl);
 
   return {
     ...session,

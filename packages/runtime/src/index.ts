@@ -302,7 +302,7 @@ function unique(values: Array<string | null | undefined>): string[] {
   );
 }
 
-function trimTrailingSlashes(value: string): string {
+export function trimTrailingSlashes(value: string): string {
   let end = value.length;
   while (end > 0 && value.charAt(end - 1) === "/") end -= 1;
   return value.slice(0, end);

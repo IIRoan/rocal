@@ -42,6 +42,7 @@ import {
 } from "@workspace/calendar-core";
 import { sanitizeContext } from "@workspace/calendar-core/report-redaction";
 import { createLogger } from "@workspace/logger";
+import { trimTrailingSlashes } from "@workspace/runtime";
 import { getMailboxNameCipher } from "./mailbox-name-cipher";
 
 export { buildBearerAuthHeader, getPrimaryMailAccountId, normalizeJmapSession } from "@workspace/calendar-core";
@@ -82,10 +83,6 @@ type JmapClientBearerAuthInput = {
   fetcher?: Fetcher;
   getMailboxNameCipher?: () => Promise<MailboxNameCipher | null>;
 };
-
-function normalizeBaseUrl(baseUrl: string): string {
-  return baseUrl.replace(/\/+$/, "");
-}
 
 function defaultFetcher(input: string, init?: RequestInit): Promise<Response> {
   // repo-rules-allow client-api-boundary: JMAP protocol transport to the mail server, not a Solace API route.
@@ -200,7 +197,7 @@ export class StalwartJmapClient extends JmapMailClient {
     ...auth
   }: JmapClientBearerAuthInput) {
     super(mailboxNameCipher, log);
-    this.baseUrl = normalizeBaseUrl(baseUrl);
+    this.baseUrl = trimTrailingSlashes(baseUrl);
     this.onUnauthorized = onUnauthorized;
 
     const accessTokenProvider =

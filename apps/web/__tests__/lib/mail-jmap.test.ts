@@ -62,7 +62,7 @@ describe("mail JMAP helpers", () => {
           "urn:ietf:params:jmap:mail": "b",
         },
       },
-      "http://localhost:4001/api/mail/jmap",
+      "http://localhost:4001/api/mail/jmap///",
     );
 
     expect(session).toEqual(

@@ -23,6 +23,7 @@ import {
   type OutgoingJmapMessage,
   withDraftsSeen,
 } from "../mail-jmap-email-set";
+import type { MailMessageFlags } from "../mail-mailbox-refresh";
 import type { JmapMethodCallLike } from "../mail-server-policy";
 
 const base = {
@@ -1270,7 +1271,7 @@ describe("withDraftsSeen", () => {
     const readDraft = { id: "d2", keywords: { $draft: true, $seen: true } };
     const unreadMail = { id: "m1", keywords: {} };
     const partial = { id: "p1" };
-    const [draft, ...rest] = withDraftsSeen([unreadDraft, readDraft, unreadMail, partial]);
+    const [draft, ...rest] = withDraftsSeen<MailMessageFlags>([unreadDraft, readDraft, unreadMail, partial]);
     expect(draft?.keywords).toEqual({ $draft: true, $seen: true });
     expect(rest).toEqual([readDraft, unreadMail, partial]);
     expect(rest[0]).toBe(readDraft);
