@@ -218,6 +218,28 @@ describe("MessageList", () => {
     expect(onSelect).toHaveBeenCalledWith("message-1");
   });
 
+  it("shows two named labels and an overflow count beside the subject", () => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const renderedRoot = root;
+    const labels = [
+      { id: "a", name: "Testlabel", color: "green" },
+      { id: "b", name: "test123", color: "#f83" },
+      { id: "c", name: "Other", color: "blue" },
+    ];
+    const tagged = { ...message, keywords: { "label:a": true, "label:b": true, "label:c": true } };
+
+    act(() => renderedRoot.render(
+      <MessageList messages={[tagged]} labels={labels} selectedMessageId={null} timeFormat="24h" onSelect={jest.fn()} />,
+    ));
+
+    const chips = container.querySelector('[title="Testlabel"]')?.parentElement;
+    expect(Array.from(chips?.children ?? [], (chip) => chip.textContent)).toEqual([
+      "Testlabel", "test123", "+1",
+    ]);
+  });
+
   it("names unread and open rows without relying on color", () => {
     container = document.createElement("div");
     document.body.appendChild(container);

@@ -8,7 +8,7 @@ How the desktop list and reader are laid out, how a conversation slides in like 
 | --- | --- |
 | `mail-reader-transition.ts` | The list column width, the drawer timing (`MAIL_READER_DRAWER_MS`) and the content fade (`fadeInMailReaderContent`). Change timing here only. |
 | `mail-reader-layer.tsx` | `useMailReaderDrawer` and `MailReaderLayer`: one surface per conversation, hidden until ready, slid across the empty reader on open, swapped in place on a switch and slid off on close. |
-| `mail-app-main-layout.tsx` | `@container` row holding the two surfaces with an 8px gap. |
+| `mail-app-main-layout.tsx` | `@container` row providing the shared desktop background, border and rounded corners. |
 | `mail-app-list-column.tsx` | List surface at `clamp(300px,32cqw,420px)`, stacked rows (`narrow`) on desktop. |
 | `mail-app-detail-pane.tsx` | Reader surface taking the rest of the row; shows the open conversation's layer, full compose, or the empty state. |
 | `../../../hooks/use-mail-app.ts` | `isSelectedConversationReady`: the thread (a `useQuery` on `mailQueryKeys.threadMessages`), the body, its decryption and the earlier messages' previews are in. |
@@ -18,7 +18,7 @@ How the desktop list and reader are laid out, how a conversation slides in like 
 
 ## Layout
 
-- On desktop the list and the reader are always both on screen, as two rounded surfaces on the sidebar's backdrop. The list keeps its width and the reader fills the rest of the row, so opening, switching or closing a message never moves the list.
+- On desktop the list and the reader are always both on screen in one rounded surface with a thin divider at the list’s edge. The list keeps its width and the reader fills the rest of the row, so opening, switching or closing a message never moves the list.
 - With nothing open the reader shows its empty state (the Solace mark and "Select a conversation"). A closing conversation slides off over it.
 - Mobile keeps one full-screen pane: the list, or the reader once a message is open.
 

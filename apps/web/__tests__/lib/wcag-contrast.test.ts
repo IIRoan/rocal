@@ -91,6 +91,8 @@ const mailLightBlock = block(MAIL_CSS, /^html:has\(\[data-solace\]/m);
 const mailLight = { ...webLight, ...mailLightBlock };
 const mailDark = { ...webDark, ...mailLightBlock, ...block(MAIL_CSS, /^html\.dark:has/m) };
 
+const desktopMailPanes = { ...mailDark, ...block(MAIL_CSS, /^\.dark \.mail-panes\s*\{/m) };
+
 const EVENTS = ["sky", "violet", "orange", "rose", "emerald", "red", "cyan", "lime", "amber", "indigo", "pink", "teal"];
 const SURFACES = ["--background", "--card", "--popover", "--muted"];
 
@@ -138,6 +140,7 @@ describe.each([
 describe.each([
   ["light", mailLight],
   ["dark", mailDark],
+  ["dark desktop panes", desktopMailPanes],
 ])("mail tokens (%s)", (_theme, vars) => {
   it.each(MAIL_BACKGROUNDS.flatMap((bg) => [...MAIL_TEXT, ...MAIL_LABELS].map((fg) => [fg, bg] as const)))(
     "%s on %s reaches 4.5:1 (1.4.3)",

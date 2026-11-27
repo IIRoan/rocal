@@ -209,6 +209,27 @@ html.dark:has([data-solace]:not([data-solace-scoped])),
   --sidebar-border: var(--border-tertiary);
 }
 
+.dark [data-solace].mail-desktop {
+  --bg-sidepanel: #1b1b1b;
+}
+
+.dark .mail-panes {
+  --bg-l2-solid: #2b2b2b;
+  --bg-main-container: var(--bg-l2-solid);
+  --bg-l3-solid: #303030;
+  --bg-cell-unread: var(--bg-l3-solid);
+  --text-tertiary: rgba(255, 255, 255, 0.55);
+  --text-secondary: rgba(255, 255, 255, 0.57);
+  --muted-foreground: var(--text-secondary);
+  --accent-orange-primary: rgb(255, 142, 120);
+  --accent-green-primary: rgb(25, 199, 127);
+  --accent-pink-primary: rgb(239, 149, 194);
+  --accent-yellow-primary: rgb(223, 171, 14);
+  --accent-blue-primary: rgb(74, 183, 238);
+  --accent-red-primary: rgb(255, 143, 143);
+  --accent-dark-blue-primary: rgb(135, 175, 255);
+}
+
 /* Fallback Nightwatch chrome for shared shadcn menus in mail (e.g. NavUser); mail menus use solace/dropdown. */
 html:has([data-solace]:not([data-solace-scoped]))
   :is(

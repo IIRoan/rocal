@@ -9,11 +9,9 @@ import {
   DropdownPanel,
   DropdownSubmenu,
   Icon,
-  IconButton,
-  Size,
-  Type,
 } from "@workspace/ui/solace";
 import { getMailboxDisplayName } from "@/lib/mail/mail-mailbox-roles";
+import { ReaderActionIcon } from "./message-reader-action-button";
 import { LabelPickerPanel } from "../label-picker-panel";
 import type {
   MessageReaderController,
@@ -77,13 +75,11 @@ export function MessageReaderMoreActionsPopover({
         }
         width={240}
         trigger={
-          <IconButton
+          <ReaderActionIcon
             active={morePopoverOpen || labelPopoverOpen}
             disabled={isBusy}
             icon={Icon.OverflowH}
-            size={Size.SMALL}
             tooltip="More actions"
-            type={Type.SECONDARY}
           />
         }
       >
