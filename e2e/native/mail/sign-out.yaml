@@ -17,10 +17,10 @@ appId: ${APP_ID}
       - tapOn:
           id: mail-thread-message-0
           retryTapIfNoChange: false
-- extendedWaitUntil:
-    visible:
-      id: mail-message-text
-      text: ".*Maestro body survives encrypted draft storage.*"
-    timeout: 60000
-- assertVisible: Signed with your local key
+- runFlow:
+    file: ../common/conversation-body.yaml
+    env:
+      BODY_TEXT: ".*Maestro body survives encrypted draft storage.*"
+      SIGNATURE_LABEL: Signed with your local key
+      OPEN_TIMEOUT_MS: 60000
 - takeScreenshot: ${SCREENSHOT_DIR}/signed-in-and-unlocked-again
