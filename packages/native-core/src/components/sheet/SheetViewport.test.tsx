@@ -9,6 +9,8 @@ let mockHeight = 0;
 let mockKeyboardChange = (_event: {
   endCoordinates: { screenY: number };
 }) => {};
+let mockKeyboardHide = () => {};
+let mockKeyboardY: number | undefined;
 let mockStyleUpdate = () => {};
 let mockLayout = {
   containerHeight: 800,
@@ -24,9 +26,10 @@ jest.mock("react-native", () => ({
     },
   },
   Keyboard: {
-    metrics: () => ({ screenY: 500 }),
-    addListener: (_name: string, listener: typeof mockKeyboardChange) => {
-      mockKeyboardChange = listener;
+    metrics: () => mockKeyboardY === undefined ? undefined : { screenY: mockKeyboardY },
+    addListener: (name: string, listener: typeof mockKeyboardChange) => {
+      if (name === "keyboardDidShow") mockKeyboardChange = listener;
+      else mockKeyboardHide = () => listener({ endCoordinates: { screenY: 800 } });
       return { remove: jest.fn() };
     },
   },
@@ -82,6 +85,7 @@ let root: Root;
 
 beforeEach(() => {
   mockPlatform = "android";
+  mockKeyboardY = 500;
   mockStyleUpdate = () => {};
   mockLayout = {
     containerHeight: 800,
@@ -113,6 +117,7 @@ it.each([
     expected,
   ) => {
     mockPlatform = platform;
+    if (status === 2) mockKeyboardY = undefined;
     mockLayout = {
       containerHeight,
       containerOffset: { top },
@@ -128,4 +133,14 @@ it("updates overlap when the keyboard moves on screen", async () => {
   await act(async () => root.render(<SheetViewport>Form</SheetViewport>));
   act(() => mockKeyboardChange({ endCoordinates: { screenY: 700 } }));
   expect(mockHeight).toBe(572);
+});
+
+it("keeps the dock above a WebView keyboard even when the sheet has no focused input", async () => {
+  mockKeyboard.status = 2;
+  mockKeyboardY = undefined;
+  await act(async () => root.render(<SheetViewport>Form</SheetViewport>));
+  act(() => mockKeyboardChange({ endCoordinates: { screenY: 500 } }));
+  expect(mockHeight).toBe(372);
+  act(() => mockKeyboardHide());
+  expect(mockHeight).toBe(672);
 });
