@@ -1,6 +1,7 @@
 appId: ${APP_ID}
 ---
 - extendedWaitUntil:
+    label: Wait for the expanded message body
     visible:
       text: ${BODY_TEXT}
       below:
