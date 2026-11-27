@@ -124,16 +124,15 @@ html:has([data-solace]:not([data-solace-scoped])),
 html.dark:has([data-solace]:not([data-solace-scoped])),
 .dark [data-solace] {
   --text-primary: rgb(255, 255, 255);
-  --text-secondary: rgba(255, 255, 255, 0.54);
-  /* 0.5 keeps 4.5:1 on a selected or hovered cell (--bg-cell-active over --bg-l2-solid). */
-  --text-tertiary: rgba(255, 255, 255, 0.5);
+  --text-secondary: #b0b0b0;
+  --text-tertiary: #aaaaaa;
   --text-disabled: rgba(255, 255, 255, 0.28);
   --text-destructive: rgb(255, 143, 143);
   --text-inverse: rgb(0, 0, 0);
 
   --icon-primary: rgb(255, 255, 255);
-  --icon-secondary: rgba(255, 255, 255, 0.54);
-  --icon-tertiary: rgba(255, 255, 255, 0.42);
+  --icon-secondary: var(--text-secondary);
+  --icon-tertiary: var(--text-tertiary);
   --icon-disabled: rgba(255, 255, 255, 0.28);
   --icon-destructive: rgb(255, 143, 143);
   --icon-inverse: rgb(0, 0, 0);
@@ -158,16 +157,16 @@ html.dark:has([data-solace]:not([data-solace-scoped])),
   --border-active: rgb(255, 255, 255);
   --border-destructive: rgba(255, 143, 143, 0.12);
 
-  --bg-main-container: #1f1f1f;
-  --bg-sidepanel: #1a1a1a;
-  --bg-l1-solid: #1a1a1a;
-  --bg-l2-solid: #1f1f1f;
-  --bg-l3-solid: #242424;
+  --bg-main-container: #0d0d0d;
+  --bg-sidepanel: #111111;
+  --bg-l1-solid: var(--bg-sidepanel);
+  --bg-l2-solid: #191919;
+  --bg-l3-solid: #202020;
   --bg-emphasis: #303030;
   --bg-scrim: rgba(0, 0, 0, 0.42);
   --bg-cell-hover: rgba(255, 255, 255, 0.06);
-  --bg-cell-active: rgba(255, 255, 255, 0.08);
-  --bg-cell-unread: #242424;
+  --bg-cell-active: #333333;
+  --bg-cell-unread: var(--bg-l3-solid);
   --bg-field-default: rgba(255, 255, 255, 0.08);
   --bg-overlay-primary: rgba(255, 255, 255, 0.1);
   --bg-overlay-secondary: rgba(255, 255, 255, 0.08);
@@ -197,7 +196,7 @@ html.dark:has([data-solace]:not([data-solace-scoped])),
   --popover: var(--bg-l2-solid);
   --popover-foreground: var(--text-primary);
   --muted: var(--bg-overlay-tertiary);
-  --muted-foreground: var(--text-secondary);
+  --muted-foreground: var(--text-tertiary);
   --hover: var(--bg-overlay-tertiary);
   --hover-foreground: var(--text-primary);
   --border: var(--border-secondary);
@@ -214,13 +213,8 @@ html.dark:has([data-solace]:not([data-solace-scoped])),
 }
 
 .dark .mail-panes {
-  --bg-l2-solid: #2b2b2b;
   --bg-main-container: var(--bg-l2-solid);
-  --bg-l3-solid: #303030;
-  --bg-cell-unread: var(--bg-l3-solid);
-  --text-tertiary: rgba(255, 255, 255, 0.55);
-  --text-secondary: rgba(255, 255, 255, 0.57);
-  --muted-foreground: var(--text-secondary);
+  --background: var(--bg-main-container);
   --accent-orange-primary: rgb(255, 142, 120);
   --accent-green-primary: rgb(25, 199, 127);
   --accent-pink-primary: rgb(239, 149, 194);
