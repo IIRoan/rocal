@@ -288,7 +288,7 @@ export function MailAppDetailPane({
 
   // The reader is always beside the list on desktop, so opening a message never moves the list.
   return (
-    <div className="relative min-w-0 flex-1 overflow-hidden rounded-xl border border-[var(--border-secondary)] bg-[var(--bg-l2-solid)]">
+    <div className="relative min-w-0 flex-1 overflow-hidden">
       {panes}
     </div>
   );

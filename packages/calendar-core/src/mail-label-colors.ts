@@ -10,6 +10,8 @@ export const MAIL_LABEL_PRESET_COLORS = [
   { value: "indigo", hex: "#6366f1", label: "Indigo" },
 ] as const;
 
+export const MAIL_LIST_LABEL_TINT = { background: 0.14, text: 0.38 } as const;
+
 export const MAIL_LABEL_CUSTOM_DEFAULT_COLOR = "#6366f1";
 
 /** Unknown label definitions use each platform's neutral theme color. */

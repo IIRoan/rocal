@@ -8,13 +8,14 @@ import {
   type ViewStyle,
 } from "react-native";
 import Animated, {
+  interpolateColor,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 import { Feather, FontAwesome } from "@expo/vector-icons";
-import type { ListDensity, TimeFormat } from "@workspace/calendar-core";
+import { MAIL_LIST_LABEL_TINT, resolveLabelDisplayColor, type ListDensity, type TimeFormat } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import {
@@ -45,7 +46,6 @@ import {
 } from "@workspace/native-core/components/mail/mail-ui";
 import { MAIL_SELECT_CHECK_SPRING } from "./mail-selection-anim-utils";
 import { MailIdentityBadge } from "./MailIdentityBadge";
-import { MailLabelChip } from "./MailLabelChip";
 import { BlobatarAvatar } from "@workspace/native-core/components/BlobatarAvatar";
 
 const EMPTY_LABELS: LabelDef[] = [];
@@ -472,6 +472,7 @@ function MailRowLabels({
   showLabelChips: boolean;
   styles: MailRowStyles;
 }) {
+  const { theme } = useTheme();
   const visibleLabels = showLabelChips
     ? messageLabels.slice(0, MAX_VISIBLE_LABELS)
     : EMPTY_LABELS;
@@ -483,9 +484,16 @@ function MailRowLabels({
   }
   return (
     <View style={styles.labels}>
-      {visibleLabels.map((label) => (
-        <MailLabelChip key={label.id} name={label.name} color={label.color} />
-      ))}
+      {visibleLabels.map((label) => {
+        const tint = resolveLabelDisplayColor(label.color, theme.colors.mutedForeground);
+        const color = interpolateColor(MAIL_LIST_LABEL_TINT.text, [0, 1], [theme.colors.foreground, tint], "RGB", { gamma: 1 });
+        const backgroundColor = interpolateColor(MAIL_LIST_LABEL_TINT.background, [0, 1], [theme.colors.background, tint], "RGB", { gamma: 1 });
+        return (
+          <Text key={label.id} numberOfLines={1} style={[styles.label, { color, backgroundColor }]}>
+            {label.name}
+          </Text>
+        );
+      })}
       {extraLabelCount > 0 ? (
         <Text style={styles.labelOverflow}>+{extraLabelCount}</Text>
       ) : null}
@@ -639,7 +647,7 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
     meta: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      gap: pad.tight + 2,
+      gap: pad.tight,
       flexShrink: 0,
     },
     previewPlaceholder: {
@@ -696,6 +704,16 @@ function createStyles(theme: ThemeTokens, skin: MailSkin) {
       fontSize: 14,
       lineHeight: PREVIEW_LINE_HEIGHT,
       color: skin.textTertiary,
+    },
+    label: {
+      flexShrink: 1,
+      maxWidth: 140,
+      overflow: "hidden",
+      borderRadius: theme.borderRadius.sm,
+      paddingHorizontal: 7,
+      fontSize: 12,
+      lineHeight: 18,
+      fontWeight: "500",
     },
     labelOverflow: {
       ...skin.meta,

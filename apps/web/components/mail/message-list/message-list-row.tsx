@@ -14,7 +14,7 @@ import type { JmapEmailMessage } from "@/lib/mail/types";
 import { formatAddress, formatMessageDate } from "../mail-helpers";
 import { SenderAvatar } from "../mail-avatar";
 import { getAllMessageLabels } from "@/lib/mail/mail-labels";
-import { resolveLabelDisplayColor, type TimeFormat } from "@workspace/calendar-core";
+import { MAIL_LIST_LABEL_TINT, resolveLabelDisplayColor, type TimeFormat } from "@workspace/calendar-core";
 import {
   formatThreadSenders,
   getListPreviewSnippet,
@@ -35,7 +35,7 @@ function MessageLabelChips({
   max = 2,
   className,
 }: {
-  messageLabels: { id: string; name: string; color?: string }[];
+  messageLabels: { id: string; name: string; color: string }[];
   max?: number;
   className: string;
 }) {
@@ -51,17 +51,13 @@ function MessageLabelChips({
           <span
             key={label.id}
             title={label.name}
-            className="inline-flex max-w-[5.5rem] items-center gap-0.5 rounded px-1 py-px text-[11px] font-medium leading-none text-[var(--text-primary)]"
+            className="min-w-0 max-w-[5.5rem] truncate rounded-[5px] px-[7px] text-xs leading-[18px] font-medium"
             style={{
-              backgroundColor: `color-mix(in srgb, ${displayColor} 10%, transparent)`,
-              border: `1px solid color-mix(in srgb, ${displayColor} 25%, transparent)`,
+              backgroundColor: `color-mix(in srgb, ${displayColor} ${MAIL_LIST_LABEL_TINT.background * 100}%, transparent)`,
+              color: `color-mix(in srgb, ${displayColor} ${MAIL_LIST_LABEL_TINT.text * 100}%, var(--text-primary))`,
             }}
           >
-            <span
-              className="size-1.5 shrink-0 rounded-full"
-              style={{ backgroundColor: displayColor }}
-            />
-            <span className="truncate">{label.name}</span>
+            {label.name}
           </span>
         );
       })}
@@ -377,13 +373,12 @@ function MessageListRowStacked({ view }: { view: MessageListRowView }) {
               onToggleThreadExpand={view.onToggleThreadExpand}
             />
           ) : null}
-          {/* The date keeps a fixed column so attachment and star icons line up from row to row. */}
-          <span className="ml-auto flex shrink-0 items-center gap-1.5 @min-[480px]/list:group-hover/row:hidden @min-[480px]/list:group-has-[:focus-visible]/row:hidden @min-[480px]/list:group-has-[[data-state=open]]/row:hidden">
+          <span className="ml-auto flex shrink-0 items-center gap-1 @min-[480px]/list:group-hover/row:hidden @min-[480px]/list:group-has-[:focus-visible]/row:hidden @min-[480px]/list:group-has-[[data-state=open]]/row:hidden">
+            {view.isFlagged ? <Star aria-label="Starred" className="size-3 fill-current text-accent" /> : null}
             {view.hasAttachments ? (
               <Icons color="tertiary" icon={Icon.PaperClip} size={Size.SMALL} />
             ) : null}
-            {view.isFlagged ? <Star aria-label="Starred" className="size-3 fill-current text-accent" /> : null}
-            <span className="min-w-12 text-right text-xs tabular-nums whitespace-nowrap text-[var(--text-tertiary)]">
+            <span className="text-xs tabular-nums whitespace-nowrap text-[var(--text-tertiary)]">
               {view.dateLabel}
             </span>
           </span>

@@ -1,23 +1,19 @@
 "use client";
 
-import { Paperclip, Reply, Smile, X } from "lucide-react";
+import { Paperclip, Reply, X } from "lucide-react";
 import { getSimpleLoginForward } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
-import { Button } from "@workspace/ui/components/ui/button";
 import {
-  Button as SolaceButton,
   DropdownPanel,
-  FilledVariant,
   Icon,
-  IconText,
-  Size,
-  TypographyWeight,
+  Type,
 } from "@workspace/ui/solace";
 import type {
   MessageReaderController,
   MessageReaderViewModel,
 } from "../use-message-reader-controller";
 import { COMMON_EMOJI } from "./constants";
+import { ReaderActionButton, ReaderActionIcon } from "./message-reader-action-button";
 
 const log = createLogger("message-reader-reply-bar");
 
@@ -154,7 +150,7 @@ export function MessageReaderReplyBar({
               ))}
             </div>
           )}
-          <div className="-ml-1.5 flex items-center gap-0.5 pt-1">
+          <div className="flex items-center gap-1.5 pt-1">
             <DropdownPanel
               open={emojiPickerOpen}
               onOpenChange={(open) =>
@@ -165,15 +161,12 @@ export function MessageReaderReplyBar({
               width={272}
               className="p-1.5"
               trigger={
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  type="button"
+                <ReaderActionIcon
+                  tone={Type.TERTIARY}
                   aria-label="Add emoji"
+                  icon={Icon.Smile}
                   disabled={isBusy || isSendingReply}
-                >
-                  <Smile />
-                </Button>
+                />
               }
             >
                 <div className="grid grid-cols-10 gap-0.5">
@@ -196,17 +189,15 @@ export function MessageReaderReplyBar({
                   ))}
                 </div>
             </DropdownPanel>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              type="button"
+            <ReaderActionIcon
+              tone={Type.TERTIARY}
               aria-label="Attach file"
+              icon={Icon.PaperClip}
               disabled={isBusy || isSendingReply}
               onClick={() => fileInputRef.current?.click()}
-            >
-              <Paperclip />
-            </Button>
-            <SolaceButton
+            />
+            <ReaderActionButton
+              tone={Type.PRIMARY}
               aria-label="Send reply"
               className="ml-auto"
               disabled={
@@ -220,34 +211,29 @@ export function MessageReaderReplyBar({
                   log.error("Failed to send reply", error),
                 )
               }
-              size={Size.SMALL}
             >
               Send
-            </SolaceButton>
+            </ReaderActionButton>
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-2">
-          <IconText
-            dataTest="message-reply"
-            label="Reply"
+        <div className="flex items-center gap-1.5">
+          <ReaderActionButton
+            data-test="message-reply"
+            icon={Icon.Reply}
             onClick={() =>
               dispatchMessageUi({ type: "patch", patch: { isReplyExpanded: true } })
             }
-            size={Size.SMALL}
-            startIcon={Icon.Reply}
-            variant={FilledVariant.FILLED}
-            weight={TypographyWeight.REGULAR}
-          />
-          <IconText
+          >
+            Reply
+          </ReaderActionButton>
+          <ReaderActionButton
             disabled={!canReply}
-            label="Forward"
+            icon={Icon.Forward}
             onClick={onForward}
-            size={Size.SMALL}
-            startIcon={Icon.Forward}
-            variant={FilledVariant.FILLED}
-            weight={TypographyWeight.REGULAR}
-          />
+          >
+            Forward
+          </ReaderActionButton>
         </div>
       )}
     </div>
