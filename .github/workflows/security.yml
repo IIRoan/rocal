@@ -109,7 +109,7 @@ jobs:
         run: trivy convert --format sarif --output "$RUNNER_TEMP/repository.sarif" "$RUNNER_TEMP/repository.json"
 
       - name: Publish findings
-        uses: chainguard-actions/github-codeql-action/upload-sarif@e4969b640f7a67163769dc6d910d19032366881b # v4.39.3
+        uses: chainguard-actions/github-codeql-action/upload-sarif@dac3722852ba9a9395423095c80007f1be2964f8 # v4.39.5
         with:
           sarif_file: ${{ runner.temp }}/repository.sarif
           category: /trivy/repository
@@ -177,7 +177,7 @@ jobs:
         run: trivy convert --format sarif --output "$RUNNER_TEMP/runtime.sarif" "$RUNNER_TEMP/runtime.json"
 
       - name: Publish application image findings
-        uses: chainguard-actions/github-codeql-action/upload-sarif@e4969b640f7a67163769dc6d910d19032366881b # v4.39.3
+        uses: chainguard-actions/github-codeql-action/upload-sarif@dac3722852ba9a9395423095c80007f1be2964f8 # v4.39.5
         with:
           sarif_file: ${{ runner.temp }}/runtime.sarif
           category: /trivy/container/${{ matrix.image }}/runtime
