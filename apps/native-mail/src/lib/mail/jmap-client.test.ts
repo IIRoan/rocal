@@ -594,7 +594,7 @@ describe("StalwartJmapClient undo, delete, and field search", () => {
   }
 
   it("reports a refused update when marking a whole mailbox as read", async () => {
-    const fetcher = jest.fn<(url: string, init?: RequestInit) => Promise<Response>>()
+    const fetcher = jest.fn<Promise<Response>, [string, RequestInit?]>()
       .mockResolvedValueOnce(jsonOk({ methodResponses: [["Email/query", { ids: ["m1"] }, "q1"]] }))
       .mockResolvedValueOnce(jsonOk({ methodResponses: [["Email/set", {
         notUpdated: { m1: { type: "forbidden" } },
