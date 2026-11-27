@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - deployment.yaml
+configMapGenerator:
+  - name: solace-status-entrypoint
+    namespace: solace-mail
+    files: [entrypoint.sh]
+    options:
+      immutable: true
+      annotations:
+        kustomize.toolkit.fluxcd.io/substitute: disabled

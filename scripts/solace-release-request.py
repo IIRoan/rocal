@@ -15,11 +15,20 @@ STALWART_FILES = {
     "scripts/upgrade-1.1.0.py", "railway-entrypoint.sh", "backend-gate.cfg",
     "admin-gate.lua", "stalwart/cli-schema.json", "stalwart/cli-schema.latest",
 }
+FRONTEND_FILES = {
+    ".dockerignore", ".bun-version", ".node-version", "bun.lock", "bunfig.toml",
+    "package.json", "babel.config.cts",
+}
 
 
 def affected(paths):
     result = set()
     for path in paths:
+        if (path in FRONTEND_FILES or path.startswith(("apps/web/", "patches/"))
+                or (path.startswith("packages/") and not path.startswith("packages/native-core/"))):
+            result.add("frontend")
+        if path.startswith(("apps/gatus/", ".zeabur/solace-mail/status/entrypoint.sh")) or path == ".dockerignore":
+            result.add("gatus")
         if path in RUST_SHARED or path.startswith("crates/solace-api-types/"):
             result.update(("api", "notifications"))
         elif path == "apps/backend/src/main.rs" or path == "apps/backend/Dockerfile":

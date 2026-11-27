@@ -1,0 +1,176 @@
+# HELP stalwart_auth_success_total Authentication successful
+# TYPE stalwart_auth_success_total counter
+stalwart_auth_success_total 1
+# HELP stalwart_cache_miss_total Cache miss
+# TYPE stalwart_cache_miss_total counter
+stalwart_cache_miss_total 8
+# HELP stalwart_cache_hit_total Cache hit
+# TYPE stalwart_cache_hit_total counter
+stalwart_cache_hit_total 30
+# HELP stalwart_delivery_attempt_start_total Delivery attempt started
+# TYPE stalwart_delivery_attempt_start_total counter
+stalwart_delivery_attempt_start_total 1
+# HELP stalwart_delivery_completed_total Delivery completed
+# TYPE stalwart_delivery_completed_total counter
+stalwart_delivery_completed_total 1
+# HELP stalwart_delivery_dsn_success_total DSN success notification
+# TYPE stalwart_delivery_dsn_success_total counter
+stalwart_delivery_dsn_success_total 1
+# HELP stalwart_search_index_batch_indexed_total Search index batch written
+# TYPE stalwart_search_index_batch_indexed_total counter
+stalwart_search_index_batch_indexed_total 1
+# HELP stalwart_http_connection_start_total HTTP connection started
+# TYPE stalwart_http_connection_start_total counter
+stalwart_http_connection_start_total 14
+# HELP stalwart_http_request_body_total HTTP request body
+# TYPE stalwart_http_request_body_total counter
+stalwart_http_request_body_total 12
+# HELP stalwart_http_response_body_total HTTP response body
+# TYPE stalwart_http_response_body_total counter
+stalwart_http_response_body_total 13
+# HELP stalwart_jmap_method_call_total JMAP method call
+# TYPE stalwart_jmap_method_call_total counter
+stalwart_jmap_method_call_total 11
+# HELP stalwart_jmap_unknown_method_total Unknown JMAP method
+# TYPE stalwart_jmap_unknown_method_total counter
+stalwart_jmap_unknown_method_total 1
+# HELP stalwart_message_ingest_spam_total Possible spam message ingested
+# TYPE stalwart_message_ingest_spam_total counter
+stalwart_message_ingest_spam_total 1
+# HELP stalwart_queue_message_queued_total Queued message for delivery
+# TYPE stalwart_queue_message_queued_total counter
+stalwart_queue_message_queued_total 1
+# HELP stalwart_smtp_connection_start_total SMTP connection started
+# TYPE stalwart_smtp_connection_start_total counter
+stalwart_smtp_connection_start_total 2
+# HELP stalwart_smtp_dkim_fail_total DKIM verification failed
+# TYPE stalwart_smtp_dkim_fail_total counter
+stalwart_smtp_dkim_fail_total 1
+# HELP stalwart_smtp_mail_from_unauthenticated_total MAIL FROM without authentication
+# TYPE stalwart_smtp_mail_from_unauthenticated_total counter
+stalwart_smtp_mail_from_unauthenticated_total 1
+# HELP stalwart_store_blob_read_total Blob read operation
+# TYPE stalwart_store_blob_read_total counter
+stalwart_store_blob_read_total 4
+# HELP stalwart_store_blob_write_total Blob write operation
+# TYPE stalwart_store_blob_write_total counter
+stalwart_store_blob_write_total 1
+# HELP stalwart_store_data_iterate_total Data store iteration operation
+# TYPE stalwart_store_data_iterate_total counter
+stalwart_store_data_iterate_total 83
+# HELP stalwart_store_data_write_total Write batch operation
+# TYPE stalwart_store_data_write_total counter
+stalwart_store_data_write_total 10
+# HELP stalwart_telemetry_log_error_total Log collector error
+# TYPE stalwart_telemetry_log_error_total counter
+stalwart_telemetry_log_error_total 1
+# HELP stalwart_encryption_encryption_skipped_total Encryption skipped
+# TYPE stalwart_encryption_encryption_skipped_total counter
+stalwart_encryption_encryption_skipped_total 1
+# HELP stalwart_server_memory_bytes Server memory usage
+# TYPE stalwart_server_memory_bytes gauge
+stalwart_server_memory_bytes 59584512
+# HELP stalwart_users Total number of users
+# TYPE stalwart_users gauge
+stalwart_users 3
+# HELP stalwart_domains Total number of domains
+# TYPE stalwart_domains gauge
+stalwart_domains 2
+# HELP stalwart_smtp_active_connections Active SMTP connections
+# TYPE stalwart_smtp_active_connections gauge
+stalwart_smtp_active_connections 0
+# HELP stalwart_delivery_active_connections Active delivery connections
+# TYPE stalwart_delivery_active_connections gauge
+stalwart_delivery_active_connections 0
+# HELP stalwart_imap_active_connections Active IMAP connections
+# TYPE stalwart_imap_active_connections gauge
+stalwart_imap_active_connections 0
+# HELP stalwart_pop3_active_connections Active POP3 connections
+# TYPE stalwart_pop3_active_connections gauge
+stalwart_pop3_active_connections 0
+# HELP stalwart_http_active_connections Active HTTP connections
+# TYPE stalwart_http_active_connections gauge
+stalwart_http_active_connections 1
+# HELP stalwart_sieve_active_connections Active ManageSieve connections
+# TYPE stalwart_sieve_active_connections gauge
+stalwart_sieve_active_connections 0
+# HELP stalwart_delivery_total_time_seconds Total message delivery time from submission to delivery
+# TYPE stalwart_delivery_total_time_seconds histogram
+stalwart_delivery_total_time_seconds_bucket{le="1"} 1
+stalwart_delivery_total_time_seconds_bucket{le="30"} 1
+stalwart_delivery_total_time_seconds_bucket{le="300"} 1
+stalwart_delivery_total_time_seconds_bucket{le="600"} 1
+stalwart_delivery_total_time_seconds_bucket{le="1800"} 1
+stalwart_delivery_total_time_seconds_bucket{le="3600"} 1
+stalwart_delivery_total_time_seconds_bucket{le="14400"} 1
+stalwart_delivery_total_time_seconds_bucket{le="28800"} 1
+stalwart_delivery_total_time_seconds_bucket{le="43200"} 1
+stalwart_delivery_total_time_seconds_bucket{le="86400"} 1
+stalwart_delivery_total_time_seconds_bucket{le="604800"} 1
+stalwart_delivery_total_time_seconds_bucket{le="+Inf"} 1
+stalwart_delivery_total_time_seconds_sum 0
+stalwart_delivery_total_time_seconds_count 1
+# HELP stalwart_message_size_bytes Received message size
+# TYPE stalwart_message_size_bytes histogram
+stalwart_message_size_bytes_bucket{le="500"} 0
+stalwart_message_size_bytes_bucket{le="1000"} 1
+stalwart_message_size_bytes_bucket{le="10000"} 1
+stalwart_message_size_bytes_bucket{le="100000"} 1
+stalwart_message_size_bytes_bucket{le="1000000"} 1
+stalwart_message_size_bytes_bucket{le="5000000"} 1
+stalwart_message_size_bytes_bucket{le="10000000"} 1
+stalwart_message_size_bytes_bucket{le="25000000"} 1
+stalwart_message_size_bytes_bucket{le="50000000"} 1
+stalwart_message_size_bytes_bucket{le="100000000"} 1
+stalwart_message_size_bytes_bucket{le="500000000"} 1
+stalwart_message_size_bytes_bucket{le="+Inf"} 1
+stalwart_message_size_bytes_sum 725
+stalwart_message_size_bytes_count 1
+# HELP stalwart_smtp_request_time_seconds SMTP connection duration
+# TYPE stalwart_smtp_request_time_seconds histogram
+stalwart_smtp_request_time_seconds_bucket{le="0.25"} 2
+stalwart_smtp_request_time_seconds_bucket{le="0.5"} 2
+stalwart_smtp_request_time_seconds_bucket{le="1"} 2
+stalwart_smtp_request_time_seconds_bucket{le="5"} 2
+stalwart_smtp_request_time_seconds_bucket{le="10"} 2
+stalwart_smtp_request_time_seconds_bucket{le="60"} 2
+stalwart_smtp_request_time_seconds_bucket{le="300"} 2
+stalwart_smtp_request_time_seconds_bucket{le="600"} 2
+stalwart_smtp_request_time_seconds_bucket{le="1800"} 2
+stalwart_smtp_request_time_seconds_bucket{le="3600"} 2
+stalwart_smtp_request_time_seconds_bucket{le="18000"} 2
+stalwart_smtp_request_time_seconds_bucket{le="+Inf"} 2
+stalwart_smtp_request_time_seconds_sum 0.049
+stalwart_smtp_request_time_seconds_count 2
+# HELP stalwart_delivery_attempt_time_seconds Message delivery time
+# TYPE stalwart_delivery_attempt_time_seconds histogram
+stalwart_delivery_attempt_time_seconds_bucket{le="0.25"} 1
+stalwart_delivery_attempt_time_seconds_bucket{le="0.5"} 1
+stalwart_delivery_attempt_time_seconds_bucket{le="1"} 1
+stalwart_delivery_attempt_time_seconds_bucket{le="5"} 1
+stalwart_delivery_attempt_time_seconds_bucket{le="10"} 1
+stalwart_delivery_attempt_time_seconds_bucket{le="60"} 1
+stalwart_delivery_attempt_time_seconds_bucket{le="300"} 1
+stalwart_delivery_attempt_time_seconds_bucket{le="600"} 1
+stalwart_delivery_attempt_time_seconds_bucket{le="1800"} 1
+stalwart_delivery_attempt_time_seconds_bucket{le="3600"} 1
+stalwart_delivery_attempt_time_seconds_bucket{le="18000"} 1
+stalwart_delivery_attempt_time_seconds_bucket{le="+Inf"} 1
+stalwart_delivery_attempt_time_seconds_sum 0.023
+stalwart_delivery_attempt_time_seconds_count 1
+# HELP stalwart_http_request_time_seconds HTTP connection duration
+# TYPE stalwart_http_request_time_seconds histogram
+stalwart_http_request_time_seconds_bucket{le="0.25"} 13
+stalwart_http_request_time_seconds_bucket{le="0.5"} 13
+stalwart_http_request_time_seconds_bucket{le="1"} 13
+stalwart_http_request_time_seconds_bucket{le="5"} 13
+stalwart_http_request_time_seconds_bucket{le="10"} 13
+stalwart_http_request_time_seconds_bucket{le="60"} 13
+stalwart_http_request_time_seconds_bucket{le="300"} 13
+stalwart_http_request_time_seconds_bucket{le="600"} 13
+stalwart_http_request_time_seconds_bucket{le="1800"} 13
+stalwart_http_request_time_seconds_bucket{le="3600"} 13
+stalwart_http_request_time_seconds_bucket{le="18000"} 13
+stalwart_http_request_time_seconds_bucket{le="+Inf"} 13
+stalwart_http_request_time_seconds_sum 0.356
+stalwart_http_request_time_seconds_count 13

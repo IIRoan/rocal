@@ -90,7 +90,7 @@ def check(flux, gateway_dir):
                    for doc in docs if doc["kind"] == "ConfigMap"}
         deployments = {doc["metadata"]["name"]: doc for doc in docs if doc["kind"] == "Deployment"}
         release_containers = {"stalwart-a": "stalwart", "stalwart-b": "stalwart",
-                              "solace-api": "api", "notifications": "worker"}
+                              "solace-api": "api", "notifications": "worker", "solace-status": "gatus"}
         for deployment, container in release_containers.items():
             if deployment in deployments:
                 containers = deployments[deployment]["spec"]["template"]["spec"]["containers"]
@@ -120,6 +120,7 @@ def check(flux, gateway_dir):
             check_gateway(deployments["solace-api"], configs, "edge")
             check_service_targets(network, deployments["solace-api"], ("solace-api", "solace-api-direct"))
             check_frontend(network, docs)
+            check_status(docs)
             check_gateway(deployments["notifications"], configs, "mail-gate")
             validate_redis(docs, network)
             check_public_ingress(network, docs)
@@ -134,6 +135,21 @@ def check(flux, gateway_dir):
         for key in ("haproxy.cfg", "admin-gate.lua"):
             (gateway_dir / key).write_text(fixtures[0][key])
         (gateway_dir / "images").write_text("\n".join(dict.fromkeys(images)) + "\n")
+
+
+def check_status(workloads):
+    status = find_resource(workloads, "Deployment", "solace-mail", "solace-status")
+    pod = status["spec"]["template"]["spec"]
+    assert status["spec"]["strategy"] == {"type": "Recreate"}
+    assert pod["nodeSelector"] == {"kubernetes.io/hostname": "roan-server"}
+    volumes = {volume["name"]: volume for volume in pod["volumes"]}
+    assert volumes["history"]["persistentVolumeClaim"]["claimName"] == "solace-status-history"
+    assert volumes["runtime"]["emptyDir"]["medium"] == "Memory"
+    config = find_resource(workloads, "ConfigMap", "solace-mail", volumes["config"]["configMap"]["name"])
+    assert config["immutable"] and "/run/gatus/config.yaml" in config["data"]["entrypoint.sh"]
+    (container,) = pod["containers"]
+    assert container["envFrom"] == [{"secretRef": {"name": "solace-status-runtime"}}]
+    assert container["securityContext"]["readOnlyRootFilesystem"] is True
 
 
 

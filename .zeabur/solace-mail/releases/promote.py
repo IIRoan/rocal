@@ -13,13 +13,16 @@ from urllib.request import Request, urlopen
 GITOPS = "/api/v1/namespaces/solace-gitops/configmaps/"
 BUILDS = "/apis/builder.zeabur.com/v1alpha1/namespaces/solace-mail/builds/"
 DEPLOYMENTS = "/apis/apps/v1/namespaces/solace-mail/deployments/"
+STATEFULSETS = "/apis/apps/v1/namespaces/solace-mail/statefulsets/"
 SOURCE = "/apis/source.toolkit.fluxcd.io/v1/namespaces/solace-gitops/gitrepositories/solace-release-requests"
 ARTIFACT_ROOT = "gitrepository/solace-gitops/solace-release-requests/"
 ARTIFACT_PATH = re.compile(ARTIFACT_ROOT + r"[a-f0-9]{40}\.tar\.gz")
 MAX_ARTIFACT_SIZE = 64 * 1024
 IMAGES = {
-    "api": ("SOLACE_API_IMAGE", "solace-api", "api"),
-    "notifications": ("SOLACE_NOTIFICATIONS_IMAGE", "notifications", "worker"),
+    "api": ("SOLACE_API_IMAGE", DEPLOYMENTS + "solace-api", "api"),
+    "notifications": ("SOLACE_NOTIFICATIONS_IMAGE", DEPLOYMENTS + "notifications", "worker"),
+    "frontend": ("SOLACE_FRONTEND_IMAGE", STATEFULSETS + "solace-web", "frontend"),
+    "gatus": ("SOLACE_GATUS_IMAGE", DEPLOYMENTS + "solace-status", "gatus"),
 }
 REVISION = re.compile(r"[0-9a-f]{40}")
 DIGEST = re.compile(r"sha256:[a-f0-9]{64}")
@@ -111,13 +114,11 @@ def promote(api=kube, requests_from=read_requests):
     requests = requests_from(api)
     current = api(GITOPS + "solace-release-images")
     pins = current.get("data", {})
-    if not pins:
-        sources = [*IMAGES.values(), ("SOLACE_STALWART_A_IMAGE", "stalwart-a", "stalwart"),
-                   ("SOLACE_STALWART_B_IMAGE", "stalwart-b", "stalwart")]
-        images = {
-            key: deployed_image(api(DEPLOYMENTS + deployment), container)
-            for key, deployment, container in sources
-        }
+    sources = [*IMAGES.values(), ("SOLACE_STALWART_A_IMAGE", DEPLOYMENTS + "stalwart-a", "stalwart"),
+               ("SOLACE_STALWART_B_IMAGE", DEPLOYMENTS + "stalwart-b", "stalwart")]
+    missing = [(key, path, container) for key, path, container in sources if key not in pins]
+    if missing:
+        images = {key: deployed_image(api(path), container) for key, path, container in missing}
         if not all(DIGEST.fullmatch(image.rpartition("@")[2]) for image in images.values()):
             raise ValueError("Cannot seed releases from an unpinned workload")
         api(GITOPS + "solace-release-images", {

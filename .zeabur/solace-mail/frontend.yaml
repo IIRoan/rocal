@@ -50,7 +50,7 @@ spec:
         - {key: roan.dev/mail-only, operator: Equal, value: "true", effect: NoSchedule}
       containers:
         - name: frontend
-          image: zot.zot.svc:5000/solace-mail/frontend@sha256:22e25160a90d46c9fc73cfc2f057cd7e00df732863f1e71883e9cddf5ee136eb
+          image: ${SOLACE_FRONTEND_IMAGE:=zot.zot.svc:5000/solace-mail/frontend@sha256:22e25160a90d46c9fc73cfc2f057cd7e00df732863f1e71883e9cddf5ee136eb}
           ports:
             - {name: http, containerPort: 3000}
           env:

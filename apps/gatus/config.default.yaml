@@ -1,0 +1,146 @@
+storage:
+  type: sqlite
+  path: /data/gatus.db
+  # A day of individual checks at the fastest (30s) interval, so the status page can zoom into any recent hour.
+  maximum-number-of-results: 2880
+
+web:
+  address: 0.0.0.0
+  port: ${PORT}
+
+alerting:
+  discord:
+    webhook-url: "${DISCORD_WEBHOOK_URL}"
+    title: "Solace Status"
+    default-alert:
+      send-on-resolved: true
+      failure-threshold: 2
+      success-threshold: 2
+      description: "Service monitor failed"
+
+# Endpoint names are storage keys. Use status.html for display names and preserve-endpoint-keys for retired series.
+.discord-alerts: &discord-alerts
+  alerts:
+    - type: discord
+
+endpoints:
+  # HEAD checks website availability and TLS without transferring the page.
+  - name: website
+    <<: *discord-alerts
+    group: Application
+    url: https://solace.onl/
+    method: HEAD
+    interval: 2m
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 3000"
+      - "[CERTIFICATE_EXPIRATION] > 336h"
+
+  # Cheap JSON liveness on the API; the primary backend signal.
+  - name: api-health
+    <<: *discord-alerts
+    group: Application
+    url: https://api.solace.onl/api/health
+    interval: 1m
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].status == ok"
+      - "[RESPONSE_TIME] < 5000"
+      - "[CERTIFICATE_EXPIRATION] > 336h"
+
+  # The API times its private JMAP request. Its own history key keeps those times comparable.
+  - name: api-mail-jmap-private
+    <<: *discord-alerts
+    group: Application
+    url: https://api.solace.onl/api/health/mail-jmap
+    response-time-metric: stalwart-jmap
+    interval: 1m
+    client:
+      timeout: 15s
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].status == ok"
+      - "[RESPONSE_TIME] < 10000"
+
+  # Shared user-directory scan status; independent from liveness and mail acceptance.
+  - name: api-mail-policy
+    <<: *discord-alerts
+    group: Application
+    url: https://api.solace.onl/api/health/mail-policy
+    interval: 5m
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].status == ok"
+
+  # Fourteen-day user-key advisory; service keys require a separate operator check.
+  - name: api-mail-key-expiry
+    <<: *discord-alerts
+    group: Application
+    url: https://api.solace.onl/api/health/mail-key-expiry
+    interval: 5m
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].status == ok"
+
+  # Public JMAP through Cloudflare and the Zeabur mail gateway.
+  - name: jmap-session
+    <<: *discord-alerts
+    group: Mail
+    url: https://mail.solace.onl/jmap/session
+    interval: 30s
+    client:
+      timeout: 10s
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 5000"
+      - "[CERTIFICATE_EXPIRATION] > 336h"
+
+  # Public MTA-STS through Cloudflare. Each VPS check verifies the SMTP certificate separately.
+  - name: mta-sts
+    <<: *discord-alerts
+    group: Mail
+    url: https://mta-sts.solace.onl/.well-known/mta-sts.txt
+    interval: 10m
+    client:
+      timeout: 15s
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY] == pat(*mx: mx.solace.onl*)"
+      - "[BODY] == pat(*mx: mx2.solace.onl*)"
+      - "[CERTIFICATE_EXPIRATION] > 336h"
+
+  # One scrape may land on either node. Counters and histograms can be absent until that node handles traffic.
+  - name: stalwart-metrics
+    <<: *discord-alerts
+    group: Stalwart Metrics
+    url: https://mail.solace.onl/metrics/prometheus
+    interval: 2m
+    headers:
+      Authorization: "Basic __PROMETHEUS_BASIC_AUTH__"
+    client:
+      timeout: 15s
+    ui:
+      hide-url: true
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY] == pat(*stalwart_server_memory_bytes*)"
+      - "[BODY] == pat(*stalwart_smtp_active_connections*)"
+      - "[BODY] == pat(*stalwart_delivery_active_connections*)"
+      - "[BODY] == pat(*stalwart_imap_active_connections*)"
+      - "[BODY] == pat(*stalwart_http_active_connections*)"
+      - "[BODY] == pat(*stalwart_users*)"
+      - "[BODY] == pat(*stalwart_domains*)"
+      # Error counters are exported only once they are non-zero.
+      - "[BODY] != pat(*store_unexpected_error*)"
+      - "[BODY] != pat(*store_s3_error*)"
+      - "[BODY] != pat(*smtp_concurrency_limit_exceeded*)"
+      - "[BODY] != pat(*calendar_rule_expansion_error*)"
+      - "[BODY] != pat(*stalwart_encryption_encryption_skipped_total*)"

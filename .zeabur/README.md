@@ -1,6 +1,6 @@
 # Solace on Zeabur
 
-This Kustomize root declares the active Solace project on Zeabur OSS. `solace-mail` contains the API, its PostgreSQL database, and the mail stack. The shared Zeabur installation and the Kubernetes platform have their own lifecycle.
+This Kustomize root declares the active Solace project on Zeabur OSS. `solace-mail` contains the website, API, notifications, status page, databases and mail stack. The shared Zeabur installation and the Kubernetes platform have their own lifecycle.
 
 | Path | What it manages |
 | --- | --- |
@@ -50,14 +50,18 @@ A push to protected `master` runs [Solace production images](../.github/workflow
 | Change | Images requested |
 | --- | --- |
 | API entry point or Dockerfile | API |
+| Web app, shared TypeScript packages, JavaScript dependencies or web Dockerfile | Frontend |
+| Gatus source, Dockerfile or status entrypoint | Status page |
 | Shared backend Rust code, API types or workspace dependency inputs | API and notifications |
 | Notifications worker or Dockerfile | Notifications |
 | Stalwart runtime Dockerfile, install scripts or packaged configuration | Stalwart |
-| Kubernetes config, docs, web or native code only | None |
+| Kubernetes config, docs or native-only code | None; Flux applies workload configuration |
 
 Solace builds run on the MacBook's build node with limits of eight CPUs and 16 GiB of RAM per build. Zeabur reads those limits from the project namespace when a build starts.
 
 The workflow tags each requested source commit. The release CronJob verifies the Flux artifact before passing that exact Git ref to Zeabur Builder. It records successful image digests from Zot through the image admission policy. Flux applies the selected digest. Stalwart A must be available on the new digest for its full readiness window before B is updated. Third-party containers use the image pins in their Git manifests and change when their pod templates change.
+
+The frontend and Gatus use the same digest promotion as the API and notifications. The status page retains `solace-status-history` and reads `solace-status-runtime`; configuration and SSH credentials are prepared only in its memory-backed runtime directory. Native apps keep their separate build and OTA workflows. A manual dispatch of the production-images workflow retries planning from the last recorded source revision.
 
 Solace uses Builder’s default Zot repository naming. Zeabur associates a Build with the running service once Builder publishes its first image. This keeps the status of an existing service accurate while its first Build is paused.
 

@@ -106,6 +106,7 @@ jobs:
           tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" flux
           "$RUNNER_TEMP/solace-python/bin/python" -B scripts/check-zeabur.py \
             --flux "$RUNNER_TEMP/flux" --gateway-dir "$RUNNER_TEMP/solace-gateway"
+          "$RUNNER_TEMP/solace-python/bin/python" -B -m unittest discover -s apps/gatus/tests -v
 
       - name: Verify the deployed Zeabur mail gateway
         if: needs.changes.outputs.mail_gateway == 'true'

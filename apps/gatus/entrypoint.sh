@@ -1,0 +1,1 @@
+../../.zeabur/solace-mail/status/entrypoint.sh

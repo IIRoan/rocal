@@ -3,6 +3,7 @@ name: Solace production images
 on:
   push:
     branches: [master]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -13,6 +14,7 @@ concurrency:
 
 jobs:
   request-images:
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -45,7 +47,7 @@ jobs:
           git -C "$release_tree" -c user.name=github-actions -c 'user.email=41898282+github-actions[bot]@users.noreply.github.com' \
             commit -m "Request Solace production images"
           refs=("HEAD:refs/heads/$requests_branch")
-          if jq -e --arg revision "$GITHUB_SHA" '.data | [.api, .notifications, .stalwart] | index($revision) != null' \
+          if jq -e --arg revision "$GITHUB_SHA" '.data | [.api, .notifications, .stalwart, .frontend, .gatus] | index($revision) != null' \
             "$release_tree/requests.json" >/dev/null; then
             refs+=("$GITHUB_SHA:refs/tags/solace-build-$GITHUB_SHA")
           fi

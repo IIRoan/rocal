@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: solace-status
+  namespace: solace-mail
+  labels:
+    app.kubernetes.io/name: solace-status
+    app.kubernetes.io/part-of: solace
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: solace-status
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: solace-status
+        app.kubernetes.io/part-of: solace
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: roan-server
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: gatus
+          image: ${SOLACE_GATUS_IMAGE:=zot.zot.svc:5000/solace-mail/gatus@sha256:aa1d8f879f2e6f2ff6d3d1a33b25b45993e4f8160da6713a7721ee9e876fe151}
+          command: ["/bin/sh", "/config/entrypoint.sh"]
+          envFrom:
+            - secretRef:
+                name: solace-status-runtime
+          env:
+            - name: GATUS_CONFIG_PATH
+              value: /run/gatus/config.yaml
+            - name: PORT
+              value: "8080"
+            - name: TZ
+              value: Europe/Amsterdam
+          ports:
+            - name: http
+              containerPort: 8080
+          startupProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 3
+            failureThreshold: 40
+          readinessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests: {cpu: 20m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          volumeMounts:
+            - name: history
+              mountPath: /data
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: runtime
+              mountPath: /run/gatus
+            - name: temp
+              mountPath: /tmp
+      volumes:
+        - name: history
+          persistentVolumeClaim:
+            claimName: solace-status-history
+        - name: config
+          configMap:
+            name: solace-status-entrypoint
+        - name: runtime
+          emptyDir: {medium: Memory, sizeLimit: 16Mi}
+        - name: temp
+          emptyDir: {medium: Memory, sizeLimit: 16Mi}

@@ -20,16 +20,20 @@ spec:
   validations:
     - expression: >-
         has(object.data) &&
-        object.data.size() == 4 &&
+        object.data.size() == 6 &&
         "SOLACE_API_IMAGE" in object.data &&
         object.data.SOLACE_API_IMAGE.matches("^zot[.]zot[.]svc:5000/(solace-api|solace-mail)/api@sha256:[0-9a-f]{64}$") &&
         "SOLACE_NOTIFICATIONS_IMAGE" in object.data &&
         object.data.SOLACE_NOTIFICATIONS_IMAGE.matches("^zot[.]zot[.]svc:5000/(solace-api|solace-mail)/notifications@sha256:[0-9a-f]{64}$") &&
+        "SOLACE_FRONTEND_IMAGE" in object.data &&
+        object.data.SOLACE_FRONTEND_IMAGE.matches("^zot[.]zot[.]svc:5000/solace-mail/frontend@sha256:[0-9a-f]{64}$") &&
+        "SOLACE_GATUS_IMAGE" in object.data &&
+        object.data.SOLACE_GATUS_IMAGE.matches("^zot[.]zot[.]svc:5000/solace-mail/gatus@sha256:[0-9a-f]{64}$") &&
         "SOLACE_STALWART_A_IMAGE" in object.data &&
         object.data.SOLACE_STALWART_A_IMAGE.matches("^zot[.]zot[.]svc:5000/solace-mail/stalwart@sha256:[0-9a-f]{64}$") &&
         "SOLACE_STALWART_B_IMAGE" in object.data &&
         object.data.SOLACE_STALWART_B_IMAGE.matches("^zot[.]zot[.]svc:5000/solace-mail/stalwart@sha256:[0-9a-f]{64}$")
-      message: Release inputs must contain only the four immutable Solace image references from their approved Zot repositories.
+      message: Release inputs must contain only the six immutable Solace image references from their approved Zot repositories.
     - expression: >-
         !has(object.binaryData) &&
         !has(object.immutable) &&

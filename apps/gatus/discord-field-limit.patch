@@ -1,0 +1,15 @@
+diff --git a/alerting/provider/discord/discord.go b/alerting/provider/discord/discord.go
+--- a/alerting/provider/discord/discord.go
++++ b/alerting/provider/discord/discord.go
+@@ -148,6 +148,11 @@ func (provider *AlertProvider) buildRequestBody(cfg *Config, ep *endpoint.Endpoint,
+ 		},
+ 	}
+ 	if len(formattedConditionResults) > 0 {
++		// Discord rejects the entire alert when a field exceeds 1024 characters.
++		conditionRunes := []rune(formattedConditionResults)
++		if len(conditionRunes) > 1024 {
++			formattedConditionResults = string(conditionRunes[:1021]) + "..."
++		}
+ 		body.Embeds[0].Fields = append(body.Embeds[0].Fields, Field{
+ 			Name:   "Condition results",
+ 			Value:  formattedConditionResults,

@@ -20,11 +20,15 @@ metadata:
 rules:
   - apiGroups: [builder.zeabur.com]
     resources: [builds]
-    resourceNames: [api, notifications, stalwart]
+    resourceNames: [api, notifications, stalwart, frontend, gatus]
     verbs: [get, patch]
   - apiGroups: [apps]
     resources: [deployments]
-    resourceNames: [solace-api, notifications, stalwart-a, stalwart-b]
+    resourceNames: [solace-api, notifications, stalwart-a, stalwart-b, solace-status]
+    verbs: [get]
+  - apiGroups: [apps]
+    resources: [statefulsets]
+    resourceNames: [solace-web]
     verbs: [get]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -91,10 +95,11 @@ spec:
   concurrency: Replace
   suspend: true
   source:
+    type: git
     git:
       url: https://github.com/IIRoan/rocal.git
       ref: master
-      dockerfile: apps/backend/Dockerfile
+    dockerfile: apps/backend/Dockerfile
 ---
 apiVersion: builder.zeabur.com/v1alpha1
 kind: Build
@@ -106,10 +111,11 @@ spec:
   concurrency: Replace
   suspend: true
   source:
+    type: git
     git:
       url: https://github.com/IIRoan/rocal.git
       ref: master
-      dockerfile: apps/notifications/Dockerfile
+    dockerfile: apps/notifications/Dockerfile
 ---
 apiVersion: builder.zeabur.com/v1alpha1
 kind: Build
@@ -121,7 +127,40 @@ spec:
   concurrency: Replace
   suspend: true
   source:
+    type: git
     git:
       url: https://github.com/IIRoan/rocal.git
       ref: master
-      contextDir: apps/stalwart
+    contextDir: apps/stalwart
+---
+apiVersion: builder.zeabur.com/v1alpha1
+kind: Build
+metadata:
+  name: frontend
+  namespace: solace-mail
+spec:
+  builderRef: dockerfile
+  concurrency: Replace
+  suspend: true
+  source:
+    type: git
+    git:
+      url: https://github.com/IIRoan/rocal.git
+      ref: master
+    dockerfile: apps/web/Dockerfile
+---
+apiVersion: builder.zeabur.com/v1alpha1
+kind: Build
+metadata:
+  name: gatus
+  namespace: solace-mail
+spec:
+  builderRef: dockerfile
+  concurrency: Replace
+  suspend: true
+  source:
+    type: git
+    git:
+      url: https://github.com/IIRoan/rocal.git
+      ref: master
+    dockerfile: apps/gatus/Dockerfile

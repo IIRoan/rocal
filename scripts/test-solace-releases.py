@@ -5,7 +5,10 @@ import importlib.util
 from io import BytesIO
 import json
 from pathlib import Path
+import subprocess
+import sys
 import tarfile
+import tempfile
 import unittest
 
 
@@ -24,9 +27,12 @@ controller = load(ROOT / ".zeabur/solace-mail/releases/promote.py")
 REVISION = "a" * 40
 API = "SOLACE_API_IMAGE"
 NOTIFICATIONS = "SOLACE_NOTIFICATIONS_IMAGE"
+FRONTEND = "SOLACE_FRONTEND_IMAGE"
+GATUS = "SOLACE_GATUS_IMAGE"
 A = "SOLACE_STALWART_A_IMAGE"
 B = "SOLACE_STALWART_B_IMAGE"
-PINS = {API: "api-old", NOTIFICATIONS: "worker-old", A: "mail-old", B: "mail-old"}
+PINS = {API: "api-old", NOTIFICATIONS: "worker-old", FRONTEND: "web-old", GATUS: "status-old",
+        A: "mail-old", B: "mail-old"}
 
 
 def image(component, char="1"):
@@ -91,11 +97,47 @@ class SelectiveReleaseTests(unittest.TestCase):
             (["apps/backend/src/integrations/stalwart/mailer.rs"], {"api", "notifications"}),
             (["Cargo.lock"], {"api", "notifications"}),
             (["apps/stalwart/stalwart/plan/00-stores.ndjson"], {"stalwart"}),
-            ([".zeabur/solace-mail/data.yaml", "apps/stalwart/README.md", "apps/web/app/page.tsx"], set()),
+            ([".zeabur/solace-mail/data.yaml", "apps/stalwart/README.md", "apps/native-mail/app/mail/index.tsx"], set()),
+            (["apps/web/app/page.tsx"], {"frontend"}),
+            (["packages/mail-editor/src/extensions.ts"], {"frontend"}),
+            (["packages/calendar-client/src/index.ts"], {"frontend"}),
+            (["bun.lock", "package.json", "patches/next.patch"], {"frontend"}),
+            (["packages/native-core/src/index.ts"], set()),
+            (["apps/gatus/config.default.yaml"], {"gatus"}),
+            ([".zeabur/solace-mail/status/entrypoint.sh"], {"gatus"}),
+            ([".dockerignore"], {"api", "notifications", "frontend", "gatus"}),
             (["apps/backend/Dockerfile", "apps/stalwart/railway-entrypoint.sh"], {"api", "stalwart"}),
         ):
             with self.subTest(paths=paths):
                 self.assertEqual(planner.affected(paths), expected)
+
+    def test_web_only_push_creates_an_idempotent_release_request(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            def git(*args):
+                return subprocess.check_output([
+                    "git", "-c", "commit.gpgsign=false", "-c", "user.name=Release test",
+                    "-c", "user.email=release@example.invalid", *args,
+                ], cwd=root, text=True).strip()
+
+            git("init", "-q", "-b", "master")
+            git("commit", "-q", "--allow-empty", "-m", "Initial revision")
+            before = git("rev-parse", "HEAD")
+            page = root / "apps/web/app/page.tsx"
+            page.parent.mkdir(parents=True)
+            page.write_text("export default function Page() { return null; }\n")
+            git("add", ".")
+            git("commit", "-q", "-m", "Change only the website")
+            head = git("rev-parse", "HEAD")
+            request = root / "requests.json"
+            command = [sys.executable, "-B", str(ROOT / "scripts/solace-release-request.py"),
+                       before, head, str(request)]
+            subprocess.check_output(command, cwd=root)
+            recorded = request.read_text()
+            self.assertEqual(json.loads(recorded)["data"], {"sourceRevision": head, "frontend": head})
+            subprocess.check_output(command, cwd=root)
+            self.assertEqual(request.read_text(), recorded)
 
     def reconcile(self, requests, pins=None, builds=None, a_healthy=True, b_healthy=True):
         pins = pins or PINS
@@ -123,6 +165,43 @@ class SelectiveReleaseTests(unittest.TestCase):
         self.assertEqual(self.promoted({"api": REVISION}, builds={"api": build("api")}),
                          [{API: image("api")}])
         self.assertEqual(self.reconcile({}), [])
+
+    def test_frontend_and_status_images_are_promoted(self):
+        self.assertEqual(self.promoted({"frontend": REVISION, "gatus": REVISION}, builds={
+            "frontend": build("frontend"), "gatus": build("gatus"),
+        }), [{FRONTEND: image("frontend"), GATUS: image("gatus")}])
+
+    def test_existing_environment_seeds_only_missing_pins(self):
+        pins = {key: value for key, value in PINS.items() if key not in (FRONTEND, GATUS)}
+        writes = []
+        resources = {
+            controller.GITOPS + "solace-release-images": {"metadata": {"resourceVersion": "4"}, "data": pins},
+            controller.STATEFULSETS + "solace-web": {
+                "spec": {"template": {"spec": {"containers": [{"name": "frontend", "image": image("frontend")} ]}}},
+            },
+            controller.DEPLOYMENTS + "solace-status": {
+                "spec": {"template": {"spec": {"containers": [{"name": "gatus", "image": image("gatus")} ]}}},
+            },
+        }
+
+        def kubernetes(path, patch=None):
+            if patch is None:
+                return resources[path]
+            writes.append((path, patch))
+
+        controller.promote(kubernetes, requests_from=lambda _: {})
+        self.assertEqual(writes, [(controller.GITOPS + "solace-release-images", {
+            "metadata": {"resourceVersion": "4"}, "data": {FRONTEND: image("frontend"), GATUS: image("gatus")},
+        })])
+
+    def test_failed_and_foreign_frontend_builds_are_not_promoted(self):
+        current = build("frontend")
+        current["status"]["conditions"] = [{"type": "Ready", "status": "False"}]
+        self.assertEqual(self.reconcile({"frontend": REVISION}, builds={"frontend": current}), [])
+        current = build("frontend")
+        current["status"]["latestImage"] = image("api")
+        with self.assertRaisesRegex(ValueError, "unexpected image reference"):
+            self.reconcile({"frontend": REVISION}, builds={"frontend": current})
 
     def test_old_build_status_cannot_be_promoted(self):
         for result in (build("api", revision="b" * 40), build("api", observed_generation=1)):

@@ -50,6 +50,14 @@ spec:
       kind: Deployment
       name: solace-public-ingress
       namespace: solace-mail
+    - apiVersion: apps/v1
+      kind: StatefulSet
+      name: solace-web
+      namespace: solace-mail
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: solace-status
+      namespace: solace-mail
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
