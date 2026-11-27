@@ -14,6 +14,7 @@ const workspacePackages = [
   "@workspace/calendar-core",
   "@workspace/e2ee",
   "@workspace/logger",
+  "@workspace/mail-editor",
   "@workspace/runtime",
 ] as const;
 
@@ -56,7 +57,6 @@ const nextConfig: NextConfig = {
       "date-fns",
       "@tiptap/react",
       "@tiptap/core",
-      "@tiptap/starter-kit",
       "radix-ui",
       "@dnd-kit/core",
       "@dnd-kit/sortable",

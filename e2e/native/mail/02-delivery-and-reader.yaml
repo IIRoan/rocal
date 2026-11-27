@@ -22,6 +22,13 @@ appId: ${APP_ID}
 - assertVisible: Star
 - tapOn: Reply
 - assertVisible: Send
+# A reply's quote starts folded under its "On …, … wrote" line.
+- extendedWaitUntil:
+    visible: ".*wrote"
+    timeout: 60000
+- tapOn:
+    text: ".*wrote"
+    retryTapIfNoChange: false
 - extendedWaitUntil:
     visible: ".*Maestro body survives encrypted draft storage.*"
     timeout: 60000

@@ -1,9 +1,11 @@
 import {
   AlignLeft,
   Eye,
+  FileText,
   Inbox,
   ListFilter,
   Reply,
+  Signature,
   Tag,
   Users,
   type LucideIcon,
@@ -14,6 +16,8 @@ export type MailSettingsView =
   | "labels"
   | "contacts"
   | "composing"
+  | "templates"
+  | "signatures"
   | "mail-display"
   | "mail-list"
   | "auto-reply";
@@ -54,6 +58,20 @@ export const MAIL_SETTINGS_NAV_ITEMS: MailSettingsNavItem[] = [
     icon: AlignLeft,
     description: "Plain text mode, signatures, attachment reminders",
     keywords: ["compose", "signature", "reply", "attachment", "photo", "location", "metadata", "undo send", "schedule", "send later"],
+  },
+  {
+    id: "templates",
+    label: "Templates",
+    icon: FileText,
+    description: "Saved replies to insert while you write",
+    keywords: ["template", "canned", "saved reply", "snippet", "quick text", "boilerplate"],
+  },
+  {
+    id: "signatures",
+    label: "Signatures",
+    icon: Signature,
+    description: "Sign-offs for new messages and replies",
+    keywords: ["signature", "sign-off", "sign off", "footer", "default signature"],
   },
   {
     id: "mail-display",

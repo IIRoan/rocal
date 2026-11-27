@@ -3,6 +3,7 @@ import {
   encryptMailForRecipients,
   type MailRecipientEncryptionInput,
 } from "@workspace/calendar-core/mail-pgp-encryption";
+import { signMailDetached } from "@workspace/calendar-core/mail-pgp-signature";
 
 let activePrivateKey: openpgp.PrivateKey | null = null;
 let vaultGeneration = 0;
@@ -49,6 +50,19 @@ export function encryptForRecipients(payload: MailRecipientEncryptionInput) {
       signingKey,
       isCurrent: () => generation === vaultGeneration,
     },
+    openpgp,
+  );
+}
+
+export function signDetached(payload: { data: string }) {
+  const signingKey = activePrivateKey;
+  const generation = vaultGeneration;
+  if (!signingKey) {
+    throw new Error("Mail vault is not loaded on this device.");
+  }
+  return signMailDetached(
+    payload,
+    { signingKey, isCurrent: () => generation === vaultGeneration },
     openpgp,
   );
 }

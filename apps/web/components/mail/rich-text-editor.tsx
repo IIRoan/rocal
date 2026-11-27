@@ -2,8 +2,10 @@
 
 import { useEffect, useRef } from "react";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
-import { serializeEditorContent } from "./quoted-html";
+import { Selection } from "@tiptap/pm/state";
+import { serializeEditorContent } from "@workspace/mail-editor";
 import { cn } from "@workspace/ui/lib/utils";
+import { insertUploadedImages } from "@/lib/mail/compose-editor-utils";
 import { richTextEditorExtensions } from "./rich-text-editor-extensions";
 
 export interface InlineImageUpload {
@@ -51,32 +53,6 @@ export function RichTextEditor({
     onEditorReadyRef.current = onEditorReady;
     onChangeRef.current = onChange;
   }, [onImageUpload, onEditorReady, onChange]);
-  const insertUploadedImage = (
-    result: InlineImageUpload,
-    file: File,
-    position?: number,
-  ) => {
-    const currentEditor = editorRef.current;
-    if (!currentEditor) return;
-    requestAnimationFrame(() => {
-      if (currentEditor.isDestroyed) return;
-      const attrs = {
-        src: result.src,
-        alt: file.name,
-        cid: result.cid,
-      };
-      if (typeof position === "number") {
-        currentEditor
-          .chain()
-          .focus()
-          .insertContentAt(position, { type: "image", attrs })
-          .run();
-        return;
-      }
-      currentEditor.chain().focus().insertContent({ type: "image", attrs }).run();
-    });
-  };
-
   const editor = useEditor({
     extensions: richTextEditorExtensions,
     content: "",
@@ -85,46 +61,29 @@ export function RichTextEditor({
       attributes: editorAttributes(),
       handleDrop: (view, event) => {
         const upload = onImageUploadRef.current;
-        if (!upload || !event.dataTransfer?.files?.length) return false;
+        const currentEditor = editorRef.current;
+        if (!upload || !currentEditor || !event.dataTransfer?.files?.length) return false;
         const imageFiles = Array.from(event.dataTransfer.files).filter((f) =>
           f.type.startsWith("image/"),
         );
         if (imageFiles.length === 0) return false;
         event.preventDefault();
         event.stopPropagation();
-        for (const file of imageFiles) {
-          // onImageUpload (handleComposeImageUpload) reports upload failures itself and returns null.
-          void upload(file)
-            .then((result) => {
-              if (!result) return;
-              const pos = view.posAtCoords({
-                left: event.clientX,
-                top: event.clientY,
-              })?.pos;
-              insertUploadedImage(result, file, pos);
-            })
-            .catch(() => undefined);
-        }
+        insertUploadedImages(currentEditor, imageFiles, upload, () =>
+          view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos,
+        );
         return true;
       },
-      handlePaste: (view, event) => {
+      handlePaste: (_view, event) => {
         const upload = onImageUploadRef.current;
-        if (!upload || !event.clipboardData?.files?.length) return false;
+        const currentEditor = editorRef.current;
+        if (!upload || !currentEditor || !event.clipboardData?.files?.length) return false;
         const imageFiles = Array.from(event.clipboardData.files).filter((f) =>
           f.type.startsWith("image/"),
         );
         if (imageFiles.length === 0) return false;
         event.preventDefault();
-        for (const file of imageFiles) {
-          // onImageUpload (handleComposeImageUpload) reports upload failures itself and returns null.
-          void upload(file)
-            .then((result) => {
-              if (result) {
-                insertUploadedImage(result, file);
-              }
-            })
-            .catch(() => undefined);
-        }
+        insertUploadedImages(currentEditor, imageFiles, upload);
         return true;
       },
     },
@@ -150,7 +109,11 @@ export function RichTextEditor({
         lastEmittedHtmlRef.current = content;
         return;
       }
+      const { from } = editor.state.selection;
       editor.commands.setContent(content, { emitUpdate: false });
+      // setContent leaves the caret after the new content; it goes back where it was, the top of a freshly opened compose.
+      const { doc, tr } = editor.state;
+      editor.view.dispatch(tr.setSelection(Selection.near(doc.resolve(Math.min(from, doc.content.size)))));
       lastEmittedHtmlRef.current = content;
     });
 

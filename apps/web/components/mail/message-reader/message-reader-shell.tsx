@@ -1,11 +1,8 @@
 "use client";
 
-import { useLayoutEffect, useRef } from "react";
 import { Copy } from "lucide-react";
 import { toast } from "@workspace/ui/lib/toast";
 import { Button } from "@workspace/ui/components/ui/button";
-import { usePrefersReducedMotion } from "@workspace/ui/hooks";
-import { fadeInMailReaderContent } from "../mail-app/mail-reader-transition";
 import {
   Dialog,
   DialogContent,
@@ -35,8 +32,6 @@ export function MessageReaderShell({
     orderedConversationMessages[0]?.id ??
     message?.id ??
     "";
-  const rootRef = useRef<HTMLDivElement>(null);
-  const prefersReducedMotion = usePrefersReducedMotion();
 
   const handleCopySource = async () => {
     try {
@@ -47,21 +42,8 @@ export function MessageReaderShell({
     }
   };
 
-  // Toolbar stays put; only the thread content fades (WAAPI, so it stays on the compositor), making a switch read as new content in a fixed frame.
-  useLayoutEffect(() => {
-    const root = rootRef.current;
-    if (!root) return;
-    const fades = Array.from(
-      root.querySelectorAll<HTMLElement>(":scope > :not(:first-child)"),
-    ).flatMap((element) => fadeInMailReaderContent(element, prefersReducedMotion) ?? []);
-    return () => fades.forEach((fade) => fade.cancel());
-  }, [conversationThreadKey, prefersReducedMotion]);
-
   return (
-    <div
-      ref={rootRef}
-      className="flex h-full flex-col overflow-hidden bg-[var(--bg-l2-solid)]"
-    >
+    <div className="flex h-full flex-col overflow-hidden bg-[var(--bg-l2-solid)]">
       <MessageReaderToolbar controller={controller} view={view} />
       <MessageReaderTitle controller={controller} view={view} />
       <MessageReaderThreadStack

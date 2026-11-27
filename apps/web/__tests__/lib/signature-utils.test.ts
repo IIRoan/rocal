@@ -2,16 +2,14 @@
 
 import { describe, expect, it } from "@jest/globals";
 import {
-  appendHtmlSignature,
-  appendPlainTextSignature,
   getPlainTextSignature,
   hasComposeHtmlBody,
   htmlToPlainText,
   resolveOutgoingComposeBodies,
   sanitizeSignatureHtml,
-  stripTrailingPlainTextSignature,
-  swapEmbeddedSignatureInPlainText,
-} from "@/lib/mail/signature-utils";
+  buildEmbeddedSignatureHtml,
+} from "@workspace/calendar-core";
+import { insertEmbeddedSignatureHtml, swapEmbeddedSignatureInHtml } from "@workspace/mail-editor";
 
 describe("signature-utils", () => {
   it("prefers text signatures over html signatures for plain text", () => {
@@ -29,69 +27,6 @@ describe("signature-utils", () => {
         htmlSignature: "<p>Line one</p><p>Line two</p>",
       }),
     ).toBe("Line one\nLine two");
-  });
-
-  it("appends plain text signatures with the standard separator", () => {
-    expect(
-      appendPlainTextSignature("Hello", { textSignature: "Alice" }),
-    ).toBe("Hello\n\n-- \nAlice");
-  });
-
-  it("seeds an empty plain text compose body with a trailing signature", () => {
-    expect(appendPlainTextSignature("", { textSignature: "Alice" })).toBe(
-      "\n\n-- \nAlice",
-    );
-  });
-
-  it("strips trailing plain text signatures", () => {
-    const body = "Hello\n\n-- \nAlice";
-    expect(
-      stripTrailingPlainTextSignature(body, { textSignature: "Alice" }),
-    ).toBe("Hello");
-    expect(
-      stripTrailingPlainTextSignature("\n\n-- \nAlice", { textSignature: "Alice" }),
-    ).toBe("");
-  });
-
-  it("swaps embedded plain text signatures when identity changes", () => {
-    const alice = { textSignature: "Alice" };
-    const bob = { textSignature: "Bob" };
-    const body = "Hello\n\n-- \nAlice";
-    expect(swapEmbeddedSignatureInPlainText(body, alice, bob, { separator: true })).toBe(
-      "Hello\n\n-- \nBob",
-    );
-  });
-
-  it("does not swap plain text signatures when the old signature was removed", () => {
-    expect(
-      swapEmbeddedSignatureInPlainText(
-        "Hello",
-        { textSignature: "Alice" },
-        { textSignature: "Bob" },
-        { separator: true },
-      ),
-    ).toBeNull();
-  });
-
-  it("appends html signatures to html bodies", () => {
-    expect(
-      appendHtmlSignature("<p>Hello</p>", {
-        htmlSignature: "<p>Alice</p>",
-      }),
-    ).toBe("<p>Hello</p><br><br>-- <br><p>Alice</p>");
-  });
-
-  it("does not append a plain text signature that is already present", () => {
-    const body = appendPlainTextSignature("Hello", { textSignature: "Alice" });
-    expect(appendPlainTextSignature(body, { textSignature: "Alice" })).toBe(
-      body,
-    );
-  });
-
-  it("does not append an html signature that is already present", () => {
-    const identity = { htmlSignature: "<p>Alice</p>" };
-    const body = appendHtmlSignature("<p>Hello</p>", identity);
-    expect(appendHtmlSignature(body, identity)).toBe(body);
   });
 
   it("converts html to plain text", () => {
@@ -119,23 +54,6 @@ describe("signature-utils", () => {
     ).toEqual({
       textBody: "Hello world",
       htmlBody: "<p>Hello <strong>world</strong></p>",
-    });
-  });
-
-  it("resolves outgoing compose bodies with signatures on both parts", () => {
-    const identity = {
-      textSignature: "Alice",
-      htmlSignature: "<p>Alice</p>",
-    };
-    expect(
-      resolveOutgoingComposeBodies({
-        body: "",
-        htmlBody: "<p>Hello</p>",
-        signature: identity,
-      }),
-    ).toEqual({
-      textBody: "Hello\n\n-- \nAlice",
-      htmlBody: "<p>Hello</p><br><br>-- <br><p>Alice</p>",
     });
   });
 
@@ -173,5 +91,50 @@ describe("signature-utils", () => {
     expect(sanitized).not.toMatch(/script/i);
     expect(sanitized).not.toMatch(/onerror/i);
     expect(sanitized).not.toMatch(/onclick/i);
+  });
+});
+
+describe("swapEmbeddedSignatureInHtml", () => {
+  const work = { textSignature: "Alex Doe\nSolace" };
+  const home = { textSignature: "Alex" };
+  const block = (signature: { textSignature: string }) =>
+    buildEmbeddedSignatureHtml(signature, { separator: true });
+  const quote = '<blockquote><p data-signature-block="start"></p><p>Alex</p><p data-signature-block="end"></p></blockquote>';
+
+  it("swaps or removes the block that holds a known signature", () => {
+    const html = `<p>Hi</p>${block(work)}${quote}`;
+    expect(swapEmbeddedSignatureInHtml(html, [work, home], home, { separator: true })).toBe(
+      `<p>Hi</p>${block(home)}${quote}`,
+    );
+    expect(swapEmbeddedSignatureInHtml(html, [work, home], null, { separator: true })).toBe(`<p>Hi</p>${quote}`);
+  });
+
+  it("never touches an edited block, typed text after it or a signature inside the quote", () => {
+    const edited = `<p>Hi</p>${block(work).replace("</p><p data-signature-block=\"end\">", "</p><p data-signature-block=\"end\">See you")}`;
+    expect(swapEmbeddedSignatureInHtml(edited, [work, home], home, { separator: true })).toBeNull();
+    expect(swapEmbeddedSignatureInHtml(`<p>Hi</p>${quote}`, [work, home], work, { separator: true })).toBeNull();
+  });
+});
+
+describe("insertEmbeddedSignatureHtml", () => {
+  const work = { textSignature: "Alex Doe\nSolace" };
+  const options = { separator: true, aboveQuote: true };
+  const block = buildEmbeddedSignatureHtml(work, { separator: true });
+  const replyQuote = "<p>On Monday, Sam wrote:</p><div data-quoted-html=\"\"><p>Hello</p></div>";
+
+  it("adds the signature after the empty writing line of a new message", () => {
+    expect(insertEmbeddedSignatureHtml("", work, { separator: true, aboveQuote: false })).toBe(`<p></p>${block}`);
+    expect(insertEmbeddedSignatureHtml("<p>Hi</p>", work, { separator: true, aboveQuote: false })).toBe(`<p>Hi</p>${block}`);
+  });
+
+  it("adds a reply or forward signature above the quote header, or after the quote below it", () => {
+    expect(insertEmbeddedSignatureHtml(`<p>Thanks</p>${replyQuote}`, work, options)).toBe(`<p>Thanks</p>${block}${replyQuote}`);
+    const forward = "<p>---------- Forwarded message ----------<br>From: sam@solace.test</p><div data-quoted-html=\"\"><p>Hello</p></div>";
+    expect(insertEmbeddedSignatureHtml(`<p></p>${forward}`, work, options)).toBe(`<p></p>${block}${forward}`);
+    expect(insertEmbeddedSignatureHtml(`<p>Thanks</p>${replyQuote}`, work, { ...options, aboveQuote: false })).toBe(`<p>Thanks</p>${replyQuote}${block}`);
+  });
+
+  it("leaves the body alone for no signature", () => {
+    expect(insertEmbeddedSignatureHtml(`<p>Thanks</p>${replyQuote}`, null, options)).toBe(`<p>Thanks</p>${replyQuote}`);
   });
 });

@@ -1,18 +1,13 @@
 "use client";
 
-import { useLayoutEffect, useRef } from "react";
-import { usePrefersReducedMotion } from "@workspace/ui/hooks";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { cn } from "@workspace/ui/lib/utils";
-import { playAfterPaint } from "@workspace/ui/lib/motion";
+import { MOTION_EASING, moveFrom, slideFadeIn } from "@workspace/ui/lib/motion";
 import { toast } from "@workspace/ui/lib/toast";
 import { getErrorMessage } from "@workspace/calendar-core";
 import { createLogger } from "@workspace/logger";
 import {
   MAIL_LIST_NARROW_WIDTH_CLASS,
-  MAIL_LIST_OPEN_FADE_OPTIONS,
-  MAIL_LIST_SWAP_KEYFRAMES,
-  MAIL_READER_ANIMATION_OPTIONS,
-  MAIL_READER_MOTION_CLASS,
 } from "./mail-reader-transition";
 import { MessageList } from "../message-list";
 import { MailMailboxHeader } from "../mail-mailbox-header";
@@ -20,6 +15,24 @@ import { applyMailListViewFilter } from "../mail-app-list-chrome-state";
 import type { MailAppContentController } from "../use-mail-app-content-controller";
 
 const log = createLogger("mail-app-list-column");
+const SEARCH_COVERAGE_TOAST = "mail-search-coverage";
+const SEARCH_ISSUES_TOAST = "mail-search-issues";
+
+/** Search notes ride in toasts so the list never moves under them: coverage once per distinct note, problems once typing pauses. */
+function useSearchNoticeToasts(coverageText: string | null, issues: string[], debouncing: boolean) {
+  const shownCoverageRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!coverageText || shownCoverageRef.current === coverageText) return;
+    shownCoverageRef.current = coverageText;
+    toast(coverageText, { id: SEARCH_COVERAGE_TOAST });
+  }, [coverageText]);
+
+  const issuesText = debouncing ? "" : issues.join(" ");
+  useEffect(() => {
+    if (issuesText) toast.warning(issuesText, { id: SEARCH_ISSUES_TOAST });
+    else toast.dismiss(SEARCH_ISSUES_TOAST);
+  }, [issuesText]);
+}
 
 function MailSearchState({ loading, query, mailbox }: { loading: boolean; query: string; mailbox: string }) {
   if (loading) {
@@ -33,18 +46,20 @@ function MailSearchState({ loading, query, mailbox }: { loading: boolean; query:
   );
 }
 
-export function MailAppListColumn({
+function MailAppListHeader({
   controller,
+  title,
+  unreadCount,
 }: {
   controller: MailAppContentController;
+  title: string;
+  unreadCount: number;
 }) {
   const {
-    isMobile,
-    showMobileDetailPane,
-    desktopDetailPaneActive,
-    selectedMailboxName,
     canEmptyFolder,
     emptyFolderLabel,
+    canMarkFolderRead,
+    handleMarkMailboxAsRead,
     isBusy,
     isRefreshing,
     patchListChrome,
@@ -53,21 +68,93 @@ export function MailAppListColumn({
     filterPanelExpanded,
     searchBarOpen,
     listViewFilter,
-    activeLabelId,
     isSearching,
     isSearchDebouncing,
-    searchActive,
-    searchCoverageText,
-    searchIssues,
-    showSearchLoadingState,
     searchInputRef,
     clearListSearch,
     handleSearchInputChange,
     handleSearchInputKeyDown,
     handleManualRefresh,
+  } = controller;
+
+  return (
+    <MailMailboxHeader
+      title={title}
+      unreadCount={unreadCount}
+      filter={{
+        value: listViewFilter,
+        onChange: (value) => patchListChrome({ listViewFilter: value }),
+      }}
+      searchInputRef={searchInputRef}
+      search={{
+        open: searchBarOpen,
+        value: mailListSearch,
+        busy: Boolean(
+          (isSearching || isSearchDebouncing) && mailListSearch.trim(),
+        ),
+        onOpenChange: (open) => patchListChrome({ searchBarOpen: open }),
+        onChange: handleSearchInputChange,
+        onKeyDown: handleSearchInputKeyDown,
+        onClear: clearListSearch,
+      }}
+      advanced={{
+        filters: advancedFilters,
+        expanded: filterPanelExpanded,
+        onFiltersChange: (filters) =>
+          patchListChrome({ advancedFilters: filters }),
+        onExpandedChange: (expanded) =>
+          patchListChrome({ filterPanelExpanded: expanded }),
+      }}
+      refresh={{
+        spinning: isRefreshing,
+        disabled: isRefreshing || isBusy,
+        onClick: () =>
+          void handleManualRefresh().catch((error) =>
+            toast.error(getErrorMessage(error, "Could not refresh mail. Check your connection and try again.")),
+          ),
+      }}
+      emptyFolder={
+        canEmptyFolder
+          ? {
+              label: emptyFolderLabel,
+              onClick: () => patchListChrome({ emptyFolderOpen: true }),
+            }
+          : undefined
+      }
+      onMarkAllRead={
+        canMarkFolderRead
+          ? () =>
+              void handleMarkMailboxAsRead().catch((error) =>
+                log.error("Failed to mark folder as read", error),
+              )
+          : undefined
+      }
+    />
+  );
+}
+
+export function MailAppListColumn({
+  controller,
+}: {
+  controller: MailAppContentController;
+}) {
+  const {
+    isMobile,
+    showMobileDetailPane,
+    selectedMailboxName,
+    mailListSearch,
+    listViewFilter,
+    activeLabelId,
+    searchActive,
+    searchCoverageText,
+    searchIssues,
+    isSearchDebouncing,
+    showSearchLoadingState,
     activeMailbox,
     filteredListMessages,
     listThreadRelatedMessages,
+    cachedThreadMessages,
+    loadThreadMessages,
     selectedMessageId,
     handleSelectMessage,
     handleDeleteMessage,
@@ -91,26 +178,37 @@ export function MailAppListColumn({
     isLoadingMore,
     listSettings,
     scheduledSendAtById,
+    composeScheduling,
   } = controller;
+  const listBodyRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const hasMailbox = Boolean(activeMailbox);
+  useSearchNoticeToasts(searchCoverageText, searchIssues, isSearchDebouncing);
 
-  const contentRef = useRef<HTMLDivElement>(null);
-  const renderedDetailPaneRef = useRef(desktopDetailPaneActive);
-  const prefersReducedMotion = usePrefersReducedMotion();
+  // When the header grows or shrinks, as search filters open or chips appear, the list glides to its new place instead of jumping.
+  useEffect(() => {
+    const header = headerRef.current;
+    const body = listBodyRef.current;
+    if (!header || !body || typeof ResizeObserver === "undefined") return;
+    let height = header.offsetHeight;
+    const observer = new ResizeObserver(() => {
+      const next = header.offsetHeight;
+      const delta = next - height;
+      height = next;
+      if (delta !== 0) moveFrom(body, { y: -delta }, { duration: 240, easing: MOTION_EASING.soft });
+    });
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, [isMobile, hasMailbox]);
+  const listSource = `${activeMailbox?.selectedMailboxId}|${activeLabelId}|${listViewFilter}`;
 
+  // A new mailbox, label or filter lifts its rows in once painted, so the switch reads as fresh content in a fixed frame.
   useLayoutEffect(() => {
-    if (renderedDetailPaneRef.current === desktopDetailPaneActive) return;
-    renderedDetailPaneRef.current = desktopDetailPaneActive;
-    const content = contentRef.current;
-    if (!content || prefersReducedMotion || typeof content.animate !== "function") return;
-    // Open fade is half-length: Firefox re-composites the opacity group every frame while the stacked rows reflow.
-    // repo-rules-allow motion-shared-helpers: partial 0.4→1 fade with pane-scoped durations; slideFadeIn's 0→1 keyframes and visibility don't fit.
-    const fade = content.animate(
-      MAIL_LIST_SWAP_KEYFRAMES,
-      desktopDetailPaneActive ? MAIL_LIST_OPEN_FADE_OPTIONS : MAIL_READER_ANIMATION_OPTIONS,
-    );
-    if (!desktopDetailPaneActive) playAfterPaint(fade);
-    return () => fade.cancel();
-  }, [desktopDetailPaneActive, prefersReducedMotion]);
+    const body = listBodyRef.current;
+    if (!body) return;
+    const enter = slideFadeIn(body, { y: 6 }, { duration: 220, easing: MOTION_EASING.soft });
+    return () => enter?.cancel();
+  }, [listSource]);
 
   if (!activeMailbox) {
     return null;
@@ -143,78 +241,25 @@ export function MailAppListColumn({
             ? "hidden"
             : "flex h-full min-h-0 flex-1 flex-col overflow-hidden"
           : cn(
-              "flex h-full min-h-0 shrink-0 flex-col overflow-hidden bg-[var(--bg-l2-solid)]",
-              // Only narrowing animates (stacked rows follow the edge under the sliding reader); on close the list is already full width beneath it.
-              desktopDetailPaneActive
-                ? cn(
-                    MAIL_LIST_NARROW_WIDTH_CLASS,
-                    // repo-rules-allow motion-compositor-only: width narrows under the covering reader pane (READER-TRANSITION.md); a transform-only swap would reintroduce the Firefox stutter.
-                    "transition-[width]",
-                    MAIL_READER_MOTION_CLASS,
-                  )
-                : "w-full",
+              "flex h-full min-h-0 shrink-0 flex-col overflow-hidden rounded-xl border border-[var(--border-secondary)] bg-[var(--bg-l2-solid)]",
+              MAIL_LIST_NARROW_WIDTH_CLASS,
             )
       }
     >
-      <div ref={contentRef} className="flex min-h-0 flex-1 flex-col">
-        {searchCoverageText ? (
-          <p role="status" className="px-3 py-2 text-xs text-muted-foreground">
-            {searchCoverageText}
-          </p>
-        ) : null}
+      <div className="flex min-h-0 flex-1 flex-col">
         {!isMobile && (
-          <MailMailboxHeader
-            title={listTitle}
-            unreadCount={unreadCount}
-            filter={{
-              value: listViewFilter,
-              onChange: (value) => patchListChrome({ listViewFilter: value }),
-            }}
-            searchInputRef={searchInputRef}
-            search={{
-              open: searchBarOpen,
-              value: mailListSearch,
-              busy: Boolean(
-                (isSearching || isSearchDebouncing) && mailListSearch.trim(),
-              ),
-              onOpenChange: (open) => patchListChrome({ searchBarOpen: open }),
-              onChange: handleSearchInputChange,
-              onKeyDown: handleSearchInputKeyDown,
-              onClear: clearListSearch,
-            }}
-            advanced={{
-              filters: advancedFilters,
-              expanded: filterPanelExpanded,
-              onFiltersChange: (filters) =>
-                patchListChrome({ advancedFilters: filters }),
-              onExpandedChange: (expanded) =>
-                patchListChrome({ filterPanelExpanded: expanded }),
-            }}
-            refresh={{
-              spinning: isRefreshing,
-              disabled: isRefreshing || isBusy,
-              onClick: () =>
-                void handleManualRefresh().catch((error) =>
-                  toast.error(getErrorMessage(error, "Could not refresh mail. Check your connection and try again.")),
-                ),
-            }}
-            emptyFolder={
-              canEmptyFolder
-                ? {
-                    label: emptyFolderLabel,
-                    onClick: () => patchListChrome({ emptyFolderOpen: true }),
-                  }
-                : undefined
-            }
-          />
+          <div ref={headerRef}>
+            <MailAppListHeader
+              controller={controller}
+              title={listTitle}
+              unreadCount={unreadCount}
+            />
+          </div>
         )}
-        <p role="status" className="px-3 py-1 text-xs text-destructive empty:hidden">
-          {searchIssues.join(" ")}
-        </p>
         <p role="status" className="sr-only">
           {listStatus}
         </p>
-        <div className="flex min-h-0 flex-1 flex-col">
+        <div ref={listBodyRef} className="flex min-h-0 flex-1 flex-col">
           {showSearchLoadingState || (searchActive && shownCount === 0) ? (
             <MailSearchState loading={showSearchLoadingState} query={searchQuery} mailbox={listTitle} />
           ) : (
@@ -294,6 +339,7 @@ export function MailAppListColumn({
               labels={labels}
               timeFormat={timeFormat}
               timezone={timezone}
+              weekStartsOn={composeScheduling.weekStartsOn}
               scheduledSendAtById={scheduledSendAtById}
               onLoadMore={
                 searchActive
@@ -305,27 +351,11 @@ export function MailAppListColumn({
               }
               hasMore={searchActive ? false : hasMoreMessages}
               isLoadingMore={isLoadingMore}
-              density={listSettings.density}
               showLabelChips={listSettings.showLabelChipsInList}
               threadExpandEnabled={listSettings.threadExpandInList}
               preserveMessageOrder={searchActive}
-              narrow={desktopDetailPaneActive}
-              onExpandThread={
-                activeMailbox
-                  ? async (threadId: string) => {
-                      try {
-                        const messages =
-                          await activeMailbox.client.getThreadMessages(
-                            activeMailbox.session,
-                            threadId,
-                          );
-                        return messages;
-                      } catch {
-                        return [];
-                      }
-                    }
-                  : undefined
-              }
+              cachedThreadMessages={cachedThreadMessages}
+              onExpandThread={activeMailbox ? loadThreadMessages : undefined}
             />
           )}
         </div>

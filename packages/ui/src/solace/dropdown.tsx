@@ -260,6 +260,8 @@ export interface DropdownPanelProps {
   width?: number | string;
   className?: string;
   onOpenAutoFocus?: (event: Event) => void;
+  /** Where focus goes on close, for a panel whose trigger is not focusable. */
+  onCloseAutoFocus?: (event: Event) => void;
 }
 
 /** Same surface as `Dropdown` for non-menu content (info cards, pickers, forms). */
@@ -274,6 +276,7 @@ export function DropdownPanel({
   width,
   className,
   onOpenAutoFocus,
+  onCloseAutoFocus,
 }: DropdownPanelProps) {
   const style = surfaceWidthStyle(width);
   return (
@@ -290,6 +293,7 @@ export function DropdownPanel({
           style={style}
           onClick={stopPortalClick}
           onOpenAutoFocus={onOpenAutoFocus}
+          onCloseAutoFocus={onCloseAutoFocus}
         >
           {children}
         </PopoverPrimitive.Content>

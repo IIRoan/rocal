@@ -1,22 +1,75 @@
-import { Text, View } from "react-native";
+import type { ReactNode } from "react";
+import { Pressable, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import {
   EVENT_CONTENT_UNAVAILABLE_MESSAGE,
+  findEventCallLink,
   formatReminderShort,
+  getEventLinkLabel,
+  getEventLocationMapQuery,
   hasOptionalEventParticipants,
   isCancelledCalendarEvent,
+  splitEventDescription,
   type CalendarEvent,
+  type EventTextRun,
   type TimeFormat,
 } from "@workspace/calendar-core";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { BottomSheetScrollView } from "@workspace/native-core/components/BottomSheet";
 import { BlobatarAvatar } from "@workspace/native-core/components/BlobatarAvatar";
+import { openExternalLink } from "@workspace/native-core/lib/open-external-link";
 import { resolveCalendarSwatchColor } from "../../lib/calendar-color-utils";
 import { EncryptionStatusIcon } from "../calendar/EncryptionStatusIcon";
 import { EventEditorRow } from "./EventEditorPrimitives";
 import { FormErrorList } from "./FormErrorList";
 import { formatEventDate, formatEventTime } from "./event-detail-utils";
 import type { EventSheetStyles } from "./event-sheet-styles";
+
+function renderRuns(runs: EventTextRun[], linkStyle: EventSheetStyles["viewLink"]): ReactNode[] {
+  const parts: ReactNode[] = [];
+  // Runs only grow the offset, so it keys each link uniquely within its line.
+  let offset = 0;
+  for (const run of runs) {
+    if (run.kind === "text") {
+      parts.push(run.text);
+      offset += run.text.length;
+      continue;
+    }
+    const label = run.label ?? getEventLinkLabel(run.url);
+    parts.push(
+      <Text
+        key={offset}
+        style={linkStyle}
+        onPress={() => openExternalLink(run.url)}
+        accessibilityRole="link"
+        accessibilityHint={`Opens ${getEventLinkLabel(run.url)}`}
+      >
+        {label}
+      </Text>,
+    );
+    offset += run.url.length;
+  }
+  return parts;
+}
+
+function EventDescriptionText({
+  description,
+  styles,
+}: {
+  description: string;
+  styles: EventSheetStyles;
+}) {
+  return (
+    <Text style={[styles.viewDescription, styles.viewRowText]}>
+      {splitEventDescription(description).map(({ key, runs }, index) => (
+        <Text key={key}>
+          {index > 0 ? "\n" : ""}
+          {renderRuns(runs, styles.viewLink)}
+        </Text>
+      ))}
+    </Text>
+  );
+}
 
 function formatParticipantStatus(status?: string) {
   switch (status) {
@@ -55,6 +108,9 @@ export function EventDetailsView({
   serverErrors: string[];
 }) {
   const { theme } = useTheme();
+  const cancelled = isCancelledCalendarEvent(event);
+  const callLink = cancelled ? null : findEventCallLink(event);
+  const mapQuery = getEventLocationMapQuery(event.location);
   return (
     <BottomSheetScrollView
       style={styles.viewScroll}
@@ -63,7 +119,7 @@ export function EventDetailsView({
       bounces={false}
       overScrollMode="never"
     >
-      {isCancelledCalendarEvent(event) ? (
+      {cancelled ? (
         <View style={styles.cancelledBanner}>
           <Feather
             name="alert-triangle"
@@ -85,7 +141,7 @@ export function EventDetailsView({
           testID="event-details-title"
           style={[
             styles.viewEventTitle,
-            isCancelledCalendarEvent(event) && styles.viewEventTitleCancelled,
+            cancelled && styles.viewEventTitleCancelled,
           ]}
         >
           {event.title || "Untitled event"}
@@ -117,6 +173,33 @@ export function EventDetailsView({
             </Text>
           </View>
         </EventEditorRow>
+
+        {callLink ? (
+          <EventEditorRow icon="video" label="Video call">
+            <View style={styles.viewInlineRow}>
+              <Pressable
+                onPress={() => openExternalLink(callLink)}
+                hitSlop={4}
+                style={({ pressed }) => [
+                  styles.joinButton,
+                  pressed && styles.rsvpButtonPressed,
+                ]}
+                accessibilityRole="link"
+                accessibilityLabel={`Join video call on ${getEventLinkLabel(callLink)}`}
+              >
+                <Feather
+                  name="video"
+                  size={16}
+                  color={theme.colors.primaryForeground}
+                />
+                <Text style={styles.joinButtonText}>Join</Text>
+              </Pressable>
+              <Text style={[styles.viewMutedText, styles.viewRowContent]} numberOfLines={1}>
+                {getEventLinkLabel(callLink)}
+              </Text>
+            </View>
+          </EventEditorRow>
+        ) : null}
 
         {calendarInfo ? (
           <EventEditorRow icon="calendar" label="Calendar">
@@ -193,9 +276,27 @@ export function EventDetailsView({
 
         {event.location ? (
           <EventEditorRow icon="map-pin" label="Location">
-            <Text style={[styles.viewText, styles.viewRowText]}>
-              {event.location}
-            </Text>
+            <View style={styles.viewRowText}>
+              <Text style={styles.viewText}>{event.location}</Text>
+              {mapQuery ? (
+                <Pressable
+                  onPress={() =>
+                    openExternalLink(
+                      `https://maps.apple.com/?q=${encodeURIComponent(mapQuery)}`,
+                    )
+                  }
+                  hitSlop={10}
+                  style={({ pressed }) => [
+                    styles.mapLink,
+                    pressed && styles.rsvpButtonPressed,
+                  ]}
+                  accessibilityRole="link"
+                  accessibilityLabel="Open location in Maps"
+                >
+                  <Text style={styles.viewLink}>Open in Maps</Text>
+                </Pressable>
+              ) : null}
+            </View>
           </EventEditorRow>
         ) : null}
 
@@ -211,9 +312,10 @@ export function EventDetailsView({
 
         {event.description ? (
           <EventEditorRow icon="align-left" label="Description">
-            <Text style={[styles.viewDescription, styles.viewRowText]}>
-              {event.description}
-            </Text>
+            <EventDescriptionText
+              description={event.description}
+              styles={styles}
+            />
           </EventEditorRow>
         ) : null}
       </View>

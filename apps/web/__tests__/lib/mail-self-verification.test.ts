@@ -41,11 +41,16 @@ jest.mock("@/lib/mail/worker-client", () => ({
     encryptForRecipients: (
       ...args: Parameters<MailCryptoWorkerClient["encryptForRecipients"]>
     ) => mockClient.encryptForRecipients(...args),
+    signDetached: (
+      ...args: Parameters<MailCryptoWorkerClient["signDetached"]>
+    ) => mockClient.signDetached(...args),
   },
 }));
 
 import { decryptMessageForCompose } from "@/lib/mail/decrypt-message-for-compose";
 import { createMailSealer } from "@/lib/mail/mail-app-helpers";
+import { signOutgoingMailContent, type MailSealer } from "@workspace/calendar-core";
+import { signMailDetached } from "@workspace/calendar-core/mail-pgp-signature";
 
 const fixtures = loadStalwart110MailFixtures();
 const originalSelf = Object.getOwnPropertyDescriptor(globalThis, "self");
@@ -378,4 +383,63 @@ it("identifies a non-limit MIME parse fallback so draft editing can refuse it", 
   } finally {
     parse.mockRestore();
   }
+});
+
+/** Stalwart seals received mail to the vault key without signing it. */
+async function sealAtRest(plaintext: string) {
+  const armoredMessage = await actualPgp.encrypt({
+    message: await actualPgp.createMessage({ text: plaintext }),
+    encryptionKeys: await actualPgp.readKey({ armoredKey: fixtures.keyFor("sender").publicKeyArmored }),
+    format: "armored",
+  });
+  jest.mocked(client.getBlobAsText).mockResolvedValue(armoredMessage);
+}
+
+it("signs outside mail with the worker's vault key and verifies it against the sender's own key", async () => {
+  const key = fixtures.keyFor("sender");
+  const sealer = createMailSealer({
+    client,
+    session,
+    unlockedVault: {
+      userId: "synthetic-user",
+      email: key.email,
+      publicKeyArmored: key.publicKeyArmored,
+      publicKeyFingerprint: key.fingerprint,
+      encryptedPrivateKeyArmored: key.privateKeyArmored,
+      kdf: "argon2id",
+      kdfParams: { saltB64: "SYNTHETIC", memoryKiB: 8192, iterations: 1, parallelism: 1 },
+      vaultVersion: 1,
+      createdAt: "2026-11-10T00:00:00.000Z",
+    },
+  });
+  const entity = await signOutgoingMailContent({ text: "Signed body" }, sealer);
+  await sealAtRest(entity);
+  const result = await decrypt();
+  expect(result.signatureVerificationState).toBe("verified");
+  expect(result.text).toBe("Signed body");
+  expect(result.attachments?.map((attachment) => attachment.type)).toEqual(["application/pgp-keys"]);
+  await sealAtRest(entity.replace("Content-Type: text/plain; charset=utf-8", "Content-Type: text/plain; charset=us-ascii"));
+  expect((await decrypt()).signatureVerificationState).toBe("failed");
+});
+
+it("treats a key attached by an outside sender as unconfirmed, and only for the address it names", async () => {
+  const outside = await actualPgp.generateKey({
+    type: "ecc",
+    curve: "curve25519Legacy",
+    userIDs: [{ email: "carol@outside.test" }],
+    format: "object",
+  });
+  const sealer: MailSealer = {
+    selfPublicKeyArmored: outside.publicKey.armor(),
+    isCurrent: () => true,
+    encrypt: async () => ({ armoredMessage: "" }),
+    sign: (input) => signMailDetached(input, { signingKey: outside.privateKey, isCurrent: () => true }, actualPgp),
+    upload: async () => ({ blobId: "unused", size: 0 }),
+  };
+  await sealAtRest(await signOutgoingMailContent({ text: "From outside" }, sealer));
+  const attached = await decrypt("carol@outside.test");
+  expect(attached.signatureVerificationState).toBe("attached_key");
+  expect(attached.text).toBe("From outside");
+  expect((await decrypt("dave@outside.test")).signatureVerificationState).toBe("unverified");
+  expect(mockLookup).not.toHaveBeenCalled();
 });

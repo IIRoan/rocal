@@ -18,7 +18,6 @@ export function fieldClass(desktop?: boolean) {
   return cn(
     "w-full rounded-md border-0 bg-hover/40 px-3 text-sm text-foreground shadow-none transition-colors",
     "placeholder:text-muted-foreground hover:bg-hover/60 focus-visible:bg-hover/60",
-    FOCUS_RING,
     desktop ? "h-9" : "h-11",
   );
 }

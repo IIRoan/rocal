@@ -50,6 +50,10 @@ import {
   formatQuotedMailDate,
   buildReplyContext,
   type QuotedDateOptions,
+  mergeMailboxRefresh,
+  hasComposeHtmlBody,
+  resolveOutgoingComposeBodies,
+  htmlHasUnhydratedInlinePlaceholders,
 } from "@workspace/calendar-core";
 import { useSettings } from "@/hooks/use-settings";
 import { useUserTimeFormat } from "@/hooks/use-user-time-format";
@@ -99,6 +103,7 @@ import {
   seedMailMessageCache,
 } from "@/lib/mail/mail-message-query";
 import {
+  mergeMailMessage,
   mergeMailMessagePreservingKeywords,
   messageHasLoadedBody,
 } from "@/lib/mail/mail-message-body";
@@ -108,34 +113,27 @@ import {
   isSpamMailboxRole,
   isTrashMailboxRole,
 } from "@/lib/mail/mail-mailbox-roles";
-import { mailQueryKeys } from "@/lib/mail/mail-query-keys";
+import { mailQueryKeys, type MailMailboxMessagesCache } from "@/lib/mail/mail-query-keys";
 import { getMailComposeBridge, settleComposeDraftSave } from "@/components/mail/mail-compose-bridge";
 import { assertMailVerificationContext, captureMailVerificationContext, resolveMailSenderVerification } from "@/lib/mail/mail-sender-verification";
 import { decryptMessageForCompose } from "@/lib/mail/decrypt-message-for-compose";
 import { useConversationDecryptedPreviews } from "@/hooks/use-conversation-decrypted-previews";
 import { replaceSavedDraftInMailboxList } from "@/lib/mail/compose-draft-cache";
 import { getDraftsMailboxId } from "@/lib/mail/draft-utils";
-import {
-  hasComposeHtmlBody,
-  resolveOutgoingComposeBodies,
-} from "@/lib/mail/signature-utils";
 import { mergeRefreshedIntoCurrentMessages } from "@/lib/mail/mail-list-merge";
 import {
   readMailListSettings,
   MARK_AS_READ_DELAY_MS,
 } from "@/lib/mail/mail-list-settings";
+import { rewriteComposeInlineImages } from "@/lib/mail/compose-editor-utils";
 import {
-  rewriteComposeInlineImages,
-  htmlHasUnhydratedInlinePlaceholders,
-} from "@/lib/mail/compose-editor-utils";
-import {
-  getComposeInlineImages,
   readBlobAsDataUrl,
   registerComposeInlineImage,
   waitForQuotedInlineImageHydration,
 } from "@/lib/mail/compose-inline-images";
 import type { InlineImageUpload } from "@/components/mail/rich-text-editor";
 import { readMailComposeSettings } from "@/lib/mail/compose-settings";
+import { getEmbeddedImagesSizeError, selfCopyWithEmbeddedImages } from "@workspace/calendar-core";
 import { announceHeldSend } from "@/lib/mail/held-send-toast";
 import { prepareOutgoingImageFiles } from "@/lib/mail/strip-image-metadata";
 import { MAILBOX_MESSAGES_PAGE_SIZE } from "@/lib/mail/mail-pagination";
@@ -269,6 +267,27 @@ function bumpAutoReadNonce(
   return next;
 }
 
+/** Rechecks a mailbox page held in memory by its flags and downloads only the messages it does not hold; with none held it loads the first page. */
+async function refreshHeldMailboxPage(
+  client: StalwartJmapClient,
+  session: JmapSession,
+  mailboxId: string,
+  held: MailMailboxMessagesCache | undefined,
+  limit: number,
+): Promise<MailMailboxMessagesCache> {
+  if (!held) return client.getMailboxMessages(session, mailboxId, { limit, position: 0 });
+  const { flags, total } = await client.getMailboxMessageFlags(session, mailboxId, {
+    limit: Math.max(limit, held.messages.length),
+  });
+  const heldById = new Map(held.messages.map((message) => [message.id, message]));
+  const fetched = await client.getMessagesByIds(
+    session,
+    flags.filter((entry) => !heldById.has(entry.id)).map((entry) => entry.id),
+    { includeBodies: false },
+  );
+  return { messages: mergeMailboxRefresh(flags, heldById, fetched), total };
+}
+
 /** The open conversation, or just the selected message while it has no loaded thread. */
 function conversationOrMessage(
   conversation: JmapEmailMessage[],
@@ -276,6 +295,33 @@ function conversationOrMessage(
 ): JmapEmailMessage[] {
   return conversation.length > 0 || !message ? conversation : [message];
 }
+
+/** Thread caches also hold messages from other folders, so keyword and body changes are applied to every cached thread. */
+function patchThreadCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  update: (messages: JmapEmailMessage[]) => JmapEmailMessage[],
+) {
+  queryClient.setQueriesData<JmapEmailMessage[]>(
+    { queryKey: mailQueryKeys.threads() },
+    (current) => (current ? update(current) : current),
+  );
+}
+
+/** A thread's messages, keeping bodies opened earlier since the thread fetch carries only metadata. */
+async function fetchThreadMessages(
+  queryClient: ReturnType<typeof useQueryClient>,
+  mailbox: { client: StalwartJmapClient; session: JmapSession },
+  threadId: string,
+) {
+  const fetched = await mailbox.client.getThreadMessages(mailbox.session, threadId);
+  return fetched.map((message) => {
+    const known = findCachedMailMessage(queryClient, message.id);
+    return known ? mergeMailMessage(known, message) : message;
+  });
+}
+
+const EMPTY_THREAD_MESSAGES: JmapEmailMessage[] = [];
+const SENT_THREAD_PREFETCH_LIMIT = 50;
 
 const PROTECTED_ROLES = new Set([
   "inbox",
@@ -311,16 +357,14 @@ export function useMailApp() {
   );
   const [selectedConversationMessageId, setSelectedConversationMessageId] =
     useState<string | null>(null);
-  const [relatedConversationMessages, setRelatedConversationMessages] =
-    useState<JmapEmailMessage[]>([]);
   const [listThreadRelatedMessages, setListThreadRelatedMessages] = useState<
     JmapEmailMessage[]
   >([]);
   const threadPrefetchedMailboxRef = useRef<string | null>(null);
   const [optimisticConversationMessages, setOptimisticConversationMessages] =
     useState<JmapEmailMessage[]>([]);
-  const [isConversationLoading, setIsConversationLoading] = useState(false);
   const [isMessageBodyLoading, setIsMessageBodyLoading] = useState(false);
+  const [bodySettledFor, setBodySettledFor] = useState<string | null>(null);
   const [selectedMessagePlaintext, setSelectedMessagePlaintext] = useState<
     string | null
   >(null);
@@ -498,6 +542,19 @@ export function useMailApp() {
       findCachedMailMessage(queryClient, selectedMessageId) ??
       null)
     : null;
+  const selectedThreadId = selectedMailboxMessage?.threadId ?? null;
+  // The open thread shares the list's cache, so a conversation seen before opens at once while it refreshes.
+  const conversationThreadQuery = useQuery({
+    queryKey: mailQueryKeys.threadMessages(selectedThreadId ?? ""),
+    queryFn: () =>
+      activeMailbox && selectedThreadId
+        ? fetchThreadMessages(queryClient, activeMailbox, selectedThreadId)
+        : EMPTY_THREAD_MESSAGES,
+    enabled: Boolean(activeMailbox && selectedThreadId),
+    staleTime: 0,
+    retry: false,
+  });
+  const relatedConversationMessages = conversationThreadQuery.data ?? EMPTY_THREAD_MESSAGES;
   const serverConversationMessages = mergeConversationSourceMessages(
     activeMailbox?.messages ?? [],
     relatedConversationMessages,
@@ -649,42 +706,10 @@ export function useMailApp() {
     );
   };
 
-  const loadConversationThread = async (threadId: string) => {
-    const mb = activeMailboxRef.current;
-    if (!mb) {
-      setRelatedConversationMessages([]);
-      setIsConversationLoading(false);
-      return;
-    }
-
-    setIsConversationLoading(true);
-    const fetchThread = async () => {
-      const messages = await mb.client.getThreadMessages(mb.session, threadId);
-      // Prefer local keywords so optimistic $seen isn't wiped by the thread fetch.
-      const localById = new Map(
-        (activeMailboxRef.current?.messages ?? []).map((message) => [
-          message.id,
-          message,
-        ]),
-      );
-      setRelatedConversationMessages(
-        messages.map((message) => {
-          const local = localById.get(message.id);
-          return local
-            ? mergeMailMessagePreservingKeywords(local, message)
-            : message;
-        }),
-      );
-    };
-    await fetchThread().catch((error: unknown) => {
-      log.warn("Failed to load thread messages", error);
-      setRelatedConversationMessages([]);
-    }).finally(() => setIsConversationLoading(false));
-  };
-
-  const clearConversationThread = () => {
-    setRelatedConversationMessages([]);
-    setIsConversationLoading(false);
+  const loadConversationThread = (threadId: string) => {
+    queryClient
+      .invalidateQueries({ queryKey: mailQueryKeys.threadMessages(threadId) })
+      .catch((error: unknown) => log.warn("Failed to load thread messages", error));
   };
 
   useEffect(() => {
@@ -693,8 +718,6 @@ export function useMailApp() {
       if (cancelled) return;
       setSelectedConversationMessageId(null);
       setOptimisticConversationMessages([]);
-      setRelatedConversationMessages([]);
-      setIsConversationLoading(false);
     });
     return () => {
       cancelled = true;
@@ -719,29 +742,6 @@ export function useMailApp() {
       };
     }
   }, [selectedConversationMessageId, selectedConversationMessages]);
-
-  const syncConversationThread = useEffectEvent((messageId: string | null) => {
-    if (!messageId || !activeMailboxRef.current) {
-      clearConversationThread();
-      return;
-    }
-
-    // Read activeMailbox via ref so keyword/flag updates don't refetch the thread (threadId is stable per message).
-    const selectedMsg =
-      activeMailboxRef.current.messages.find((m) => m.id === messageId) ??
-      findCachedMailMessage(queryClient, messageId);
-    const threadId = selectedMsg?.threadId;
-
-    if (threadId) {
-      void loadConversationThread(threadId);
-    } else {
-      clearConversationThread();
-    }
-  });
-
-  useEffect(() => {
-    syncConversationThread(selectedMessageId);
-  }, [selectedMessageId]);
 
   const applyLoadedMessage = useEffectEvent((message: JmapEmailMessage) => {
     const mergeBody = (
@@ -779,7 +779,7 @@ export function useMailApp() {
         ),
       };
     });
-    setRelatedConversationMessages((current) =>
+    patchThreadCaches(queryClient, (current) =>
       current.map((entry) =>
         entry.id === message.id ? mergeBody(entry, message) : entry,
       ),
@@ -850,6 +850,7 @@ export function useMailApp() {
       .finally(() => {
         if (!cancelled) {
           setIsMessageBodyLoading(false);
+          setBodySettledFor(bodyTargetMessageId);
         }
       })
       .catch((error) => {
@@ -914,27 +915,13 @@ export function useMailApp() {
     };
   }, [queryClient, selectedMessageId]);
 
-  // Fetch sent messages once per mailbox to augment thread grouping without hitting rate limits.
+  // Sent replies join the list's threads; once held, the Sent page shows at once on every switch and only its new messages download.
   useEffect(() => {
     const mailbox = activeMailboxRef.current;
     if (!mailbox || !mailbox.selectedMailboxId) {
       setListThreadRelatedMessages([]);
       return;
     }
-
-    if (threadPrefetchedMailboxRef.current === mailbox.selectedMailboxId)
-      return;
-    threadPrefetchedMailboxRef.current = mailbox.selectedMailboxId;
-
-    const currentMailbox = mailbox.mailboxes.find(
-      (m) => m.id === mailbox.selectedMailboxId,
-    );
-    if (currentMailbox?.role?.toLowerCase() === "sent") {
-      setListThreadRelatedMessages([]);
-      return;
-    }
-
-    let cancelled = false;
     const sentMailbox = mailbox.mailboxes.find(
       (m) => m.role?.toLowerCase() === "sent",
     );
@@ -942,24 +929,30 @@ export function useMailApp() {
       setListThreadRelatedMessages([]);
       return;
     }
+    // Sent's own list already holds these messages, and the open Sent view refreshes its cache.
+    if (sentMailbox.id === mailbox.selectedMailboxId) return;
+    if (threadPrefetchedMailboxRef.current === sentMailbox.id) return;
+    threadPrefetchedMailboxRef.current = sentMailbox.id;
 
-    void mailbox.client
-      .getMailboxMessages(mailbox.session, sentMailbox.id, {
-        limit: 50,
+    const { client, session } = mailbox;
+    const held = queryClient.getQueryData<MailMailboxMessagesCache>(
+      mailQueryKeys.mailboxMessages(sentMailbox.id),
+    );
+    if (held) setListThreadRelatedMessages(held.messages);
+    void refreshHeldMailboxPage(client, session, sentMailbox.id, held, SENT_THREAD_PREFETCH_LIMIT)
+      .then(({ messages, total }) => {
+        if (activeMailboxRef.current?.session !== session) return;
+        seedMailMessageCache(queryClient, sentMailbox.id, messages, total);
+        setListThreadRelatedMessages(messages);
       })
-      .then(({ messages: sentMessages }) => {
-        if (cancelled) return;
-        setListThreadRelatedMessages(sentMessages);
-      })
-      .catch((error) => {
+      .catch((error: unknown) => {
         // Non-critical — thread grouping still works with mailbox-only messages
         log.warn("Failed to prefetch sent messages for thread grouping", error);
+      })
+      .finally(() => {
+        threadPrefetchedMailboxRef.current = null;
       });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeMailbox?.selectedMailboxId]);
+  }, [activeMailbox?.selectedMailboxId, queryClient]);
 
   // Only re-decrypt on message identity or E2EE config changes; keyword updates never change encryption state.
   const syncSelectedMessageDecryption = useEffectEvent(
@@ -1044,6 +1037,7 @@ export function useMailApp() {
         assertMailVerificationContext(verificationContext);
         const decrypted = await mailCryptoWorkerClient.decryptMessage({
           armoredMessage,
+          senderEmail: selectedMessage.from?.[0]?.email ?? undefined,
           senderPublicKeyArmored: verification.senderPublicKeyArmored,
           expectedVaultFingerprint: verificationContext.fingerprint,
         });
@@ -1133,6 +1127,7 @@ export function useMailApp() {
   const {
     previews: conversationDecryptedPreviews,
     attachments: conversationAttachments,
+    loading: conversationPreviewsLoading,
   } = useConversationDecryptedPreviews({
     messages: selectedConversationMessages,
     client: activeMailbox?.client,
@@ -1238,7 +1233,7 @@ export function useMailApp() {
             }
           : cur,
       );
-      setRelatedConversationMessages((cur) =>
+      patchThreadCaches(queryClient, (cur) =>
         patchMessagesKeywords(cur, messageId, markRead),
       );
       setListThreadRelatedMessages((cur) =>
@@ -1292,19 +1287,18 @@ export function useMailApp() {
     };
   }, [queryClient, selectedMessageId]);
 
+  const requestedMailboxRef = useRef<string | null>(null);
+
   const refreshMailboxMessages = async (mailboxId: string) => {
     if (!activeMailbox) return;
-    setIsBusy(true);
-    try {
-      const pageSize = resolveMailboxMessagesPageSize(
-        activeMailbox.mailServerPolicy,
-        MAILBOX_MESSAGES_PAGE_SIZE,
-      );
-      const { messages, total } = await activeMailbox.client.getMailboxMessages(
-        activeMailbox.session,
-        mailboxId,
-        { limit: pageSize, position: 0 },
-      );
+    requestedMailboxRef.current = mailboxId;
+    const { client, session } = activeMailbox;
+    const held = queryClient.getQueryData<MailMailboxMessagesCache>(
+      mailQueryKeys.mailboxMessages(mailboxId),
+    );
+    // A late answer for a mailbox the user has already left must not replace the one on screen.
+    const show = (messages: JmapEmailMessage[], total: number) => {
+      if (requestedMailboxRef.current !== mailboxId) return;
       setTotalMessages(total);
       seedMailMessageCache(queryClient, mailboxId, messages, total);
       setActiveMailbox((cur) =>
@@ -1316,11 +1310,26 @@ export function useMailApp() {
         if (findCachedMailMessage(queryClient, curId)) return curId;
         return null;
       });
-    } catch (error) {
-      log.error("Failed to load mailbox messages", error);
-      toast.error(getErrorMessage(error, "Could not load messages."));
-    }
-    setIsBusy(false);
+    };
+    const pageSize = resolveMailboxMessagesPageSize(
+      activeMailbox.mailServerPolicy,
+      MAILBOX_MESSAGES_PAGE_SIZE,
+    );
+    const refresh = async () => {
+      // A mailbox opened before shows at once from memory; only its flags are checked and only new messages downloaded.
+      if (held) show(held.messages, held.total);
+      const refreshed = await refreshHeldMailboxPage(client, session, mailboxId, held, pageSize);
+      show(refreshed.messages, refreshed.total);
+    };
+    if (!held) setIsBusy(true);
+    await refresh()
+      .catch((error: unknown) => {
+        log.error("Failed to load mailbox messages", error);
+        toast.error(getErrorMessage(error, "Could not load messages."));
+      })
+      .finally(() => {
+        if (!held) setIsBusy(false);
+      });
   };
 
   const loadMoreMessages = async () => {
@@ -1642,11 +1651,9 @@ export function useMailApp() {
       replyContext: composeReplyContext,
       identityId: composeIdentityId,
       draftId: composeDraftId,
-      composeMode,
-      signatureAlreadyEmbedded,
+      plainTextMode,
     } = draft;
     const composeSettings = readMailComposeSettings();
-    const plainTextMode = composeSettings.plainTextMode;
     if (!composeTo.trim()) {
       toast.error("Enter a recipient email address.");
       return;
@@ -1720,24 +1727,12 @@ export function useMailApp() {
 
       const fromEmail = identity.email;
       const fromName = identity.name ?? null;
-      const { textBody: bodyWithSignature, htmlBody: htmlWithSignature } =
-        plainTextMode
-          ? {
-              textBody: signatureAlreadyEmbedded
-                ? composeBody
-                : resolveOutgoingComposeBodies({
-                    body: composeBody,
-                    htmlBody: "",
-                    signature: identity,
-                  }).textBody,
-              htmlBody: undefined,
-            }
-          : resolveOutgoingComposeBodies({
-              body: composeBody,
-              htmlBody: composeHtmlBody,
-              signature: identity,
-              signatureAlreadyEmbedded,
-            });
+      // The signature is ordinary body text by now, so the message goes out exactly as written.
+      const { textBody: outgoingText, htmlBody: outgoingHtml } =
+        resolveOutgoingComposeBodies({
+          body: composeBody,
+          htmlBody: plainTextMode ? "" : composeHtmlBody,
+        });
       const internalDomain = resolveEncryptionInternalDomain(
         config?.defaultDomain,
       );
@@ -1759,39 +1754,27 @@ export function useMailApp() {
           maxBytes: mailbox.mailServerPolicy.limits.maxOutgoingAttachmentBytes,
         },
       );
-      const hasFileAttachments = preparedAttachments.length > 0;
-      const hasInlineComposeImages = getComposeInlineImages().length > 0;
-      const embedInlineImagesInEncryptedHtml =
-        willEncrypt && hasInlineComposeImages && !hasFileAttachments;
-
+      // Encrypted mail keeps its images embedded: the Solace reader drops the cid parts of decrypted mail.
       const rewritten: {
         html: string | undefined;
         attachments: ReturnType<
           typeof rewriteComposeInlineImages
         >["attachments"];
       } =
-        !plainTextMode && htmlWithSignature && !embedInlineImagesInEncryptedHtml
-          ? rewriteComposeInlineImages(htmlWithSignature)
-          : { html: htmlWithSignature, attachments: [] };
+        !plainTextMode && outgoingHtml && !willEncrypt
+          ? rewriteComposeInlineImages(outgoingHtml)
+          : { html: outgoingHtml, attachments: [] };
       const htmlForSend = plainTextMode
         ? undefined
-        : (rewritten.html ?? htmlWithSignature);
+        : (rewritten.html ?? outgoingHtml);
       const inlineMimeAttachments: OutgoingMimeAttachment[] =
-        embedInlineImagesInEncryptedHtml
-          ? []
-          : getComposeInlineImages()
-              .filter((image) =>
-                rewritten.attachments.some(
-                  (attachment) => attachment.cid === image.cid,
-                ),
-              )
-              .map((image) => ({
-                filename: image.name,
-                contentType: image.type,
-                content: image.content,
-                cid: image.cid,
-                disposition: "inline" as const,
-              }));
+        rewritten.attachments.map((image) => ({
+          filename: image.name,
+          contentType: image.type,
+          content: image.content,
+          cid: image.cid,
+          disposition: "inline" as const,
+        }));
       const fileMimeAttachments: OutgoingMimeAttachment[] =
         preparedAttachments.map(({ filename, contentType, content }) => ({
           filename,
@@ -1802,28 +1785,38 @@ export function useMailApp() {
         inlineMimeAttachments.length > 0 || fileMimeAttachments.length > 0
           ? [...inlineMimeAttachments, ...fileMimeAttachments]
           : undefined;
+      const embeddedImagesError = willEncrypt && !plainTextMode ? getEmbeddedImagesSizeError(outgoingHtml) : null;
+      if (embeddedImagesError) throw new Error(embeddedImagesError);
+      // The Sent copy keeps its images embedded, since the reader drops cid parts of decrypted mail.
+      const selfCopy = selfCopyWithEmbeddedImages(
+        { text: outgoingText, html: htmlForSend, attachments: fileMimeAttachments },
+        plainTextMode ? undefined : outgoingHtml,
+      );
       const outgoing = await resolveOutgoingMessageBody({
         activeMailbox: mailbox,
         recipients: allRecipients,
-        plaintext: bodyWithSignature,
+        plaintext: outgoingText,
         html: htmlForSend,
         internalDomain,
         mimeAttachments:
           plainTextMode && fileMimeAttachments.length > 0
             ? fileMimeAttachments
             : mimeAttachments,
+        sentCopyContent: selfCopy.html === htmlForSend ? undefined : selfCopy,
+        sign: composeSettings.signOutgoingMail,
       });
       const {
         textBody,
         encrypted,
         pgpMimeCiphertext,
         pgpMimeMessage,
+        signedMimeMessage,
         sentCopyCiphertext,
         contentFingerprint,
         isCurrent: isVaultCurrent,
       } = outgoing;
       const isCurrent = () => isMailSendScopeOpen(`compose:${composeSessionId}`) && isVaultCurrent();
-      const htmlBody = encrypted || plainTextMode ? undefined : htmlForSend;
+      const htmlBody = encrypted || signedMimeMessage || plainTextMode ? undefined : htmlForSend;
 
       if (!shouldEncryptOutgoingMail(allRecipients, internalDomain)) {
         await mailbox.client.ensureEncryptOnAppendDisabled(mailbox.session);
@@ -1924,6 +1917,7 @@ export function useMailApp() {
         attachments: uploadedAttachments,
         pgpMimeCiphertext,
         pgpMimeMessage,
+        signedMimeMessage,
         sentCopyCiphertext,
         inReplyTo: composeReplyContext?.inReplyTo,
         references: composeReplyContext?.references,
@@ -1931,7 +1925,7 @@ export function useMailApp() {
         hold,
       });
       completeMailSendAttempt(getPrimaryMailAccountId(mailbox.session), `compose:${composeSessionId}`);
-      const sentMessage = encrypted ? "Encrypted message sent." : "Message sent.";
+      const sentMessage = encrypted ? "Encrypted message sent." : signedMimeMessage ? "Signed message sent." : "Message sent.";
       const announceSent = () => {
         if (!hold || !sendResult.emailId) {
           toast(sentMessage);
@@ -1972,7 +1966,7 @@ export function useMailApp() {
             fromEmail: mailbox.email,
             to: recipients,
             subject: composeSubject.trim(),
-            textBody: bodyWithSignature,
+            textBody: outgoingText,
             sentMailboxId,
             threadId: effectiveThreadId,
             inReplyTo: composeReplyContext.inReplyTo,
@@ -2010,7 +2004,7 @@ export function useMailApp() {
       announceSent();
       // Reload only the thread; realtime sync updates the inbox so the sent draft never flashes there.
       if (effectiveThreadId) {
-        void loadConversationThread(effectiveThreadId);
+        loadConversationThread(effectiveThreadId);
       }
     };
     await send().catch((error: unknown) => {
@@ -2367,12 +2361,14 @@ export function useMailApp() {
         plaintext: `${replyText}${quotedBody}`,
         internalDomain,
         mimeAttachments,
+        sign: readMailComposeSettings().signOutgoingMail,
       });
       const {
         textBody,
         encrypted,
         pgpMimeCiphertext,
         pgpMimeMessage,
+        signedMimeMessage,
         sentCopyCiphertext,
         contentFingerprint,
         isCurrent: isVaultCurrent,
@@ -2426,6 +2422,7 @@ export function useMailApp() {
         attachments,
         pgpMimeCiphertext,
         pgpMimeMessage,
+        signedMimeMessage,
         sentCopyCiphertext,
         inReplyTo: replyContext.inReplyTo,
         references: replyContext.references,
@@ -2451,7 +2448,7 @@ export function useMailApp() {
         }),
       );
       if (effectiveThreadId) {
-        void loadConversationThread(effectiveThreadId);
+        loadConversationThread(effectiveThreadId);
       }
       quickReplyScopeRef.current = null;
       toast(encrypted ? "Encrypted reply sent." : "Reply sent.");
@@ -3034,6 +3031,49 @@ export function useMailApp() {
     }
   };
 
+  const handleMarkMailboxAsRead = async () => {
+    const mailboxId = activeMailbox?.selectedMailboxId;
+    if (!activeMailbox || !mailboxId) return;
+    const unreadIds = new Set(
+      activeMailbox.messages
+        .filter((m) => !m.keywords?.["$seen"])
+        .map((m) => m.id),
+    );
+    if (unreadIds.size === 0) return;
+    const setUnreadSeen = (seen: boolean) => (cur: ActiveMailboxState | null) =>
+      cur?.selectedMailboxId === mailboxId
+        ? {
+            ...cur,
+            messages: cur.messages.map((m) =>
+              unreadIds.has(m.id)
+                ? withMessageKeywords(m, ({ $seen: _seen, ...keywords }) =>
+                    seen ? { ...keywords, $seen: true } : keywords,
+                  )
+                : m,
+            ),
+          }
+        : cur;
+    setActiveMailbox(setUnreadSeen(true));
+    try {
+      await keywordReconciliation.trackWrite(
+        [...unreadIds].map((messageId) => ({
+          messageId,
+          keyword: "$seen",
+          enabled: true,
+        })),
+        () =>
+          activeMailbox.client.markMailboxAsRead(
+            activeMailbox.session,
+            mailboxId,
+          ),
+      );
+    } catch (error) {
+      log.error("Failed to mark folder as read", error);
+      setActiveMailbox(setUnreadSeen(false));
+      toast.error(getErrorMessage(error, "Could not mark the folder as read."));
+    }
+  };
+
   const handleBulkReportSpam = async (
     messageIds: string[],
     options?: MailAdvanceOptions,
@@ -3069,7 +3109,7 @@ export function useMailApp() {
           }
         : cur,
     );
-    setRelatedConversationMessages((current) =>
+    patchThreadCaches(queryClient, (current) =>
       current.map((m) => (m.id === targetId ? markUnread(m) : m)),
     );
     try {
@@ -3316,7 +3356,7 @@ export function useMailApp() {
           }
         : cur,
     );
-    setRelatedConversationMessages((cur) =>
+    patchThreadCaches(queryClient, (cur) =>
       patchMessagesKeywords(cur, msg.id, update),
     );
     setListThreadRelatedMessages((cur) =>
@@ -3487,6 +3527,7 @@ export function useMailApp() {
     internalDomain: resolveEncryptionInternalDomain(config?.defaultDomain),
     timezone: resolveTimezone(settings?.timezone),
     timeFormat,
+    weekStartsOn: ((settings?.weekStartDay ?? 1) % 7) as 0 | 1 | 2 | 3 | 4 | 5 | 6,
   };
 
   const user = session?.user
@@ -3496,6 +3537,31 @@ export function useMailApp() {
         avatar: resolveAvatarUrl(session.user.image),
       }
     : null;
+
+  const cachedThreadMessages = (threadId: string) =>
+    queryClient.getQueryData<JmapEmailMessage[]>(mailQueryKeys.threadMessages(threadId));
+  const loadThreadMessages = async (threadId: string) => {
+    const mailbox = activeMailboxRef.current;
+    if (!mailbox) return [];
+    const messages = await fetchThreadMessages(queryClient, mailbox, threadId);
+    queryClient.setQueryData(mailQueryKeys.threadMessages(threadId), messages);
+    return messages;
+  };
+
+  const selectedEncryption = selectedMessage ? classifyMessageEncryption(selectedMessage) : null;
+  const selectedReadSettled =
+    selectedMessage !== null &&
+    selectedMessageRead !== null &&
+    selectedMessageRead.messageId === selectedMessage.id &&
+    selectedMessageRead.state !== "pending";
+  const selectedDecryptSettled =
+    (selectedEncryption !== "inline_pgp" && selectedEncryption !== "pgp_mime") || selectedReadSettled;
+  // The reader opens only once the thread's earlier messages, the body and its decryption are in, so it never shows half loaded.
+  const isSelectedConversationReady =
+    selectedMessage !== null &&
+    !conversationThreadQuery.isLoading &&
+    !conversationPreviewsLoading &&
+    (selectedMessageBodyLoaded ? selectedDecryptSettled : bodySettledFor === selectedMessage.id);
 
   let selectedMessageReadState: MailReadState = "pending";
   if (
@@ -3520,6 +3586,8 @@ export function useMailApp() {
     composeMailPolicy,
     composeScheduling,
     listThreadRelatedMessages,
+    cachedThreadMessages,
+    loadThreadMessages,
     selectedMessage,
     selectedMessageId,
     setSelectedMessageId: handleSelectMessageId,
@@ -3527,7 +3595,7 @@ export function useMailApp() {
     selectedConversationMessages,
     conversationDecryptedPreviews,
     conversationAttachments,
-    isConversationLoading,
+    isSelectedConversationReady,
     isMessageBodyLoading,
     loadConversationThread,
     setSelectedConversationMessageId: handleSelectConversationMessageId,
@@ -3588,6 +3656,7 @@ export function useMailApp() {
     handleBulkMove,
     handleBulkMarkAsUnread,
     handleBulkMarkAsRead,
+    handleMarkMailboxAsRead,
     handleToggleFlagged,
     handleSetMessageLabel,
     handleSimpleLoginAction,

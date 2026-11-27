@@ -1,34 +1,4 @@
-import {
-  isCurrentUserMailAddress,
-  type MailAttachmentPreviewKind,
-} from "@workspace/calendar-core";
-import type { MailAddress } from "./types";
-
-function recipientNames(
-  recipients: MailAddress[] | undefined,
-  currentUserEmail?: string | null,
-): string {
-  return (recipients ?? [])
-    .map((recipient) =>
-      isCurrentUserMailAddress(recipient.email, currentUserEmail)
-        ? "me"
-        : recipient.name?.trim() || recipient.email,
-    )
-    .join(", ");
-}
-
-/** Single reader line such as "To: Kevin, me, Cc: Andrew" (truncated by the view). */
-export function formatReaderRecipientLine(
-  to: MailAddress[] | undefined,
-  cc: MailAddress[] | undefined,
-  currentUserEmail?: string | null,
-): string {
-  const toNames = recipientNames(to, currentUserEmail);
-  const ccNames = recipientNames(cc, currentUserEmail);
-  return [toNames && `To: ${toNames}`, ccNames && `Cc: ${ccNames}`]
-    .filter(Boolean)
-    .join(", ");
-}
+import type { MailAttachmentPreviewKind } from "@workspace/calendar-core";
 
 export type ReaderAttachmentIcon = "image" | "file-text" | "file";
 

@@ -1,53 +1,62 @@
 "use client";
 "use no memo";
 
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { AppLoadingState } from "@workspace/ui/components/ui";
-import { MessageListRow } from "./message-list-row";
+import { cn } from "@workspace/ui/lib/utils";
+import { MessageListDayHeader, MessageListRow } from "./message-list-row";
 import type {
   MessageListPaginationState,
   MessageListRowInteraction,
   MessageListRowPresentation,
 } from "./message-list-types";
 import {
-  getRowHeight,
-  ROW_HEIGHT_DESKTOP,
-  ROW_HEIGHT_NARROW,
+  DAY_HEADER_HEIGHT,
+  ROW_HEIGHT,
   SCROLL_LOAD_THRESHOLD,
-  type MessageListThreadRow,
+  type MessageListItem,
 } from "./message-list-utils";
 
 export type MessageListVirtualizedProps = {
-  threadRows: MessageListThreadRow[];
+  items: MessageListItem[];
   primaryIds: Set<string>;
   interaction: MessageListRowInteraction;
   presentation: MessageListRowPresentation;
   pagination: MessageListPaginationState;
+  /** While selecting, day headings offer select-all. */
+  selectionActive: boolean;
+  /** The floating action bar is up, so the list scrolls clear of it. */
+  reserveBarSpace: boolean;
 };
 
+function itemHeight(item: MessageListItem | undefined) {
+  return item?.kind === "row" ? ROW_HEIGHT : DAY_HEADER_HEIGHT;
+}
+
 function findThreadRowIndex(
-  threadRows: MessageListThreadRow[],
+  items: MessageListItem[],
   messageId: string | null | undefined,
 ) {
   if (!messageId) return -1;
-  return threadRows.findIndex(
-    (row) =>
-      row.latestMessage.id === messageId || row.messageIds.includes(messageId),
+  return items.findIndex(
+    (item) =>
+      item.kind === "row" &&
+      (item.row.latestMessage.id === messageId || item.row.messageIds.includes(messageId)),
   );
 }
 
 export function MessageListVirtualized({
-  threadRows,
+  items,
   primaryIds,
   interaction,
   presentation,
   pagination,
+  selectionActive,
+  reserveBarSpace,
 }: MessageListVirtualizedProps) {
   "use no memo";
-  const { selectedMessageId } = interaction;
-  const { labels, display } = presentation;
-  const { isMobile, narrow, density, showLabelChips } = display;
+  const { selectedMessageId, selectedIds, onToggleSelect } = interaction;
   const { hasMore, isLoadingMore, onLoadMore } = pagination;
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadMoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -57,25 +66,14 @@ export function MessageListVirtualized({
     loadMoreStateRef.current = pagination;
   });
 
-  const estimateRowSize = (index: number) => {
-    const row = threadRows[index];
-    if (!row) return isMobile ? ROW_HEIGHT_NARROW : ROW_HEIGHT_DESKTOP;
-    return getRowHeight(
-      row.latestMessage,
-      labels,
-      isMobile,
-      density,
-      showLabelChips,
-      narrow,
-    );
-  };
+  const estimateRowSize = (index: number) => itemHeight(items[index]);
 
   const virtualizer = useVirtualizer({
-    count: threadRows.length,
+    count: items.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: estimateRowSize,
     overscan: 8,
-    getItemKey: (index) => threadRows[index]?.id ?? String(index),
+    getItemKey: (index) => items[index]?.id ?? String(index),
   });
 
   const scheduleLoadMore = () => {
@@ -110,10 +108,10 @@ export function MessageListVirtualized({
 
   useEffect(() => {
     if (lastVirtualItemIndex === undefined) return;
-    if (lastVirtualItemIndex >= threadRows.length - 5) {
+    if (lastVirtualItemIndex >= items.length - 5) {
       scheduleLoadMore();
     }
-  }, [lastVirtualItemIndex, threadRows.length]);
+  }, [lastVirtualItemIndex, items.length]);
 
   // Re-check after each page: a list filter can leave loaded rows short of the viewport.
   useEffect(() => {
@@ -138,63 +136,31 @@ export function MessageListVirtualized({
         loadMoreTimer.current = null;
       }
     };
-  }, [threadRows.length, isLoadingMore]);
-
-  const renderedNarrowRef = useRef(narrow);
-  // Row heights change with `narrow`; keep the selected (else top) row at the same screen position so nothing jumps.
-  useLayoutEffect(() => {
-    if (renderedNarrowRef.current === narrow) return;
-    renderedNarrowRef.current = narrow;
-    const element = scrollRef.current;
-    if (!element) return;
-    const scrollTop = element.scrollTop;
-    const previousStarts: number[] = [];
-    const nextStarts: number[] = [];
-    let previous = 0;
-    let next = 0;
-    let topIndex = 0;
-    threadRows.forEach((row, index) => {
-      previousStarts.push(previous);
-      nextStarts.push(next);
-      if (previous <= scrollTop) topIndex = index;
-      const heightFor = (rowNarrow: boolean) =>
-        getRowHeight(row.latestMessage, labels, isMobile, density, showLabelChips, rowNarrow);
-      previous += heightFor(!narrow);
-      next += heightFor(narrow);
-    });
-    const selectedIndex = findThreadRowIndex(threadRows, selectedMessageId);
-    const selectedStart = previousStarts[selectedIndex];
-    const selectedVisible =
-      selectedStart !== undefined &&
-      selectedStart >= scrollTop &&
-      selectedStart < scrollTop + element.clientHeight;
-    const anchor = selectedVisible ? selectedIndex : topIndex;
-    const previousStart = previousStarts[anchor];
-    const nextStart = nextStarts[anchor];
-    if (previousStart === undefined || nextStart === undefined) return;
-    element.scrollTop = nextStart + (scrollTop - previousStart);
-  }, [narrow, threadRows, selectedMessageId, labels, isMobile, density, showLabelChips]);
+  }, [items.length, isLoadingMore]);
 
   useEffect(() => {
-    const index = findThreadRowIndex(threadRows, selectedMessageId);
+    const index = findThreadRowIndex(items, selectedMessageId);
     if (index >= 0) {
       virtualizer.scrollToIndex(index, { align: "auto" });
     }
-  }, [selectedMessageId, threadRows, virtualizer, narrow]);
+  }, [selectedMessageId, items, virtualizer]);
 
   return (
     <div
       ref={scrollRef}
       data-mail-list-scroll
-      className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-6 safe-area-inset-bottom [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+      className={cn(
+        "flex min-h-0 flex-1 flex-col overflow-y-auto safe-area-inset-bottom [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
+        reserveBarSpace ? "pb-20" : "pb-6",
+      )}
     >
       <div
         className="relative w-full"
         style={{ height: `${virtualizer.getTotalSize()}px` }}
       >
         {virtualItems.map((virtualRow) => {
-          const row = threadRows[virtualRow.index];
-          if (!row) return null;
+          const item = items[virtualRow.index];
+          if (!item) return null;
 
           // Measured, so an expanded thread's child rows push the next row down instead of overlapping it.
           return (
@@ -205,13 +171,22 @@ export function MessageListVirtualized({
               className="absolute top-0 left-0 w-full"
               style={{ transform: `translateY(${virtualRow.start}px)` }}
             >
-              <MessageListRow
-                row={row}
-                primaryIds={primaryIds}
-                interaction={interaction}
-                presentation={presentation}
-                height={estimateRowSize(virtualRow.index)}
-              />
+              {item.kind === "day" ? (
+                <MessageListDayHeader
+                  label={item.label}
+                  selectionActive={selectionActive}
+                  allSelected={item.messageIds.every((id) => selectedIds.has(id))}
+                  onToggleDay={(event) => onToggleSelect(event, item.messageIds)}
+                />
+              ) : (
+                <MessageListRow
+                  row={item.row}
+                  primaryIds={primaryIds}
+                  interaction={interaction}
+                  presentation={presentation}
+                  height={estimateRowSize(virtualRow.index)}
+                />
+              )}
             </div>
           );
         })}

@@ -105,10 +105,10 @@ export function ComposeSettingsContent() {
               <SheetItem
                 key={option.value}
                 label={option.label}
-                checked={settings.signaturePosition === option.value}
-                onPress={() => updateSettings({ signaturePosition: option.value })}
+                checked={settings.replySignaturePosition === option.value}
+                onPress={() => updateSettings({ replySignaturePosition: option.value })}
                 accessibilityRole="radio"
-                accessibilityState={{ checked: settings.signaturePosition === option.value }}
+                accessibilityState={{ checked: settings.replySignaturePosition === option.value }}
               />
             ))}
           </SheetGroup>

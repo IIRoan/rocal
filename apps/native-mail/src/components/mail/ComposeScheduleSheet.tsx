@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   formatInstantCalendarDayKey,
-  formatScheduledSendTime,
+  formatScheduledSendShortTime,
   getScheduledSendPresets,
   parseScheduledSendInput,
   resolveMailSendHold,
@@ -92,7 +92,7 @@ export function ComposeScheduleSheet({
                   key={preset.label}
                   icon="clock"
                   label={preset.label}
-                  value={formatScheduledSendTime(preset.sendAt, timezone, timeFormat)}
+                  value={formatScheduledSendShortTime(preset.sendAt, timezone, timeFormat)}
                   onPress={() => schedule(preset.sendAt, Date.now())}
                 />
               ))}
@@ -125,7 +125,7 @@ export function ComposeScheduleSheet({
         </SheetSection>
       </BottomSheetScrollView>
       <BottomSheetFooter>
-        <SheetButton label="Schedule" onPress={() => schedule(parseScheduledSendInput(day, time, timezone), Date.now())} />
+        <SheetButton label="Set time" onPress={() => schedule(parseScheduledSendInput(day, time, timezone), Date.now())} />
       </BottomSheetFooter>
     </BottomSheet>
   );

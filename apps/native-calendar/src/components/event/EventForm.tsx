@@ -79,6 +79,7 @@ interface EventFormProps {
   /** A new event offers the date and time typed into its title. */
   isCreate?: boolean;
   defaultDurationMinutes?: number;
+  defaultReminderMinutes?: number;
 }
 
 export interface EventFormHandle {
@@ -104,6 +105,29 @@ function useScrollFieldIntoView() {
   return { scrollRef, handleInputFocus };
 }
 
+function EventFormFooter({
+  isSubmitting,
+  onCancel,
+  onSave,
+}: {
+  isSubmitting: boolean;
+  onCancel?: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <SheetActions>
+      {onCancel && <SheetSecondaryButton label="Cancel" onPress={onCancel} />}
+      <SheetPrimaryButton
+        label="Save"
+        icon="save"
+        onPress={onSave}
+        loading={isSubmitting}
+        disabled={isSubmitting}
+      />
+    </SheetActions>
+  );
+}
+
 export function EventForm({
   ref,
   initialValues,
@@ -119,6 +143,7 @@ export function EventForm({
   actionsPlacement = "footer",
   isCreate = false,
   defaultDurationMinutes = 60,
+  defaultReminderMinutes,
 }: EventFormProps & { ref?: Ref<EventFormHandle> }) {
   const { theme } = useTheme();
   const resolvedTimezone = resolveTimezone(initialValues?.timezone ?? timezone);
@@ -130,6 +155,8 @@ export function EventForm({
     initialValues,
     initialReminders,
     timezone: resolvedTimezone,
+    defaultReminderMinutes,
+    defaultDurationMinutes,
   });
   const [initialFields] = useState(fields);
   const [ui, updateUi] = useEventFormUi();
@@ -363,18 +390,11 @@ export function EventForm({
         </ScrollView>
 
         {actionsPlacement === "footer" ? (
-          <SheetActions>
-            {onCancel && (
-              <SheetSecondaryButton label="Cancel" onPress={onCancel} />
-            )}
-            <SheetPrimaryButton
-              label="Save"
-              icon="save"
-              onPress={handleSubmit}
-              loading={isSubmitting}
-              disabled={isSubmitting}
-            />
-          </SheetActions>
+          <EventFormFooter
+            isSubmitting={isSubmitting}
+            onCancel={onCancel}
+            onSave={handleSubmit}
+          />
         ) : null}
       </View>
 

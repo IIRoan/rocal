@@ -5,6 +5,7 @@ import {
   MAX_MAIL_DISPLAY_CHARACTERS,
   MAX_MAIL_DISPLAY_HTML_CHARACTERS,
   MAX_MAIL_MIME_BYTES,
+  MAX_MAIL_MIME_HEADER_BYTES,
   readMailMimeLeaves,
   type MailMimeLeaf,
 } from "./mail-mime-limits";
@@ -371,7 +372,7 @@ function decodeLeafText(
 
 function decodeLeafBytes(
   raw: string,
-  leaf: MailMimeLeaf,
+  leaf: Pick<MailMimeLeaf, "bodyStart" | "end">,
   encoding: string,
 ): Uint8Array<ArrayBuffer> {
   if (encoding === "base64")
@@ -528,6 +529,92 @@ export function parseDecryptedMailContent(
     attachments: [],
     truncated: plaintext.length > limits.text,
   };
+}
+
+const MAX_MIME_SIGNATURE_CHARACTERS = 16 * 1024;
+const MAX_MIME_KEY_CHARACTERS = 64 * 1024;
+const PGP_SIGNATURE_BEGIN = "-----BEGIN PGP SIGNATURE-----";
+const PGP_SIGNATURE_END = "-----END PGP SIGNATURE-----";
+
+export type MailMimeSignedParts = {
+  /** Part one exactly as signed, with CRLF line ends. */
+  signedText: string;
+  armoredSignature: string;
+  /** Part one as the entity the reader shows. */
+  content: string;
+};
+
+/** A part's header block with LF line ends, or an empty block when the part starts with its body. */
+function splitMimeHeaders(raw: string, start: number, end: number): { headers: string; bodyStart: number } {
+  const window = raw.slice(start, Math.min(end, start + MAX_MAIL_MIME_HEADER_BYTES + 4));
+  const leadingBlank = /^\r?\n/.exec(window);
+  if (leadingBlank) return { headers: "", bodyStart: start + leadingBlank[0].length };
+  const separator = /\r?\n\r?\n/.exec(window);
+  if (!separator) return { headers: "", bodyStart: end };
+  return {
+    headers: window.slice(0, separator.index).replace(/\r\n/g, "\n"),
+    bodyStart: start + separator.index + separator[0].length,
+  };
+}
+
+/** The two parts of an RFC 3156 PGP multipart/signed entity; null when the content is not one, throws when it is malformed. */
+export function readMailMimeSignedParts(raw: string): MailMimeSignedParts | null {
+  const top = splitMimeHeaders(raw, 0, raw.length);
+  const type = readStructuredHeader(headerValue(top.headers.replace(/\n[ \t]+/g, " "), "content-type") ?? "");
+  if (type.value !== "multipart/signed" || type.params.get("protocol")?.toLowerCase() !== "application/pgp-signature") return null;
+  readMailMimeLeaves(raw);
+  const boundary = type.params.get("boundary");
+  if (!boundary) throw new Error("Signed MIME parts are invalid.");
+  const opening = `--${boundary}`;
+  const parts: { start: number; end: number }[] = [];
+  let partStart: number | null = null;
+  let closed = false;
+  for (let cursor = top.bodyStart; cursor < raw.length && !closed; ) {
+    const found = raw.indexOf("\n", cursor);
+    const lineEnd = found < 0 ? raw.length : found;
+    const rest = raw.startsWith(opening, cursor) ? raw.slice(cursor + opening.length, lineEnd).trimEnd() : null;
+    if (rest === "" || rest === "--") {
+      if (partStart !== null) {
+        let end = cursor;
+        if (end > partStart && raw.charCodeAt(end - 1) === 10) end -= 1;
+        if (end > partStart && raw.charCodeAt(end - 1) === 13) end -= 1;
+        parts.push({ start: partStart, end });
+      }
+      closed = rest === "--";
+      partStart = lineEnd + 1;
+    }
+    cursor = lineEnd + 1;
+  }
+  const [signedPart, signaturePart] = parts;
+  if (!closed || parts.length !== 2 || !signedPart || !signaturePart) throw new Error("Signed MIME parts are invalid.");
+  const signature = splitMimeHeaders(raw, signaturePart.start, signaturePart.end);
+  const signatureHeaders = readLeafHeaders(signature.headers);
+  if (signatureHeaders.type !== "application/pgp-signature" || signaturePart.end - signature.bodyStart > MAX_MIME_SIGNATURE_CHARACTERS * 2)
+    throw new Error("Signed MIME signature part is invalid.");
+  const armoredSignature = new TextDecoder()
+    .decode(decodeLeafBytes(raw, { bodyStart: signature.bodyStart, end: signaturePart.end }, signatureHeaders.encoding))
+    .trim();
+  if (
+    armoredSignature.length > MAX_MIME_SIGNATURE_CHARACTERS ||
+    !armoredSignature.startsWith(PGP_SIGNATURE_BEGIN) ||
+    !armoredSignature.endsWith(PGP_SIGNATURE_END) ||
+    armoredSignature.indexOf(PGP_SIGNATURE_BEGIN, 1) >= 0
+  )
+    throw new Error("Signed MIME signature part is invalid.");
+  const content = raw.slice(signedPart.start, signedPart.end);
+  return { signedText: content.replace(/\r?\n/g, "\r\n"), armoredSignature, content };
+}
+
+/** Decoded `application/pgp-keys` parts of a MIME entity; oversized parts are left out. */
+export function readMailMimeKeyParts(raw: string): string[] {
+  const keys: string[] = [];
+  for (const leaf of readMailMimeLeaves(raw)) {
+    const headers = readLeafHeaders(leaf.headers);
+    if (headers.type !== "application/pgp-keys" || leaf.end - leaf.bodyStart > MAX_MIME_KEY_CHARACTERS * 2) continue;
+    const key = new TextDecoder().decode(decodeLeafBytes(raw, leaf, headers.encoding)).trim();
+    if (key.length <= MAX_MIME_KEY_CHARACTERS) keys.push(key);
+  }
+  return keys;
 }
 
 /** The armored inner message of an RFC 3156 envelope, or null when the payload is not one. */

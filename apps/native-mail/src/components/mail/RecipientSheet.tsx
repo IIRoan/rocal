@@ -11,10 +11,6 @@ import {
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-  enrichSelfMailRecipient,
-  isCurrentUserMailAddress,
-} from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { useToast } from "@workspace/native-core/providers/ToastProvider";
@@ -37,37 +33,40 @@ type RecipientSheetProps = {
   style?: StyleProp<ViewStyle>;
 };
 
+/** Copy a person's address or start a message to them; `onDone` closes whatever surface offered the action. */
+export function useRecipientActions(recipient: RecipientAddress, onDone: () => void) {
+  const { toast } = useToast();
+  const { openCompose } = useMailCompose();
+  const name = recipient.name?.trim() || undefined;
+  return {
+    copy: () => {
+      Clipboard.setStringAsync(recipient.email).then(
+        () => {
+          toast("Copied");
+          onDone();
+        },
+        () => toast("Could not copy email", "error"),
+      );
+    },
+    compose: () => {
+      onDone();
+      openCompose({ to: recipient.email, toName: name });
+    },
+  };
+}
+
 export function RecipientSheet({
   recipient,
   children,
   style,
 }: RecipientSheetProps) {
   const { theme } = useTheme();
-  const { toast } = useToast();
-  const { openCompose } = useMailCompose();
   const insets = useSafeAreaInsets();
   const styles = createStyles(theme);
   const [open, setOpen] = React.useState(false);
+  const actions = useRecipientActions(recipient, () => setOpen(false));
 
   const displayName = recipient.name?.trim() || recipient.email;
-
-  const handleCopy = async () => {
-    try {
-      await Clipboard.setStringAsync(recipient.email);
-      toast("Copied");
-      setOpen(false);
-    } catch {
-      toast("Could not copy email", "error");
-    }
-  };
-
-  const handleEmail = () => {
-    setOpen(false);
-    openCompose({
-      to: recipient.email,
-      toName: recipient.name?.trim() || undefined,
-    });
-  };
 
   return (
     <>
@@ -117,13 +116,13 @@ export function RecipientSheet({
                   variant="mail"
                   icon="copy"
                   label="Copy email"
-                  onPress={() => void handleCopy()}
+                  onPress={actions.copy}
                 />
                 <SheetRow
                   variant="mail"
                   icon="send"
                   label="New message"
-                  onPress={handleEmail}
+                  onPress={actions.compose}
                   showDivider
                 />
               </MailSheetList>
@@ -133,85 +132,6 @@ export function RecipientSheet({
       </Modal>
     </>
   );
-}
-
-export function RecipientLinkList({
-  recipients,
-  currentUserEmail,
-  currentUserName,
-  textStyle,
-}: {
-  recipients: RecipientAddress[];
-  currentUserEmail?: string;
-  currentUserName?: string | null;
-  textStyle?: TextStyle;
-}) {
-  return (
-    <Text style={textStyle}>
-      {recipients.map((recipient, index) => (
-        <Text key={`${recipient.email}-${index}`}>
-          {index > 0 ? ", " : ""}
-          <RecipientLink
-            recipient={recipient}
-            currentUserEmail={currentUserEmail}
-            currentUserName={currentUserName}
-            textStyle={textStyle}
-          />
-        </Text>
-      ))}
-    </Text>
-  );
-}
-
-export function RecipientLink({
-  recipient,
-  currentUserEmail,
-  currentUserName,
-  textStyle,
-  showInlineAddress = false,
-}: {
-  recipient: RecipientAddress;
-  currentUserEmail?: string;
-  currentUserName?: string | null;
-  textStyle?: TextStyle;
-  showInlineAddress?: boolean;
-}) {
-  const enriched = enrichSelfMailRecipient(recipient, {
-    email: currentUserEmail,
-    name: currentUserName,
-  });
-  const displayName = enriched.name?.trim() || enriched.email;
-  const isMe = isCurrentUserMailAddress(recipient.email, currentUserEmail);
-  const showAddressSuffix =
-    (showInlineAddress || isMe) &&
-    Boolean(enriched.name?.trim()) &&
-    displayName !== enriched.email;
-
-  return (
-    <RecipientSheet recipient={enriched}>
-      <Text style={textStyle}>
-        {showAddressSuffix ? (
-          <>
-            <Text style={textStyle}>{displayName}</Text>
-            <Text style={[textStyle, stylesInlineEmail(textStyle)]}>
-              {" "}
-              &lt;{enriched.email}&gt;
-            </Text>
-          </>
-        ) : (
-          displayName
-        )}
-      </Text>
-    </RecipientSheet>
-  );
-}
-
-function stylesInlineEmail(base?: TextStyle): TextStyle {
-  return {
-    ...base,
-    textDecorationLine: "none",
-    opacity: 0.75,
-  };
 }
 
 function createStyles(theme: ThemeTokens) {

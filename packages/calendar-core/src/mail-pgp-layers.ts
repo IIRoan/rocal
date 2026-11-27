@@ -4,8 +4,9 @@ export const PGP_MESSAGE_END = "-----END PGP MESSAGE-----";
 
 export const MAX_PGP_DECRYPT_LAYERS = 4;
 
+/** "attached_key": the signature matches only a key the message itself carries for the sender's address. */
 export type PgpSignatureVerificationState =
-  "not_signed" | "unverified" | "verified" | "failed";
+  "not_signed" | "unverified" | "attached_key" | "verified" | "failed";
 
 export function containsArmoredPgpMessage(
   value: string | null | undefined,
@@ -71,6 +72,9 @@ export function mergeSignatureVerificationState(
   }
   if (current === "verified" || layer === "verified") {
     return "verified";
+  }
+  if (current === "attached_key" || layer === "attached_key") {
+    return "attached_key";
   }
   if (current === "unverified" || layer === "unverified") {
     return "unverified";

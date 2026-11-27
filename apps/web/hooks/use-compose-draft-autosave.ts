@@ -13,13 +13,12 @@ import {
   useMailComposeChrome,
 } from "@/components/mail/mail-compose-context";
 import {
+  resolveOutgoingComposeBodies,
   sealMailForSelf,
   splitRecipientList,
   validateOutgoingJmapMessage,
 } from "@workspace/calendar-core";
 import type { MailServerPolicy } from "@workspace/calendar-core";
-import { resolveOutgoingComposeBodies } from "@/lib/mail/signature-utils";
-import { readMailComposeSettings } from "@/lib/mail/compose-settings";
 import { createMailSealer } from "@/lib/mail/mail-app-helpers";
 
 const log = createLogger("compose-draft-autosave");
@@ -96,13 +95,11 @@ export function useComposeDraftAutosave(input: ComposeDraftAutosaveInput) {
     const toAddresses = splitRecipientList(draft.to);
     const ccAddresses = splitRecipientList(draft.cc);
     const bccAddresses = splitRecipientList(draft.bcc);
-    const composeSettings = readMailComposeSettings();
-    const { textBody: plainBody, htmlBody } = resolveOutgoingComposeBodies({
+    // A plain-text message keeps its last rich HTML only for switching back, so the draft stores its text alone.
+    const { textBody: plainBody, htmlBody: htmlForDraft } = resolveOutgoingComposeBodies({
       body: draft.body,
-      htmlBody: draft.htmlBody,
-      signatureAlreadyEmbedded: draft.signatureAlreadyEmbedded,
+      htmlBody: draft.plainTextMode ? "" : draft.htmlBody,
     });
-    const htmlForDraft = composeSettings.plainTextMode ? undefined : htmlBody;
 
     if (!bridge.hasUserContent()) {
       return bridge.getDraftIdRef();

@@ -10,16 +10,18 @@ import { PrivateSearchIndexPrompt } from "../command-palette/private-search-inde
 import { TransitionContainer } from "../command-palette/transition-container";
 import { MailCommandPaletteViewContent } from "./mail-command-palette-view-content";
 import { useMailCommandPaletteController } from "./use-mail-command-palette-controller";
-import type { JmapEmailMessage, JmapMailbox, LabelDef } from "@/lib/mail/types";
+import type { JmapEmailMessage, JmapIdentity, JmapMailbox, LabelDef } from "@/lib/mail/types";
 import type { MailConnection } from "@/hooks/use-mail-vacation-response";
 
 const EMPTY_MAILBOXES: JmapMailbox[] = [];
 const EMPTY_LABELS: LabelDef[] = [];
+const EMPTY_IDENTITIES: JmapIdentity[] = [];
 
 export interface MailCommandPaletteProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCompose: () => void;
+  onMarkAllRead?: () => void;
   mailboxes?: JmapMailbox[];
   onCreateMailbox?: (name: string) => Promise<void>;
   onDeleteMailbox?: (id: string) => Promise<void>;
@@ -36,12 +38,14 @@ export interface MailCommandPaletteProps {
   messages?: JmapEmailMessage[];
   onSelectMessage?: (id: string) => void;
   mailConnection?: MailConnection | null;
+  identities?: JmapIdentity[];
 }
 
 export function MailCommandPalette({
   open,
   onOpenChange,
   onCompose,
+  onMarkAllRead,
   mailboxes = EMPTY_MAILBOXES,
   onCreateMailbox,
   onDeleteMailbox,
@@ -54,11 +58,13 @@ export function MailCommandPalette({
   initialView,
   onSelectMessage,
   mailConnection = null,
+  identities = EMPTY_IDENTITIES,
 }: MailCommandPaletteProps) {
   const c = useMailCommandPaletteController({
     open,
     onOpenChange,
     onCompose,
+    onMarkAllRead,
     mailboxes,
     onCreateMailbox,
     onDeleteMailbox,
@@ -128,6 +134,7 @@ export function MailCommandPalette({
                 onUpdateLabel={c.onUpdateLabel}
                 onDeleteLabel={c.onDeleteLabel}
                 mailConnection={mailConnection}
+                identities={identities}
                 userId={c.session?.user?.id ?? null}
               />
             </TransitionContainer>

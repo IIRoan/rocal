@@ -2,6 +2,7 @@ import {
   sealOutgoingMessageBody,
   MAIL_KEY_CONTINUITY_ENABLED,
   type MailSealer,
+  type OutgoingMailContent,
   type OutgoingMessageBody,
   type OutgoingMimeAttachment,
 } from "@workspace/calendar-core";
@@ -10,6 +11,7 @@ import {
   encryptForRecipients,
   ensureVaultLoaded,
   isMailVaultCurrent,
+  signDetached,
 } from "./mail-crypto";
 import type { MailRuntime } from "./mail-runtime";
 
@@ -26,6 +28,12 @@ export async function createMailSealer(runtime: MailRuntime): Promise<MailSealer
     encrypt: async (input) => {
       assertCurrent();
       const result = await encryptForRecipients(input);
+      assertCurrent();
+      return result;
+    },
+    sign: async (input) => {
+      assertCurrent();
+      const result = await signDetached(input);
       assertCurrent();
       return result;
     },
@@ -49,9 +57,13 @@ export async function resolveOutgoingMessageBody(input: {
   plaintext: string;
   html?: string;
   mimeAttachments?: OutgoingMimeAttachment[];
+  /** What the self-sealed Sent copy stores when it differs from the submitted message. */
+  sentCopyContent?: OutgoingMailContent;
+  sign?: boolean;
 }): Promise<OutgoingMessageBody> {
   const sealer = await createMailSealer(input.runtime);
   return sealOutgoingMessageBody({
+    sign: input.sign,
     recipients: input.recipients,
     senderEmail: input.runtime.identities[0]?.email ?? "",
     internalDomain: input.runtime.config.defaultDomain,
@@ -60,6 +72,7 @@ export async function resolveOutgoingMessageBody(input: {
       html: input.html,
       attachments: input.mimeAttachments,
     },
+    sentCopyContent: input.sentCopyContent,
     sealer,
     getRecipientPublicKey: async (email) => {
       if (!MAIL_KEY_CONTINUITY_ENABLED) return (await getRecipientKey(email)).publicKeyArmored;

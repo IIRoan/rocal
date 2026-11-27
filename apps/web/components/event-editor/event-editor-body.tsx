@@ -186,7 +186,7 @@ export function EventEditorBody({
             placeholder="Add title"
             aria-label="Event title"
             autoFocus={desktop && !eventForm.selectedEvent?.id}
-            className="-mx-2 h-11 w-[calc(100%+1rem)] rounded-md border-0 bg-transparent px-2 text-xl font-semibold text-foreground shadow-none placeholder:text-muted-foreground hover:bg-hover/40 focus-visible:bg-hover/40 focus-visible:ring-2 focus-visible:ring-ring"
+            className="-mx-2 h-11 w-[calc(100%+1rem)] rounded-md border-0 bg-transparent px-2 text-xl font-semibold text-foreground shadow-none placeholder:text-muted-foreground hover:bg-hover/40 focus-visible:bg-hover/40"
           />
           {eventForm.selectedEvent?.id ? null : (
             <QuickAddSuggestion

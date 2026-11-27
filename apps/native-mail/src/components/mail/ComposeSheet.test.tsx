@@ -11,29 +11,40 @@ const mockDispatch = jest.fn();
 const mockDeleteAsync = jest.fn(async (_uri: string) => undefined);
 const mockStrip = jest.fn(async (_uri: string, file: { name: string; type?: string; bytes: Uint8Array }) => ({ ...file, name: "clean.jpg", bytes: new Uint8Array([1]) }));
 let mockOnSent: (() => void) | null = null;
-jest.mock("react-native", () => ({ ActivityIndicator: () => null, Text: () => null, TextInput: () => null, View: () => null, StyleSheet: { create: (styles: object) => styles, hairlineWidth: 1 } }));
+jest.mock("react-native", () => ({ ActivityIndicator: () => null, Text: () => null, TextInput: () => null, View: ({ children }: { children?: React.ReactNode }) => <>{children}</>, StyleSheet: { create: (styles: object) => styles, hairlineWidth: 1 } }));
+jest.mock("react-native-reanimated", () => ({
+  __esModule: true,
+  default: { View: ({ children }: { children?: React.ReactNode }) => <>{children}</> },
+  Easing: { bezier: () => () => 0, out: () => () => 0, cubic: () => 0 },
+  useAnimatedStyle: () => ({}),
+  useSharedValue: (value: unknown) => ({ get: () => value, set: () => undefined }),
+  withTiming: (value: unknown) => value,
+}));
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 0, left: 0, right: 0, bottom: 0 }) }));
 jest.mock("@workspace/native-core/components/BottomSheet", () => ({ BottomSheet: ({ children }: { children: React.ReactNode }) => <>{children}</>, BottomSheetHeader: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 jest.mock("@workspace/native-core/providers/ThemeProvider", () => ({ useTheme: () => ({ theme: jest.requireActual<typeof import("@workspace/design-tokens")>("@workspace/design-tokens").nativeMailLightTheme }) }));
 jest.mock("@workspace/native-core/components/mail/mail-ui", () => ({ useMailSkin: () => ({ body: { fontSize: 14 }, meta: {}, borderTertiary: "synthetic", textTertiary: "synthetic" }) }));
-jest.mock("@workspace/native-core/hooks/use-keyboard-inset", () => ({ useKeyboardInset: () => 0 }));
+jest.mock("../../hooks/use-compose-keyboard", () => ({ useComposeKeyboard: () => ({ open: false, height: { get: () => 0, set: () => undefined }, settledInset: 0 }) }));
 jest.mock("../../lib/mail/use-mail", () => ({ useMailAccount: () => ({ data: { provisioned: true } }), useMailRuntime: () => ({ data: undefined, isLoading: false }), useMailMessage: () => ({ data: null }) }));
 jest.mock("../../hooks/use-mail-settings", () => ({ useMailComposeSettings: () => ({ settings: jest.requireActual<typeof import("@workspace/calendar-core")>("@workspace/calendar-core").DEFAULT_MAIL_COMPOSE_SETTINGS, isLoaded: true }) }));
 jest.mock("../../hooks/use-compose-identity", () => ({ useComposeIdentity: () => ({ identities: [], selectedIdentity: null, selectedIdentityId: null, composeContext: null, pickerOpen: false, setPickerOpen: jest.fn(), pick: jest.fn() }) }));
 jest.mock("../../hooks/use-compose-form", () => ({ useComposeForm: () => [jest.requireActual<typeof import("../../lib/mail/compose-form")>("../../lib/mail/compose-form").INITIAL_COMPOSE_FORM, mockDispatch] }));
 jest.mock("../../hooks/use-compose-draft-autosave", () => ({ useComposeDraftAutosave: () => ({ saveDraft: jest.fn(), settleDraftSave: jest.fn() }) }));
+jest.mock("../../hooks/use-compose-schedule", () => ({ useComposeSchedule: () => ({ sendAt: null, label: null, open: jest.fn(), clear: jest.fn(), sheet: { key: 0, visible: false, onSchedule: jest.fn(), onDismiss: jest.fn() } }) }));
 jest.mock("../../hooks/use-compose-send", () => ({ useComposeSend: (input: { sendScope: string; onSent: () => void }) => { mockScope = input.sendScope; mockOnSent = input.onSent; return { send: jest.fn(), sending: false, canSend: true }; } }));
 jest.mock("../../hooks/use-compose-leave", () => ({ useComposeLeave: () => ({ cancel: jest.fn(), dismiss: jest.fn() }) }));
 jest.mock("expo-document-picker", () => ({ getDocumentAsync: async () => ({ canceled: false, assets: [{ uri: "file:///cache/trip.jpg", name: "trip.jpg", mimeType: "image/jpeg", size: 4 }] }) }));
 jest.mock("expo-file-system/legacy", () => ({ EncodingType: { Base64: "base64" }, readAsStringAsync: async () => "/9j/4Q==", deleteAsync: (uri: string) => mockDeleteAsync(uri) }));
 jest.mock("../../lib/mail/strip-image-metadata", () => ({ stripPickedImageMetadata: (uri: string, file: { name: string; type?: string; bytes: Uint8Array }) => mockStrip(uri, file) }));
-jest.mock("./ComposeRecipientFields", () => ({ ComposeRecipientFields: () => null }));
+jest.mock("./ComposeFields", () => ({ ComposeFields: () => null }));
 jest.mock("./ComposeBodyEditor", () => ({ ComposeBodyEditor: () => null }));
-jest.mock("./ComposeHeader", () => ({ ComposeHeader: ({ onAttach }: { onAttach: () => void }) => { mockOnAttach = onAttach; return null; } }));
-jest.mock("./ComposeFormatBar", () => ({ ComposeFormatBar: () => null }));
-jest.mock("./ComposeAttachmentList", () => ({ ComposeAttachmentList: () => null }));
+jest.mock("./ComposeHeader", () => ({ ComposeHeader: () => null }));
+jest.mock("./ComposeFormatBar", () => ({ ComposeFormatBar: ({ onAttach }: { onAttach: () => void }) => { mockOnAttach = onAttach; return null; } }));
 jest.mock("./ComposeIdentitySheet", () => ({ ComposeIdentitySheet: () => null }));
 jest.mock("./ComposeScheduleSheet", () => ({ ComposeScheduleSheet: () => null }));
+jest.mock("./ComposeTemplatesSheet", () => ({ ComposeTemplatesSheet: () => null }));
+jest.mock("./ComposeLinkSheet", () => ({ ComposeLinkSheet: () => null }));
+jest.mock("./ComposeSignatureSheet", () => ({ ComposeSignatureSheet: () => null }));
 
 it("preserves the actual ComposeSheet scope during StrictMode replay and retires it on unmount", async () => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

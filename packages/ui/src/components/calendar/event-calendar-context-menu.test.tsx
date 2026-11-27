@@ -95,4 +95,70 @@ describe("EventCalendar right-click menu", () => {
       expect.objectContaining({ id: "event-1", title: "Planning" }),
     );
   });
+
+  // A second right-click while a menu is open only dismisses it, so each case opens one fresh menu.
+  const openDuplicateItem = async (
+    isSyncOnly: boolean,
+    onEventEdit: (...args: unknown[]) => void,
+  ) => {
+    act(() => {
+      root.render(
+        <CalendarProvider
+          defaultView="agenda"
+          initialCalendars={[
+            {
+              id: "calendar-1",
+              name: "Work",
+              color: "blue",
+              kind: "owned",
+              isPublic: false,
+              isVisible: true,
+              isDefault: true,
+              isSyncOnly,
+              userId: "user-1",
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ]}
+        >
+          <EventCalendar
+            events={[eventFixture()]}
+            timeFormat="24h"
+            timezone="UTC"
+            onEventEdit={onEventEdit}
+          />
+        </CalendarProvider>,
+      );
+    });
+    act(() => {
+      container
+        .querySelector("[data-event-id='event-1']")
+        ?.dispatchEvent(
+          new MouseEvent("contextmenu", { bubbles: true, clientX: 8, clientY: 8 }),
+        );
+    });
+    await act(async () => {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    });
+    return Array.from(
+      document.querySelectorAll<HTMLElement>("[role='menuitem']"),
+    ).find((item) => item.textContent?.trim() === "Duplicate");
+  };
+
+  it("hides Duplicate when no calendar is writable", async () => {
+    expect(await openDuplicateItem(true, jest.fn())).toBeUndefined();
+  });
+
+  it("offers Duplicate with a writable calendar and opens the copy editor", async () => {
+    const onEventEdit = jest.fn();
+    const duplicateItem = await openDuplicateItem(false, onEventEdit);
+    expect(duplicateItem).toBeDefined();
+    act(() => {
+      duplicateItem?.click();
+    });
+    expect(onEventEdit).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "event-1" }),
+      { mode: "modal", eventViewMode: "duplicate" },
+    );
+  });
 });

@@ -10,7 +10,9 @@ import type { UserKeyVault } from "./native-vault-crypto";
 import type { MailRuntime } from "./mail-runtime";
 import { resolveSenderVerificationKey, clearSenderKeyCache } from "./mail-sender-key";
 import { StalwartJmapClient } from "./jmap-client";
-import { resolveMailServerPolicy } from "@workspace/calendar-core";
+import { resolveMailServerPolicy, signOutgoingMailContent } from "@workspace/calendar-core";
+import * as openpgp from "openpgp";
+import { createMailSealer } from "./outgoing-message-crypto";
 import { loadStalwart110MailFixtures } from "../../../../../packages/calendar-core/test-fixtures/stalwart-1.1.0-mail/fixture-loader";
 
 const fixtures = loadStalwart110MailFixtures();
@@ -224,4 +226,26 @@ it("verifies own primary and alias signatures locally despite a foreign director
   expect(mockRecipientLookup).toHaveBeenCalledTimes(1);
   const foreignResult = await decryptPgpMimeMessage(foreignRuntime, record.message.id, record.message.bodyStructure, foreignKey);
   expect(foreignResult.signatureVerificationState).toBe("failed");
+});
+
+it("signs outside mail with the native vault key and verifies it after at-rest encryption", async () => {
+  await loadKey("sender");
+  const sender = fixtures.keyFor("sender");
+  const entity = await signOutgoingMailContent({ text: "Signed body" }, await createMailSealer(runtime));
+  const sealAtRest = async (plaintext: string) =>
+    openpgp.encrypt({
+      message: await openpgp.createMessage({ text: plaintext }),
+      encryptionKeys: await openpgp.readKey({ armoredKey: sender.publicKeyArmored }),
+      format: "armored",
+    });
+  const open = async (plaintext: string, senderKey: string | undefined, senderEmail: string) =>
+    decryptMailMessage(runtime, "signed", await sealAtRest(plaintext), senderKey, undefined, senderEmail);
+
+  const verified = await open(entity, sender.publicKeyArmored, sender.email);
+  expect(verified.signatureVerificationState).toBe("verified");
+  expect(verified.plaintext).toBe("Signed body");
+  expect((await open(entity, undefined, sender.email)).signatureVerificationState).toBe("attached_key");
+  expect((await open(entity, undefined, "someone@outside.test")).signatureVerificationState).toBe("unverified");
+  const tampered = entity.replace("Content-Type: text/plain; charset=utf-8", "Content-Type: text/plain; charset=us-ascii");
+  expect((await open(tampered, sender.publicKeyArmored, sender.email)).signatureVerificationState).toBe("failed");
 });

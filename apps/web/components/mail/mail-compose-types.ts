@@ -17,12 +17,14 @@ export type ComposeDraft = {
   subject: string;
   body: string;
   htmlBody: string;
+  /** This message is written as plain text; it starts from the compose setting and switches per message. */
+  plainTextMode: boolean;
   attachments: File[];
   replyContext: MailReplyContext | null;
   identityId: string | null;
   draftId: string | null;
   composeMode: ComposeMode;
-  signatureAlreadyEmbedded: boolean;
+  signatureChoice?: string | null;
 };
 
 export type DraftSaveStatus = "idle" | "saving" | "saved" | "error";

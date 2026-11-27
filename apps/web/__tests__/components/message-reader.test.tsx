@@ -403,15 +403,20 @@ describe("MessageReader — email header", () => {
     expect(container.textContent).toContain("Bob");
   });
 
-  it("renders CC when present", () => {
+  it("counts Cc recipients in the header and lists them when the recipients open", () => {
     render({
       message: {
         ...baseMessage,
         cc: [{ name: "Charlie", email: "charlie@example.com" }],
       } as any,
     });
-    // Header shows the CC recipient name, not the raw email.
-    expect(container.textContent).toContain("Charlie");
+    const recipients = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Recipients:"),
+    );
+    expect(recipients?.textContent).toContain("Recipients: Bob & 1 other");
+    act(() => recipients?.click());
+    expect(document.body.textContent).toContain("Cc");
+    expect(document.body.textContent).toContain("Charlie");
   });
 
   it("renders (No subject) when subject is empty", () => {
@@ -1107,37 +1112,26 @@ describe("MessageReader — reply button in toolbar", () => {
     expect(onReplyAll).toHaveBeenCalledTimes(1);
   });
 
-  it("offers a separate Reply all action with the same busy guard", () => {
+  it("offers Reply all in More actions, which is unavailable while busy", () => {
     const onReply = jest.fn();
     const onReplyAll = jest.fn();
     render({ onReply, onReplyAll });
-    const button = container.querySelector<HTMLButtonElement>("[aria-label='Reply all']");
-    expect(button).not.toBeNull();
-    act(() => button?.click());
+    openMoreActions();
+    act(() => findMenuItem("Reply all")?.click());
     expect(onReplyAll).toHaveBeenCalledTimes(1);
     expect(onReply).not.toHaveBeenCalled();
     render({ onReplyAll, isBusy: true });
-    const busyButton = container.querySelector<HTMLButtonElement>("[aria-label='Reply all']");
-    expect(busyButton?.getAttribute("aria-disabled")).toBe("true");
-    act(() => busyButton?.click());
-    expect(onReplyAll).toHaveBeenCalledTimes(1);
+    expect(container.querySelector("[aria-label='More actions']")?.getAttribute("aria-disabled")).toBe("true");
   });
 
-  it("renders Reply button in toolbar", () => {
-    render();
-    const btn = container.querySelector("[aria-label='Reply']");
-    expect(btn).not.toBeNull();
-  });
-
-  it("calls onReply when Reply button is clicked", () => {
+  it("renders a labelled Reply button in the toolbar and calls onReply", () => {
     const onReply = jest.fn();
     render({ onReply });
-    const btn = container.querySelector(
-      "[aria-label='Reply']",
-    ) as HTMLButtonElement;
-    act(() => {
-      btn.click();
-    });
+    const btn = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.trim() === "Reply",
+    );
+    expect(btn).toBeDefined();
+    act(() => btn?.click());
     expect(onReply).toHaveBeenCalledTimes(1);
   });
 });
@@ -1249,8 +1243,14 @@ describe("MessageReader — show original look", () => {
   });
 });
 
-describe("MessageReader — toolbar move to", () => {
-  it("moves the message to a mailbox picked from the toolbar", () => {
+function openSubmenu(label: string) {
+  const trigger = findMenuItem(label);
+  expect(trigger).toBeDefined();
+  act(() => trigger?.click());
+}
+
+describe("MessageReader — More actions submenus", () => {
+  it("moves the message to a mailbox picked under More → Move to", () => {
     const onMove = jest.fn();
     render({
       onMove,
@@ -1260,21 +1260,31 @@ describe("MessageReader — toolbar move to", () => {
       ],
       currentMailboxId: "inbox",
     });
-    const trigger = container.querySelector(
-      '[aria-label="Move to"]',
-    ) as HTMLElement | null;
-    expect(trigger).not.toBeNull();
-    act(() => {
-      trigger!.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
-      );
-    });
-    const archive = findMenuItem("Archive");
+    openMoreActions();
+    openSubmenu("Move to");
+    const archive = Array.from(document.body.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(
+      (item) => item.textContent?.trim() === "Archive",
+    );
     expect(archive).toBeDefined();
-    act(() => {
-      archive!.click();
-    });
+    act(() => archive?.click());
     expect(onMove).toHaveBeenCalledWith("archive");
+  });
+
+  it("toggles a label under More → Label as and offers the full label editor", () => {
+    const onSetLabel = jest.fn();
+    render({
+      onSetLabel,
+      onCreateLabel: async (name: string, color: string) => ({ id: "l2", name, color }),
+      labels: [{ id: "l1", name: "Work", color: "blue" }],
+      message: { ...baseMessage, keywords: { "label:l1": true } } as any,
+    });
+    openMoreActions();
+    openSubmenu("Label as");
+    act(() => findMenuItem("Work")?.click());
+    expect(onSetLabel).toHaveBeenCalledWith("l1", false);
+    openMoreActions();
+    openSubmenu("Label as");
+    expect(findMenuItem("Edit labels…")).toBeDefined();
   });
 });
 

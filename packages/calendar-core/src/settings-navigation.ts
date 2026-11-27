@@ -16,6 +16,8 @@ export type SettingsMailId =
   | "labels"
   | "contacts"
   | "composing"
+  | "templates"
+  | "signatures"
   | "mail-display"
   | "mail-list"
   | "auto-reply";
@@ -101,6 +103,16 @@ export const SETTINGS_MAIL_ITEMS: readonly SettingsNavItem<SettingsMailId>[] = [
     id: "composing",
     label: "Composing",
     description: "Plain text, signatures, and attachment reminders",
+  },
+  {
+    id: "templates",
+    label: "Templates",
+    description: "Saved replies to insert while you write",
+  },
+  {
+    id: "signatures",
+    label: "Signatures",
+    description: "Sign-offs for new messages and replies",
   },
   {
     id: "mail-display",

@@ -9,6 +9,7 @@ import {
 } from "react";
 import {
   EventSheet,
+  type EventSheetDuplicate,
   type EventSheetMode,
 } from "../components/event/EventSheet";
 
@@ -32,6 +33,12 @@ export function SheetProvider({ children }: { children: ReactNode }) {
     setVisible(true);
     setPresentKey((key) => key + 1);
   }, []);
+
+  const openDuplicate = useCallback(
+    (duplicate: EventSheetDuplicate) =>
+      openEventSheet({ type: "create", duplicate }),
+    [openEventSheet],
+  );
 
   const closeEventSheet = useCallback(() => {
     visibleRef.current = false;
@@ -59,6 +66,7 @@ export function SheetProvider({ children }: { children: ReactNode }) {
         presentKey={presentKey}
         onDismiss={closeEventSheet}
         onCloseComplete={handleSheetCloseComplete}
+        onDuplicate={openDuplicate}
       />
     </SheetContext.Provider>
   );

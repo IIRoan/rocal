@@ -39,7 +39,6 @@ import {
   getColorSwatchValue,
 } from "../calendar/utils";
 import { SidebarShell } from "./sidebar-shell";
-import { SidebarPrimaryAction } from "./sidebar-primary-action";
 import { SidebarIconButton } from "./sidebar-icon-button";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
@@ -454,6 +453,11 @@ function AppSidebarDesktop({
       user={user}
       onLogout={onLogout}
       onOpenSettings={onOpenSettings}
+      primaryAction={
+        onCreateEvent
+          ? { label: "New event", icon: <Plus size={15} strokeWidth={2.25} />, onClick: onCreateEvent }
+          : undefined
+      }
       {...props}
     >
       {({ isCollapsed }) => (
@@ -468,15 +472,6 @@ function AppSidebarDesktop({
                 timezone={timezone}
               />
             </SidebarGroup>
-          )}
-
-          {/* New event CTA */}
-          {onCreateEvent && (
-            <SidebarPrimaryAction
-              label="New event"
-              onClick={onCreateEvent}
-              collapsedClassName="text-accent hover:bg-accent/10 hover:text-accent"
-            />
           )}
 
           {/* Calendars list */}

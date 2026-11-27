@@ -1,6 +1,6 @@
 import { stripHtmlTags } from "../html-text";
 import { buildMailBodyExcerpt } from "../mail-body-index";
-import { htmlToComposeText } from "../mail-compose-format";
+import { composeHtmlToPlainText, markComposeCidImages } from "../mail-compose-html";
 import { analyzeEmailHtml, processEmailHtml } from "../mail-html";
 import { scoreMailSearchMessage } from "../mail-search-relevance";
 import { htmlToPlainText } from "../mail-signature";
@@ -41,6 +41,9 @@ const UNITS = [
   "<br ",
   "<a href=x>",
   "<a href=x",
+  "<blockquote>x",
+  "<ul><li>x",
+  "<div data-quoted-html>x",
 ];
 
 const ENTRY_POINTS: Record<string, (html: string) => unknown> = {
@@ -55,7 +58,8 @@ const ENTRY_POINTS: Record<string, (html: string) => unknown> = {
   "search ranking": (html) =>
     scoreMailSearchMessage({ id: "m", subject: "x", htmlBody: [{ partId: "1" }], bodyValues: { "1": { value: html } } }, "solace"),
   "tag stripper": (html) => stripHtmlTags(html),
-  "draft to compose text": (html) => htmlToComposeText(html),
+  "compose text/plain part": (html) => composeHtmlToPlainText(html),
+  "compose quoted cid images": (html) => markComposeCidImages(html),
   "signature to plain text": (html) => htmlToPlainText(html),
 };
 

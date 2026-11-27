@@ -28,6 +28,7 @@ jest.mock("../search/local-mail-search", () => ({}));
 jest.mock("expo-web-browser", () => ({}));
 
 const mockMarkAsUnread = jest.fn(async () => undefined);
+const mockMarkMailboxAsRead = jest.fn(async () => 2);
 const mockGetMessagesByIds = jest.fn<
   Promise<JmapEmailMessage[]>,
   [MailRuntime["session"], string[]]
@@ -35,6 +36,7 @@ const mockGetMessagesByIds = jest.fn<
 const mockGetPage = jest.fn<Promise<MailboxMessagesPage>, [number]>();
 const client: Partial<MailRuntime["client"]> = {
   markAsUnread: mockMarkAsUnread,
+  markMailboxAsRead: mockMarkMailboxAsRead,
   getMessagesByIds: mockGetMessagesByIds,
 };
 const runtime: MailRuntime = {
@@ -59,6 +61,20 @@ function MarkUnread() {
       }}
     >
       Mark unread
+    </button>
+  );
+}
+
+function MarkFolderRead() {
+  const mutations = useMailMutations(runtime, "inbox");
+  return (
+    <button
+      id="folder-read"
+      onClick={() => {
+        mutations.markMailboxAsRead.mutateAsync("inbox").catch(() => undefined);
+      }}
+    >
+      Mark all as read
     </button>
   );
 }
@@ -318,6 +334,53 @@ describe("mail keyword mutations against stale reads", () => {
     expect(mockGetPage.mock.calls.map(([position]) => position)).toEqual([
       1, 1,
     ]);
+  });
+
+  it("marks the open folder's unread rows read and restores them when the write fails", async () => {
+    const unreadList: MailboxMessagesInfiniteData = {
+      pages: [
+        {
+          messages: [
+            { id: "a", keywords: { $flagged: true } },
+            { id: "b", keywords: { $seen: true } },
+          ],
+          total: 2,
+          position: 0,
+        },
+      ],
+      pageParams: [0],
+    };
+    const keywords = () =>
+      queryClient
+        .getQueryData<MailboxMessagesInfiniteData>(QUERY_KEYS.mailMessages("inbox"))
+        ?.pages[0]?.messages.map((message) => message.keywords);
+    queryClient.setQueryData(QUERY_KEYS.mailMessages("inbox"), unreadList);
+    let reject: (error: Error) => void = () => undefined;
+    mockMarkMailboxAsRead.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, rejectWrite) => {
+          reject = rejectWrite;
+        }),
+    );
+    await act(async () => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <MarkFolderRead />
+        </QueryClientProvider>,
+      );
+    });
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("#folder-read")?.click();
+    });
+    expect(mockMarkMailboxAsRead).toHaveBeenCalledWith(runtime.session, "inbox");
+    expect(keywords()).toEqual([
+      { $flagged: true, $seen: true },
+      { $seen: true },
+    ]);
+    await act(async () => {
+      reject(new Error("Write refused"));
+    });
+    expect(keywords()).toEqual([{ $flagged: true }, { $seen: true }]);
   });
 
   it("does not resume a previous account's read after its query was replaced", async () => {

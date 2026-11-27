@@ -1,3 +1,5 @@
+import { createMimeBoundary } from "./mail-pgp-mime";
+
 export type OutgoingMimeAttachment = {
   filename: string;
   contentType: string;
@@ -46,104 +48,97 @@ function toMimeLines(value: string): string {
   return normalizeMimeText(value).replace(/\n/g, "\r\n");
 }
 
-function createMimeBoundary(prefix: string): string {
-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-}
-
 /** True when decrypted PGP plaintext should be parsed as a MIME envelope. */
 export function looksLikeMimeMessage(content: string): boolean {
   return /^Content-Type:\s*\S+/im.test(content.trimStart());
 }
 
-function buildAlternativeBodyParts(input: {
-  text: string;
-  html?: string;
-}): string[] {
-  const normalizedText = toMimeLines(input.text);
-  const trimmedHtml = input.html?.trim();
-
-  if (!trimmedHtml) {
-    return [
-      "Content-Type: text/plain; charset=utf-8",
-      "Content-Transfer-Encoding: 7bit",
-      "",
-      normalizedText,
-    ];
-  }
-
-  const boundary = createMimeBoundary("solace_alt");
-  const normalizedHtml = toMimeLines(trimmedHtml);
-
+/** Base64 keeps signed text 7-bit, so relays that rewrap lines or strip trailing spaces cannot break the signature. */
+function textPartLines(type: "plain" | "html", value: string, base64: boolean): string[] {
+  const lines = toMimeLines(value);
+  const encoded = base64 ? encodeBase64Lines(new TextEncoder().encode(lines)) : [];
   return [
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
-    "MIME-Version: 1.0",
+    `Content-Type: text/${type}; charset=utf-8`,
+    `Content-Transfer-Encoding: ${base64 ? "base64" : "7bit"}`,
     "",
-    `--${boundary}`,
-    "Content-Type: text/plain; charset=utf-8",
-    "Content-Transfer-Encoding: 7bit",
+    ...(encoded.length ? encoded : [lines]),
+  ];
+}
+
+function isInlineImagePart(attachment: OutgoingMimeAttachment): boolean {
+  return attachment.disposition === "inline" && Boolean(attachment.cid?.trim());
+}
+
+function attachmentPartLines(attachment: OutgoingMimeAttachment): string[] {
+  const filename = encodeMimeFilename(attachment.filename);
+  const cid = attachment.cid?.trim();
+  assertAttachmentHeader(attachment.contentType, 256);
+  if (!/^[^\s;/]+\/[^\s;/]+(?:;[^\r\n]*)?$/.test(attachment.contentType)) {
+    throw new Error("Attachment content type is invalid.");
+  }
+  if (cid) {
+    assertAttachmentHeader(cid, 256);
+    if (/[\s<>]/.test(cid))
+      throw new Error("Attachment content identifier is invalid.");
+  }
+  const inline = isInlineImagePart(attachment);
+  return [
+    `Content-Type: ${attachment.contentType}; name="${filename}"`,
+    `Content-Disposition: ${inline ? "inline" : "attachment"}; filename="${filename}"`,
+    ...(inline ? [`Content-ID: <${cid}>`] : []),
+    "Content-Transfer-Encoding: base64",
     "",
-    normalizedText,
+    ...encodeBase64Lines(attachment.content),
+  ];
+}
+
+function multipartLines(subtype: string, prefix: string, parts: string[][], topLevel: boolean): string[] {
+  const boundary = createMimeBoundary(prefix);
+  return [
+    `Content-Type: multipart/${subtype}; boundary="${boundary}"`,
+    ...(topLevel ? ["MIME-Version: 1.0"] : []),
     "",
-    `--${boundary}`,
-    "Content-Type: text/html; charset=utf-8",
-    "Content-Transfer-Encoding: 7bit",
-    "",
-    normalizedHtml,
-    "",
+    ...parts.flatMap((part) => [`--${boundary}`, ...part, ""]),
     `--${boundary}--`,
   ];
 }
 
-/** PGP MIME payload: rich text as multipart/alternative, attachments as multipart/mixed with the body first. */
+function buildAlternativeBodyParts(input: {
+  text: string;
+  html?: string;
+  base64Text?: boolean;
+  related: OutgoingMimeAttachment[];
+}): string[] {
+  const base64 = input.base64Text === true;
+  const trimmedHtml = input.html?.trim();
+
+  if (!trimmedHtml) {
+    return textPartLines("plain", input.text, base64);
+  }
+
+  const htmlPart = textPartLines("html", trimmedHtml, base64);
+  // Inline images sit beside the HTML that cites them, so readers show them in place instead of as attachments.
+  const richPart = input.related.length
+    ? multipartLines("related", "solace_rel_", [htmlPart, ...input.related.map(attachmentPartLines)], false)
+    : htmlPart;
+  return multipartLines("alternative", "solace_alt_", [textPartLines("plain", input.text, base64), richPart], true);
+}
+
+/** PGP MIME payload: rich text as multipart/alternative with inline images in multipart/related, files in multipart/mixed after the body. */
 export function buildOutgoingMimeMessage(input: {
   text: string;
   html?: string;
   attachments?: OutgoingMimeAttachment[];
+  base64Text?: boolean;
 }): string {
   const attachments = input.attachments ?? [];
-  const bodyPart = buildAlternativeBodyParts(input);
+  const related = input.html?.trim() ? attachments.filter(isInlineImagePart) : [];
+  const files = attachments.filter((attachment) => !related.includes(attachment));
+  const bodyPart = buildAlternativeBodyParts({ ...input, related });
 
-  if (attachments.length === 0) {
+  if (files.length === 0) {
     return bodyPart.join("\r\n");
   }
 
-  const boundary = createMimeBoundary("solace_mixed");
-  const lines = [
-    `Content-Type: multipart/mixed; boundary="${boundary}"`,
-    "MIME-Version: 1.0",
-    "",
-    `--${boundary}`,
-    ...bodyPart,
-    "",
-  ];
-
-  for (const attachment of attachments) {
-    const filename = encodeMimeFilename(attachment.filename);
-    const disposition = attachment.disposition ?? "attachment";
-    const cid = attachment.cid?.trim();
-    assertAttachmentHeader(attachment.contentType, 256);
-    if (!/^[^\s;/]+\/[^\s;/]+(?:;[^\r\n]*)?$/.test(attachment.contentType)) {
-      throw new Error("Attachment content type is invalid.");
-    }
-    if (cid) {
-      assertAttachmentHeader(cid, 256);
-      if (/[\s<>]/.test(cid))
-        throw new Error("Attachment content identifier is invalid.");
-    }
-    lines.push(
-      `--${boundary}`,
-      `Content-Type: ${attachment.contentType}; name="${filename}"`,
-      disposition === "inline" && cid
-        ? `Content-Disposition: inline; filename="${filename}"`
-        : `Content-Disposition: attachment; filename="${filename}"`,
-      ...(disposition === "inline" && cid ? [`Content-ID: <${cid}>`] : []),
-      "Content-Transfer-Encoding: base64",
-      "",
-      ...encodeBase64Lines(attachment.content),
-      "",
-    );
-  }
-
-  lines.push(`--${boundary}--`);
-  return lines.join("\r\n");
+  return multipartLines("mixed", "solace_mixed_", [bodyPart, ...files.map(attachmentPartLines)], true).join("\r\n");
 }

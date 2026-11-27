@@ -35,6 +35,20 @@ export function splitRecipientList(raw: string): string[] {
   return raw.split(/[,;]+/).flatMap((entry) => entry.trim() || []);
 }
 
+/** A recipient field as the finished addresses before its last separator and the one still being typed. */
+export function splitRecipientField(value: string): { tokens: string[]; draft: string } {
+  const separatorIndex = Math.max(value.lastIndexOf(","), value.lastIndexOf(";"));
+  if (separatorIndex < 0) return { tokens: [], draft: value };
+  return {
+    tokens: splitRecipientList(value.slice(0, separatorIndex)),
+    draft: value.slice(separatorIndex + 1).trimStart(),
+  };
+}
+
+export function joinRecipientField(tokens: readonly string[], draft: string): string {
+  return tokens.length > 0 ? `${tokens.join(", ")}, ${draft}` : draft;
+}
+
 export function parseAddressList(raw: string): ParsedMailAddress[] {
   const seen = new Set<string>();
   const result: ParsedMailAddress[] = [];

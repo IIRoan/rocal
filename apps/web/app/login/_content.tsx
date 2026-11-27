@@ -12,7 +12,11 @@ import {
 } from "@/lib/auth-navigation";
 import { Key, Eye, EyeOff, ArrowRight, Check, X, Ticket } from "lucide-react";
 import { useSmoothRouter } from "@/hooks/use-smooth-router";
-import { afterPaint, getErrorMessage } from "@workspace/calendar-core";
+import {
+  afterPaint,
+  getErrorMessage,
+  getSignInErrorMessage,
+} from "@workspace/calendar-core";
 import { LogoMark, ThemeToggle } from "@workspace/ui/components/layout";
 import { PageLoadingOverlay } from "@workspace/ui/components/ui";
 import { Button } from "@workspace/ui/components/ui/button";
@@ -890,9 +894,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
           clearPendingAuthPassword();
           dispatchChrome({
             type: "set-error",
-            error:
-              signInResult.error.message ||
-              "Email or password is incorrect. Check both and try again.",
+            error: getSignInErrorMessage(signInResult.error),
           });
           dispatchChrome({ type: "finish-email-auth" });
           return;
@@ -1010,6 +1012,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                       Solace email
                     </Label>
                     <div
+                      data-field
                       className={`flex h-11 overflow-hidden rounded-lg border bg-background transition-colors ${
                         emailAvailability === null
                           ? "border-input-border"
@@ -1035,7 +1038,7 @@ export function LoginFormBody({ loginSearchParams }: LoginFormBodyProps) {
                         }
                         required={isSignUp}
                         readOnly={emailLoading}
-                        className="h-full flex-1 rounded-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                        className="h-full flex-1 rounded-none border-0 bg-transparent"
                         {...fieldErrorProps(
                           "desired-email",
                           "desired-email-hint",

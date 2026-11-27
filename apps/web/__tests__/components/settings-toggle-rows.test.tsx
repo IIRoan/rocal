@@ -17,6 +17,7 @@ jest.mock("lucide-react", () => {
     ChevronLeft: Icon,
     ChevronRight: Icon,
     ChevronUpIcon: Icon,
+    Clock: Icon,
     Bell: Icon,
     Key: Icon,
     Keyboard: Icon,

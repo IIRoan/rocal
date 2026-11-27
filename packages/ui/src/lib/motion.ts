@@ -124,6 +124,20 @@ export function moveFrom(
   );
 }
 
+/** Mirror of `moveFrom` that starts at once and holds the moved end state, for exits such as a drawer sliding off; cancel it to bring the element back. */
+export function moveTo(
+  element: HTMLElement,
+  offset: MotionOffset,
+  options: { duration: number; easing?: string },
+): Animation | null {
+  if (!canAnimate(element)) return null;
+  return element.animate([{ transform: "none" }, { transform: offsetTransform(offset) }], {
+    duration: motionDuration(options.duration),
+    easing: options.easing ?? MOTION_EASING.exit,
+    fill: "forwards",
+  });
+}
+
 export interface RevealStep {
   selector: string;
   offset: MotionOffset | null;

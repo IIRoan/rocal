@@ -1,4 +1,4 @@
-import { encryptForRecipients, ensureVaultLoaded } from "./mail-crypto";
+import { encryptForRecipients, ensureVaultLoaded, signDetached } from "./mail-crypto";
 import { getRecipientKey } from "./mail-api";
 import { resolveOutgoingMessageBody } from "./outgoing-message-crypto";
 import type { MailRuntime } from "./mail-runtime";
@@ -8,6 +8,7 @@ jest.mock("./mail-crypto", () => ({
   encryptForRecipients: jest.fn(),
   ensureVaultLoaded: jest.fn(),
   isMailVaultCurrent: jest.fn(() => true),
+  signDetached: jest.fn(),
 }));
 
 jest.mock("./mail-api", () => ({
@@ -115,5 +116,32 @@ describe("resolveOutgoingMessageBody", () => {
     });
     expect(getRecipientKey).toHaveBeenCalledWith("bob@solace.onl");
     expect(uploadBlob).not.toHaveBeenCalled();
+  });
+
+  it("signs outside mail with the vault key when signing is on, beside the sealed Sent copy", async () => {
+    (signDetached as jest.Mock).mockResolvedValue({
+      armoredSignature: "-----BEGIN PGP SIGNATURE-----\n\nAAAA\n-----END PGP SIGNATURE-----",
+      micalg: "pgp-sha512",
+    });
+    const result = await resolveOutgoingMessageBody({
+      runtime: createRuntime(),
+      recipients: ["bob@example.com"],
+      plaintext: "Signed",
+      mimeAttachments: [attachment],
+      sign: true,
+    });
+
+    expect(result).toMatchObject({
+      kind: "signed",
+      encrypted: false,
+      textBody: "",
+      sentCopyCiphertext: { blobId: "sealed-blob", size: ARMORED.length },
+    });
+    expect(result.signedMimeMessage).toMatch(/^Content-Type: multipart\/signed; micalg=pgp-sha512; protocol="application\/pgp-signature"/);
+    const signed = (signDetached as jest.Mock).mock.calls[0]?.[0]?.data as string;
+    expect(signed).toContain("Content-Type: application/pgp-keys");
+    expect(signed).toContain('filename="notes.txt"');
+    expect(result.signedMimeMessage).toContain(`\r\n${signed}\r\n`);
+    expect(getRecipientKey).not.toHaveBeenCalled();
   });
 });

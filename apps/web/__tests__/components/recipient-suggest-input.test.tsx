@@ -43,6 +43,8 @@ jest.mock("@/hooks/use-recent-contacts", () => ({
   })),
 }));
 
+jest.mock("lucide-react", () => new Proxy({}, { get: () => () => null }));
+
 jest.mock("../../components/mail/mail-avatar", () => ({
   SenderAvatar: ({ email }: { email: string }) => <span>{email}</span>,
 }));
@@ -280,5 +282,32 @@ describe("RecipientSuggestInput", () => {
     expect(onChange).toHaveBeenCalledWith(
       expect.stringMatching(/existing@example\.com.*alice@example\.com/),
     );
+  });
+
+  it("shows finished addresses as chips, edits the last one on Backspace and removes one from its chip", () => {
+    renderInput("Alice <alice@example.com>, bob@example.com, ");
+
+    expect(getInput().value).toBe("");
+    expect(container.querySelector('button[aria-label="Remove Alice"]')).not.toBeNull();
+
+    act(() => {
+      getInput().dispatchEvent(new KeyboardEvent("keydown", { key: "Backspace", bubbles: true }));
+    });
+    expect(onChange).toHaveBeenLastCalledWith("Alice <alice@example.com>, bob@example.com");
+
+    act(() => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Remove Alice"]')?.click();
+    });
+    expect(onChange).toHaveBeenLastCalledWith("bob@example.com, ");
+  });
+
+  it("turns a typed address into a chip when the field loses focus", () => {
+    renderInput("alice@example.com, carol@example.org");
+
+    act(() => {
+      getInput().dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+    });
+
+    expect(onChange).toHaveBeenLastCalledWith("alice@example.com, carol@example.org, ");
   });
 });

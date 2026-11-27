@@ -6,8 +6,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/ui/select";
-import { Calendar, BookOpen, Keyboard } from "lucide-react";
-import { partitionCalendarsByKind } from "@workspace/calendar-core";
+import { Bell, Calendar, BookOpen, Clock, Keyboard } from "lucide-react";
+import {
+  DEFAULT_REMINDER_MINUTES,
+  DEFAULT_REMINDER_SETTING_OPTIONS,
+  eventDurationOptions,
+  partitionCalendarsByKind,
+} from "@workspace/calendar-core";
 import type { UserSettings } from "@/lib/types/calendar";
 import type { CalendarView } from "@workspace/ui/components/calendar";
 import { WORKING_DAYS } from "./constants";
@@ -75,6 +80,8 @@ export function CalendarDefaultsSettings({
   };
 
   const keyboardShortcuts = localSettings.keyboardShortcuts !== false;
+  const defaultReminder =
+    localSettings.defaultReminderMinutes ?? DEFAULT_REMINDER_MINUTES;
 
   return (
     <PaletteView title="Calendar Defaults" onBack={goBack}>
@@ -119,6 +126,54 @@ export function CalendarDefaultsSettings({
               <SelectItem value="3day">3 Days</SelectItem>
               <SelectItem value="day">Day</SelectItem>
               <SelectItem value="agenda">Agenda</SelectItem>
+            </SelectContent>
+          </Select>
+        </PaletteSelectRow>
+
+        <PaletteSelectRow icon={Clock} label="Default event duration">
+          <Select
+            value={String(localSettings.defaultEventDuration)}
+            onValueChange={(value) =>
+              updateSetting("defaultEventDuration", Number(value))
+            }
+          >
+            <SelectTrigger
+              aria-label="Default event duration"
+              className={`w-[120px] ${PALETTE_COMPACT_SELECT_CLASS}`}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {eventDurationOptions(localSettings.defaultEventDuration).map(
+                (option) => (
+                  <SelectItem key={option.value} value={String(option.value)}>
+                    {option.label}
+                  </SelectItem>
+                ),
+              )}
+            </SelectContent>
+          </Select>
+        </PaletteSelectRow>
+
+        <PaletteSelectRow icon={Bell} label="Default reminder">
+          <Select
+            value={String(defaultReminder)}
+            onValueChange={(value) =>
+              updateSetting("defaultReminderMinutes", Number(value))
+            }
+          >
+            <SelectTrigger
+              aria-label="Default reminder"
+              className={`w-[140px] ${PALETTE_COMPACT_SELECT_CLASS}`}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {DEFAULT_REMINDER_SETTING_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={String(option.value)}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </PaletteSelectRow>

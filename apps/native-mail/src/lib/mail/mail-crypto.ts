@@ -38,11 +38,15 @@ import type {
   MailVaultKdfParams,
 } from "./types";
 import { looksLikeMimeMessage, decryptPgpMessageLayers, MAX_PGP_DECRYPT_BYTES } from "@workspace/calendar-core";
-import type { MailVaultBackup, MailSenderKeyTrustState } from "@workspace/calendar-core";
+import type { MailVaultBackup, MailSenderKeyTrustState, PgpSignatureVerificationState } from "@workspace/calendar-core";
 import {
   encryptMailForRecipients,
   type MailRecipientEncryptionInput,
 } from "@workspace/calendar-core/mail-pgp-encryption";
+import {
+  resolveSignedMailContent,
+  signMailDetached,
+} from "@workspace/calendar-core/mail-pgp-signature";
 import type { MailRuntime } from "./mail-runtime";
 
 const log = createLogger("mail-crypto");
@@ -71,8 +75,7 @@ export type MailDecryptResult = {
   hasVerifiedSignature: boolean;
 };
 
-export type MailSignatureVerificationState =
-  "not_signed" | "unverified" | "verified" | "failed";
+export type MailSignatureVerificationState = PgpSignatureVerificationState;
 
 function isVaultBackupRecord(value: unknown): value is MailVaultBackup {
   if (typeof value !== "object" || value === null) return false;
@@ -360,9 +363,10 @@ export async function decryptMailMessage(
   armoredMessage: string,
   senderPublicKeyArmored?: string,
   limits?: MailTextLimits,
+  senderEmail?: string,
 ): Promise<MailDecryptResult> {
   log.debug("[mail-crypto] decryptMailMessage: start id=%s armoredLength=%d", messageId, armoredMessage.length);
-  const result = await decryptArmoredMessage(runtime, messageId, armoredMessage, senderPublicKeyArmored);
+  const result = await decryptArmoredMessage(runtime, messageId, armoredMessage, senderPublicKeyArmored, senderEmail);
   if (!looksLikeMimeMessage(result.plaintext)) {
     log.debug(
       "[mail-crypto] decryptMailMessage: SUCCESS id=%s plaintext=%db sigState=%s",
@@ -404,6 +408,19 @@ export async function encryptForRecipients(
   );
 }
 
+/** A detached signature with the vault key over exactly `data`, for PGP/MIME signed mail. */
+export function signDetached(input: { data: string }): Promise<{ armoredSignature: string; micalg: string }> {
+  const vault = cachedVault;
+  if (!vault) {
+    return Promise.reject(new Error("Mail vault is not loaded on this device."));
+  }
+  return signMailDetached(
+    input,
+    { signingKey: vault.privateKey, isCurrent: () => cachedVault === vault },
+    openpgp,
+  );
+}
+
 /** Decrypts an RFC 3156 PGP/MIME message: ciphertext lives in `bodyStructure.subParts[1]`, body is read by the shared MIME parser. */
 export async function decryptPgpMimeMessage(
   runtime: MailRuntime,
@@ -411,6 +428,7 @@ export async function decryptPgpMimeMessage(
   bodyStructure: JmapBodyStructure | undefined,
   senderPublicKeyArmored?: string,
   limits?: MailTextLimits,
+  senderEmail?: string,
 ): Promise<MailDecryptResult> {
   log.debug("[mail-crypto] decryptPgpMimeMessage: start id=%s", messageId);
 
@@ -440,7 +458,7 @@ export async function decryptPgpMimeMessage(
   }
 
   // Steps 3–4: decrypt PGP + check signatures (shared with inline path)
-  const pgpResult = await decryptArmoredMessage(runtime, messageId, armoredMessage, senderPublicKeyArmored);
+  const pgpResult = await decryptArmoredMessage(runtime, messageId, armoredMessage, senderPublicKeyArmored, senderEmail);
 
   // Step 5: parse decrypted MIME body with the native MIME parser
   log.debug(
@@ -485,6 +503,7 @@ async function decryptArmoredMessage(
   messageId: string,
   armoredMessage: string,
   senderPublicKeyArmored?: string,
+  senderEmail?: string,
 ): Promise<MailDecryptResult> {
   let unlockedVault: UnlockedVault;
   try {
@@ -525,8 +544,12 @@ async function decryptArmoredMessage(
       };
     },
   });
+  const signed = await resolveSignedMailContent<openpgp.Key, openpgp.Message<Uint8Array>, openpgp.Signature>(
+    { ...result, senderEmail, senderPublicKeyArmored: verificationKeys ? senderPublicKeyArmored : undefined },
+    openpgp,
+  );
   if (!isMailVaultCurrent(unlockedVault)) throw new Error("Mail encryption session changed.");
-  return result;
+  return { ...result, ...signed };
 }
 
 /** True while the vault is unlocked in memory; drives lock indicators in the UI. */

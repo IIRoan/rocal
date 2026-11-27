@@ -15,19 +15,23 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 import {
-  applyComposeBold,
-  applyComposeItalic,
-  applyComposeUnderline,
-  composeTextToHtml,
-  FORWARDED_MESSAGE_HEADER,
-  htmlToComposeText,
-  QUOTE_FOLD_LABEL,
-  REPLY_QUOTE_HEADER_PATTERN,
-  toggleComposeList,
+  afterPaint,
+  htmlToPlainText,
+  insertMailTemplateText,
+  plainTextToComposeHtml,
   type TextSelection,
 } from "@workspace/calendar-core";
-import { sanitizeUntrustedEmailHtml } from "@workspace/calendar-core/sanitize-email-html";
+import {
+  mailEditorCommandScript,
+  parseMailEditorEvent,
+  type MailEditorCommand,
+  type MailEditorFormat,
+  type MailEditorFormatState,
+} from "@workspace/mail-editor/protocol";
+import { MAIL_EDITOR_WEBVIEW_SCRIPT } from "@workspace/mail-editor/webview-script";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { useMailSkin, type MailSkin } from "@workspace/native-core/components/mail/mail-ui";
@@ -47,49 +51,49 @@ try {
   WebView = null;
 }
 
+/** Whether this binary can run the rich editor; without the WebView module compose writes plain text. */
+export const RICH_COMPOSE_AVAILABLE = WebView !== null;
+
+/** A flush the page never answers (it reloaded or hung) falls back to the last HTML it posted. */
+const FLUSH_TIMEOUT_MS = 1500;
+
+export type ComposeSignatureCommand = Omit<
+  Extract<MailEditorCommand, { type: "applySignature" }>,
+  "type"
+>;
+
 export type ComposeBodyEditorHandle = {
-  applyBold: () => void;
-  applyItalic: () => void;
-  applyUnderline: () => void;
-  applyList: () => void;
+  format: (format: MailEditorFormat) => void;
+  setLink: (href: string | null) => void;
+  /** Inserts a template at the caret (the start when the body was never focused), replacing a selection. */
+  insertTemplate: (text: string) => void;
+  insertImage: (src: string, alt: string) => void;
+  applySignature: (input: ComposeSignatureCommand) => void;
+  /** Puts loaded quoted images in place (and drops failed ones) without replacing the page's content. */
+  updateImages: (sources: ReadonlyMap<string, string>, drop: ReadonlySet<string>) => void;
+  /** The editor's current HTML, including keystrokes it has not posted yet; null while composing plain text. */
+  flush: () => Promise<string | null>;
 };
 
 type ComposeBodyEditorProps = {
-  value: string;
+  html: string;
+  text: string;
+  /** Plain-text compose edits `text` in a native field and sends no HTML. */
+  plainText: boolean;
   bodySourceVersion: number;
+  onChangeHtml: (html: string) => void;
   onChangeText: (text: string) => void;
+  onFormatState?: (state: MailEditorFormatState) => void;
+  /** The page's own serialization of the body it was just given. */
+  onBaseline?: (html: string) => void;
   placeholder: string;
   inputAccessoryViewID?: string;
   onFocusChange?: (focused: boolean) => void;
 };
 
-type EditorMessage =
-  | { type: "change"; html: string }
-  | { type: "ready" }
-  | { type: "focus" }
-  | { type: "blur" };
-
-function parseEditorMessage(raw: string): EditorMessage | null {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null) return null;
-    const message = parsed as { type?: unknown; html?: unknown };
-    if (message.type === "change") {
-      return typeof message.html === "string"
-        ? { type: "change", html: message.html }
-        : null;
-    }
-    if (
-      message.type === "ready" ||
-      message.type === "focus" ||
-      message.type === "blur"
-    ) {
-      return { type: message.type };
-    }
-    return null;
-  } catch {
-    return null;
-  }
+/** Page config is JSON in a script element, so a `<` could close it early. */
+function scriptJson(value: unknown): string {
+  return JSON.stringify(value).replace(/</g, "\\u003c");
 }
 
 function buildEditorDocument(input: {
@@ -99,181 +103,125 @@ function buildEditorDocument(input: {
   skin: MailSkin;
 }): string {
   const { html, placeholder, theme, skin } = input;
-  const fontSize = skin.body.fontSize;
-  const lineHeight = skin.body.lineHeight;
+  const { colors, spacing, borderRadius } = theme;
+  const csp =
+    "img-src data:; connect-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; form-action 'none'; base-uri 'none'";
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="${csp}" />
   <style>
+    :root { --accent: ${colors.primaryBase}; --border: ${skin.borderPrimary}; }
     html, body {
       margin: 0;
       padding: 0;
-      height: 100%;
-      background: ${theme.colors.card};
-      color: ${theme.colors.foreground};
-      font-size: ${fontSize}px;
-      line-height: ${lineHeight}px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
-    #ed {
       min-height: 100%;
-      padding: ${theme.spacing["3"]}px ${theme.spacing["4"]}px;
+      background: ${colors.card};
+      color: ${colors.foreground};
+      font-size: ${skin.body.fontSize}px;
+      line-height: ${skin.body.lineHeight}px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-text-size-adjust: 100%;
+    }
+    .tiptap {
+      min-height: 100dvh;
+      box-sizing: border-box;
+      padding: ${spacing["3"]}px ${spacing["4"]}px;
       outline: none;
-      caret-color: ${theme.colors.primaryBase};
-      -webkit-user-select: text;
-      user-select: text;
+      caret-color: ${colors.primaryBase};
+      overflow-wrap: break-word;
     }
-    #ed:empty:before {
-      content: attr(data-placeholder);
-      color: ${skin.textTertiary};
-    }
-    #ed .quote {
-      margin-top: ${theme.spacing["2"]}px;
-      padding-left: ${theme.spacing["3"]}px;
+    .tiptap p { margin: 0.25em 0; }
+    .tiptap h1 { font-size: 1.5em; font-weight: 700; margin: 0.5em 0; }
+    .tiptap h2 { font-size: 1.25em; font-weight: 600; margin: 0.5em 0; }
+    .tiptap ul, .tiptap ol { padding-left: 1.5em; margin: 0.25em 0; }
+    .tiptap li { margin: 0.125em 0; }
+    .tiptap blockquote {
+      margin: 0.5em 0;
+      padding-left: ${spacing["3"]}px;
       border-left: 2px solid ${skin.borderPrimary};
       color: ${skin.textSecondary};
     }
-    #ed .quote.collapsed {
-      position: relative;
-      max-height: ${lineHeight}px;
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
-      padding-right: ${theme.spacing["10"]}px;
-      cursor: pointer;
+    .tiptap pre, .tiptap code { font-family: ui-monospace, Menlo, monospace; font-size: 0.9em; }
+    .tiptap pre { white-space: pre-wrap; padding: ${spacing["2"]}px; border-radius: ${borderRadius.sm}px; border: 1px solid ${skin.borderPrimary}; }
+    .tiptap a { color: ${colors.primaryBase}; text-decoration: underline; }
+    .tiptap img { max-width: 100%; height: auto; }
+    .tiptap table { border-collapse: collapse; width: 100%; }
+    .tiptap td, .tiptap th { border: 1px solid ${skin.borderPrimary}; padding: 4px 6px; vertical-align: top; }
+    .tiptap table p { margin: 0; }
+    .tiptap hr { border: none; border-top: 1px solid ${skin.borderPrimary}; }
+    .tiptap p.is-editor-empty:first-child::before {
+      content: attr(data-placeholder);
+      float: left;
+      height: 0;
+      color: ${skin.textTertiary};
+      pointer-events: none;
     }
-    #ed .quote.collapsed::after {
-      content: "\\2022\\2022\\2022";
-      position: absolute;
-      top: 0;
-      right: 0;
-      padding: 0 ${theme.spacing["2"]}px;
-      border-radius: ${theme.borderRadius.sm}px;
-      background: ${skin.borderPrimary};
+    .quote-toggle, .quote-remove {
+      display: inline-flex;
+      align-items: center;
+      gap: ${spacing["2"]}px;
+      min-height: 44px;
+      padding: 0;
+      border: 0;
+      background: none;
       color: ${skin.textSecondary};
+      font: inherit;
+      font-size: 14px;
+      -webkit-tap-highlight-color: transparent;
     }
-    strong, b { font-weight: 700; }
-    em, i { font-style: italic; }
-    u { text-decoration: underline; }
-    ul { margin: 0; padding-left: 1.25em; }
+    .quote-toggle { min-width: 0; }
+    .quote-toggle svg { flex-shrink: 0; color: ${skin.textTertiary}; }
+    .quote-toggle span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .quote-remove { margin-left: auto; padding-left: ${spacing["3"]}px; }
+    .quote-toggle:active, .quote-remove:active { opacity: 0.6; }
   </style>
 </head>
 <body>
-  <div id="ed" role="textbox" aria-label="Message body" aria-multiline="true" contenteditable="true" data-placeholder="${escapeHtmlAttribute(placeholder)}">${sanitizeUntrustedEmailHtml(html)}</div>
-  <script>
-    (function() {
-      var ed = document.getElementById('ed');
-      var skip = false;
-      function post(payload) {
-        window.ReactNativeWebView.postMessage(JSON.stringify(payload));
-      }
-      // Marks and attributes only: they are dropped when the HTML is converted back to compose text, so the sent body keeps the quote.
-      var replyQuoteHeader = new RegExp(${JSON.stringify(REPLY_QUOTE_HEADER_PATTERN)});
-      var forwardedHeader = ${JSON.stringify(FORWARDED_MESSAGE_HEADER)};
-      var quoteExpanded = false;
-      function collapseReplyQuote(block) {
-        block.classList.add('collapsed');
-        block.setAttribute('contenteditable', 'false');
-        block.setAttribute('role', 'button');
-        block.setAttribute('aria-expanded', 'false');
-        block.setAttribute('aria-label', ${JSON.stringify(QUOTE_FOLD_LABEL)});
-      }
-      function expandReplyQuote(block) {
-        quoteExpanded = true;
-        block.classList.remove('collapsed');
-        ['contenteditable', 'role', 'aria-expanded', 'aria-label'].forEach(function(name) {
-          block.removeAttribute(name);
-        });
-      }
-      function markQuotes() {
-        var blocks = ed.querySelectorAll('p');
-        for (var i = 0; i < blocks.length; i++) {
-          var text = blocks[i].textContent || '';
-          if (replyQuoteHeader.test(text.replace(/^\\s+/, ''))) {
-            blocks[i].classList.add('quote');
-            // A long quoted chain under the reply crowds the editor on a phone, so it starts folded to its header.
-            if (!quoteExpanded) collapseReplyQuote(blocks[i]);
-          } else if (text.indexOf(forwardedHeader) === 0) {
-            blocks[i].classList.add('quote');
-          }
-        }
-      }
-      window.setHtml = function(next) {
-        skip = true;
-        ed.innerHTML = next || '';
-        markQuotes();
-        skip = false;
-      };
-      markQuotes();
-      window.applyFormat = function(command) {
-        ed.focus();
-        document.execCommand(command, false, null);
-        post({ type: 'change', html: ed.innerHTML });
-      };
-      ed.addEventListener('input', function() {
-        if (skip) return;
-        var html = ed.innerHTML;
-        if (html === '<br>' || html === '<div><br></div>' || html === '<p><br></p>') {
-          ed.innerHTML = '';
-          html = '';
-        }
-        post({ type: 'change', html: html });
-      });
-      ed.addEventListener('focus', function() {
-        post({ type: 'focus' });
-      });
-      ed.addEventListener('click', function(event) {
-        var quote = event.target && event.target.closest ? event.target.closest('.quote.collapsed') : null;
-        if (quote) expandReplyQuote(quote);
-        post({ type: 'focus' });
-      });
-      ed.addEventListener('blur', function() {
-        post({ type: 'blur' });
-      });
-      post({ type: 'ready' });
-    })();
-    true;
-  </script>
+  <div id="editor"></div>
+  <script>window.__solaceMailEditorConfig=${scriptJson({ html, placeholder })};</script>
+  <script>${MAIL_EDITOR_WEBVIEW_SCRIPT}</script>
 </body>
 </html>`;
-}
-
-function escapeHtmlAttribute(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
 }
 
 export const ComposeBodyEditor = forwardRef<
   ComposeBodyEditorHandle,
   ComposeBodyEditorProps
 >(function ComposeBodyEditor(
-  { value, bodySourceVersion, onChangeText, placeholder, inputAccessoryViewID, onFocusChange },
+  {
+    html,
+    text,
+    plainText,
+    bodySourceVersion,
+    onChangeHtml,
+    onChangeText,
+    onFormatState,
+    onBaseline,
+    placeholder,
+    inputAccessoryViewID,
+    onFocusChange,
+  },
   ref,
 ) {
   const { theme } = useTheme();
   const skin = useMailSkin();
   const styles = createStyles(theme, skin);
+  const rich = WebView !== null && !plainText;
   const injectJavaScriptRef = useRef<((script: string) => void) | null>(null);
-  const lastEmittedRef = useRef(value);
+  const readyRef = useRef(false);
+  const queuedRef = useRef<MailEditorCommand[]>([]);
+  const lastHtmlRef = useRef(html);
   const appliedBodySourceVersion = useRef(bodySourceVersion);
-  const [selection, setSelection] = useState<TextSelection>({
-    start: 0,
-    end: 0,
-  });
+  const flushIdRef = useRef(0);
+  const flushesRef = useRef(new Map<number, (html: string) => void>());
+  const [selection, setSelection] = useState<TextSelection>({ start: 0, end: 0 });
   const [editorReady, setEditorReady] = useState(false);
-  const buildDocument = () =>
-    buildEditorDocument({
-      html: composeTextToHtml(value),
-      placeholder,
-      theme,
-      skin,
-    });
-  // Typing updates the page through setHtml, so the document is rebuilt (and the editor reloads) only when its chrome changes.
+  const reveal = useEditorReveal(editorReady && rich);
+  const buildDocument = () => buildEditorDocument({ html, placeholder, theme, skin });
+  // Typing updates the page in place, so the document is rebuilt (and the editor reloads) only when its chrome changes.
   const [editorPage, setEditorPage] = useState(() => ({
     placeholder,
     theme,
@@ -288,109 +236,124 @@ export const ComposeBodyEditor = forwardRef<
     setEditorPage({ placeholder, theme, skin, document: buildDocument() });
     setEditorReady(false);
   }
-  const { document } = editorPage;
 
-  const applyFallback = (
-    fn: (
-      text: string,
-      nextSelection: TextSelection,
-    ) => { text: string; selection: TextSelection },
+  const run = (command: MailEditorCommand) => {
+    if (!readyRef.current) {
+      queuedRef.current.push(command);
+      return;
+    }
+    injectJavaScriptRef.current?.(mailEditorCommandScript(command));
+  };
+
+  const applyText = (
+    fn: (current: string, currentSelection: TextSelection) => { text: string; selection: TextSelection },
   ) => {
-    const next = fn(value, selection);
-    lastEmittedRef.current = next.text;
+    const next = fn(text, selection);
     onChangeText(next.text);
     setSelection(next.selection);
   };
 
-  const injectFormat = (command: string) => {
-    injectJavaScriptRef.current?.(
-      `window.applyFormat(${JSON.stringify(command)}); true;`,
-    );
-  };
+  useImperativeHandle(ref, () => ({
+    format: (format) => run({ type: "format", format }),
+    setLink: (href) => run({ type: "setLink", href }),
+    insertTemplate: (template) => {
+      if (rich) {
+        run({ type: "insertHtml", html: plainTextToComposeHtml(template), afterSelection: false });
+        return;
+      }
+      applyText((current, currentSelection) => insertMailTemplateText(current, currentSelection, template));
+    },
+    insertImage: (src, alt) => run({ type: "insertImage", src, alt }),
+    applySignature: (input) => run({ type: "applySignature", ...input }),
+    updateImages: (sources, drop) =>
+      run({ type: "updateImages", sources: Object.fromEntries(sources), drop: Array.from(drop) }),
+    flush: () => {
+      if (!rich) return Promise.resolve(null);
+      // Before the page is ready it holds nothing newer than the body it is being given.
+      if (!readyRef.current) return Promise.resolve(html);
+      const id = (flushIdRef.current += 1);
+      return new Promise<string>((resolve) => {
+        const timer = setTimeout(() => {
+          flushesRef.current.delete(id);
+          resolve(lastHtmlRef.current);
+        }, FLUSH_TIMEOUT_MS);
+        flushesRef.current.set(id, (flushed) => {
+          clearTimeout(timer);
+          resolve(flushed);
+        });
+        run({ type: "flush", id });
+      });
+    },
+  }));
 
-  useImperativeHandle(
-    ref,
-    () => ({
-      applyBold: () => {
-        if (WebView && editorReady) {
-          injectFormat("bold");
-          return;
-        }
-        applyFallback(applyComposeBold);
-      },
-      applyItalic: () => {
-        if (WebView && editorReady) {
-          injectFormat("italic");
-          return;
-        }
-        applyFallback(applyComposeItalic);
-      },
-      applyUnderline: () => {
-        if (WebView && editorReady) {
-          injectFormat("underline");
-          return;
-        }
-        applyFallback(applyComposeUnderline);
-      },
-      applyList: () => {
-        if (WebView && editorReady) {
-          injectFormat("insertUnorderedList");
-          return;
-        }
-        applyFallback(toggleComposeList);
-      },
-    }),
-  );
+  // A rebuilt page starts unready, so commands wait for its ready message again.
+  useEffect(() => {
+    readyRef.current = false;
+  }, [editorPage.document]);
 
   useEffect(() => {
-    // A React render can acknowledge older keystrokes after the WebView has already emitted newer ones.
-    if (!WebView || !editorReady || bodySourceVersion === appliedBodySourceVersion.current) {
-      return;
-    }
+    // A React render can acknowledge older keystrokes after the page has already posted newer ones.
+    if (!rich || !editorReady || bodySourceVersion === appliedBodySourceVersion.current) return;
     appliedBodySourceVersion.current = bodySourceVersion;
-    if (value === lastEmittedRef.current) return;
-    lastEmittedRef.current = value;
-    injectJavaScriptRef.current?.(
-      `window.setHtml(${JSON.stringify(composeTextToHtml(value))}); true;`,
-    );
-  }, [bodySourceVersion, editorReady, value]);
+    if (html === lastHtmlRef.current) return;
+    lastHtmlRef.current = html;
+    injectJavaScriptRef.current?.(mailEditorCommandScript({ type: "setContent", html }));
+  }, [bodySourceVersion, editorReady, html, rich]);
+
+  const acceptHtml = (next: string) => {
+    if (next === lastHtmlRef.current) return;
+    lastHtmlRef.current = next;
+    onChangeHtml(next);
+  };
 
   const onMessage = (event: WebViewMessageEvent) => {
-    const message = parseEditorMessage(event.nativeEvent.data);
+    const message = parseMailEditorEvent(event.nativeEvent.data);
     if (!message) return;
-    if (message.type === "ready") {
-      setEditorReady(true);
-      return;
+    switch (message.type) {
+      case "ready": {
+        readyRef.current = true;
+        const queued = queuedRef.current.splice(0);
+        for (const command of queued) injectJavaScriptRef.current?.(mailEditorCommandScript(command));
+        setEditorReady(true);
+        return;
+      }
+      case "baseline":
+        onBaseline?.(message.html);
+        return;
+      case "change":
+        acceptHtml(message.html);
+        return;
+      case "flushed": {
+        acceptHtml(message.html);
+        const resolve = flushesRef.current.get(message.id);
+        flushesRef.current.delete(message.id);
+        resolve?.(message.html);
+        return;
+      }
+      case "state":
+        onFormatState?.(message.state);
+        return;
+      case "focus":
+        onFocusChange?.(true);
+        return;
+      case "blur":
+        onFocusChange?.(false);
+        return;
     }
-    if (message.type === "focus") {
-      onFocusChange?.(true);
-      return;
-    }
-    if (message.type === "blur") {
-      onFocusChange?.(false);
-      return;
-    }
-    const sanitizedHtml = sanitizeUntrustedEmailHtml(message.html);
-    const next = htmlToComposeText(sanitizedHtml);
-    if (next === lastEmittedRef.current) return;
-    lastEmittedRef.current = next;
-    onChangeText(next);
   };
 
+  // The quote renders in a srcdoc frame; nothing else may load in the editor page.
   const onShouldStartLoadWithRequest = (request: ShouldStartLoadRequest) => {
     const url = request.url;
-    return url === "about:blank" || url.startsWith("data:");
+    return url === "about:blank" || url === "about:srcdoc" || url.startsWith("data:");
   };
 
-  if (!WebView) {
+  if (!rich || !WebView) {
     return (
       <TextInput
         style={styles.fallbackInput}
-        value={value}
-        onChangeText={(text) => {
-          lastEmittedRef.current = text;
-          onChangeText(text);
-        }}
+        value={text}
+        onChangeText={onChangeText}
         onSelectionChange={(event) => setSelection(event.nativeEvent.selection)}
         placeholder={placeholder}
         placeholderTextColor={skin.textTertiary}
@@ -409,8 +372,8 @@ export const ComposeBodyEditor = forwardRef<
 
   return (
     <View style={styles.container}>
-      <View
-        style={styles.webView}
+      <Animated.View
+        style={[styles.webView, reveal.editorStyle]}
         pointerEvents={editorReady ? "auto" : "none"}
         accessibilityElementsHidden={!editorReady}
         importantForAccessibility={editorReady ? "auto" : "no-hide-descendants"}
@@ -420,8 +383,8 @@ export const ComposeBodyEditor = forwardRef<
             injectJavaScriptRef.current =
               instance?.injectJavaScript?.bind(instance) ?? null;
           }}
-          originWhitelist={["about:blank", "data:"]}
-          source={{ html: document }}
+          originWhitelist={["about:blank", "about:srcdoc", "data:"]}
+          source={{ html: editorPage.document }}
           onMessage={onMessage}
           onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
           hideKeyboardAccessoryView
@@ -434,25 +397,71 @@ export const ComposeBodyEditor = forwardRef<
           nestedScrollEnabled
           style={styles.webView}
         />
-      </View>
-      {!editorReady ? (
-        <View style={styles.preparing} testID="compose-body-preparing">
-          <ScrollView style={styles.webView}>
-            <Text
-              style={[styles.previewText, !value ? styles.preparingText : null]}
-            >
-              {value || placeholder}
-            </Text>
-          </ScrollView>
+      </Animated.View>
+      {reveal.previewShown ? (
+        <Animated.View
+          style={[styles.preparing, reveal.previewStyle]}
+          pointerEvents="none"
+          accessibilityElementsHidden={editorReady}
+          importantForAccessibility={editorReady ? "no-hide-descendants" : "auto"}
+          testID={editorReady ? undefined : "compose-body-preparing"}
+        >
+          <ComposeBodyPreview html={html} placeholder={placeholder} styles={styles} />
           <View style={styles.preparingNotice}>
             <ActivityIndicator size="small" color={skin.textTertiary} />
             <Text style={styles.preparingText}>Preparing editor…</Text>
           </View>
-        </View>
+        </Animated.View>
       ) : null}
     </View>
   );
 });
+
+const REVEAL_MS = 180;
+
+/** The ready editor fades in over its text preview after it has painted; the preview leaves once it is covered. */
+function useEditorReveal(ready: boolean) {
+  const reveal = useSharedValue(0);
+  const [revealed, setRevealed] = useState(false);
+  if (!ready && revealed) setRevealed(false);
+  useEffect(() => {
+    if (!ready) {
+      reveal.set(0);
+      return;
+    }
+    return afterPaint(() => {
+      reveal.set(
+        withTiming(1, { duration: REVEAL_MS }, (finished) => {
+          if (finished) scheduleOnRN(setRevealed, true);
+        }),
+      );
+    });
+  }, [ready, reveal]);
+  return {
+    previewShown: !revealed,
+    editorStyle: useAnimatedStyle(() => ({ opacity: reveal.get() })),
+    previewStyle: useAnimatedStyle(() => ({ opacity: 1 - reveal.get() })),
+  };
+}
+
+function ComposeBodyPreview({
+  html,
+  placeholder,
+  styles,
+}: {
+  html: string;
+  placeholder: string;
+  styles: ReturnType<typeof createStyles>;
+}) {
+  const preview = htmlToPlainText(html);
+  return (
+    <ScrollView style={styles.webView}>
+      <Text style={[styles.previewText, !preview ? styles.preparingText : null]}>
+        {preview || placeholder}
+      </Text>
+    </ScrollView>
+  );
+}
 
 function createStyles(theme: ThemeTokens, skin: MailSkin) {
   const bodyText = {

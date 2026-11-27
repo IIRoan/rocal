@@ -188,6 +188,16 @@ export function useMailListController() {
     );
   };
 
+  const { markMailboxAsRead } = mutations;
+  const handleMarkMailboxAsRead = () => {
+    if (!selectedMailbox) return;
+    const name = getMailboxDisplayName(selectedMailbox);
+    markMailboxAsRead.mutate(selectedMailbox.id, {
+      onError: (error) =>
+        toast(getErrorMessage(error, `Could not mark ${name} as read.`), "error"),
+    });
+  };
+
   const drawerMailboxes = filterVisibleMailboxes(sortMailboxes(mailboxes), hiddenIds);
 
   const bulkMoveTargets = mailboxes.filter(
@@ -284,6 +294,10 @@ export function useMailListController() {
     handleSelectMailbox,
     handleEmptyMailbox,
     emptyingMailboxId,
+    markReadMailbox:
+      selectedMailbox && list.unreadThreadCount > 0 ? selectedMailbox : null,
+    handleMarkMailboxAsRead,
+    markingMailboxRead: markMailboxAsRead.isPending,
     filterOpen,
     listFilters: search.listFilters,
     handleListFiltersChange: search.handleListFiltersChange,

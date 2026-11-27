@@ -1,7 +1,10 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Alert, Keyboard, Text, View } from "react-native";
-import type { RecurrenceEditScope } from "@workspace/calendar-core";
-import { resolveTimezone } from "@workspace/calendar-core";
+import type {
+  CreateEventRequest,
+  RecurrenceEditScope,
+} from "@workspace/calendar-core";
+import { canDuplicateEvent, resolveTimezone } from "@workspace/calendar-core";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { useEventReminders } from "../../hooks/use-event-reminders";
 import { useCategories } from "../../hooks/use-categories";
@@ -34,7 +37,10 @@ import { EventForm, type EventFormHandle } from "./EventForm";
 import { formatRecurrenceLabel } from "./event-detail-utils";
 import { resolveEventSheetViewActions } from "./event-sheet-view-actions";
 import { createEventSheetStyles } from "./event-sheet-styles";
-import { eventSheetInitialValues } from "./event-sheet-initial-values";
+import {
+  eventDuplicateInitialValues,
+  eventSheetInitialValues,
+} from "./event-sheet-initial-values";
 import { EventDetailsView } from "./EventDetailsView";
 import { EventSheetHeader } from "./EventSheetHeader";
 import { EventViewFooter } from "./EventViewFooter";
@@ -48,6 +54,8 @@ export type EventSheetMode =
       /** UTC ISO instants of a swept range; they win over `date` and `hour`. */
       start?: string;
       end?: string;
+      /** A copy of another event; it wins over every other seed. */
+      duplicate?: EventSheetDuplicate;
     }
   | { type: "view"; eventId: string }
   | {
@@ -56,12 +64,18 @@ export type EventSheetMode =
       scope?: RecurrenceEditScope;
     };
 
+export type EventSheetDuplicate = {
+  values: Partial<CreateEventRequest>;
+  reminders: number[];
+};
+
 export interface EventSheetProps {
   visible: boolean;
   mode: EventSheetMode | null;
   presentKey?: number;
   onDismiss: () => void;
   onCloseComplete?: () => void;
+  onDuplicate: (duplicate: EventSheetDuplicate) => void;
 }
 
 interface EventSheetEditState {
@@ -84,6 +98,7 @@ export function EventSheet({
   presentKey,
   onDismiss,
   onCloseComplete,
+  onDuplicate,
 }: EventSheetProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => createEventSheetStyles(theme), [theme]);
@@ -209,9 +224,10 @@ export function EventSheet({
     onDelete: deleteEvent,
   });
 
+  const defaultDuration = settings?.defaultEventDuration;
   const initialValues = useMemo(
-    () => eventSheetInitialValues(mode, event, resolvedTimezone),
-    [event, mode, resolvedTimezone],
+    () => eventSheetInitialValues(mode, event, resolvedTimezone, defaultDuration),
+    [event, mode, resolvedTimezone, defaultDuration],
   );
 
   // Create needs no server data; editing waits for saved reminders because the form seeds them once.
@@ -237,6 +253,20 @@ export function EventSheet({
         null)
       : null;
   const viewActions = resolveEventSheetViewActions(event);
+  const canDuplicate =
+    !!event &&
+    !isOptimisticId(event.id) &&
+    !remindersLoading &&
+    canDuplicateEvent(event, calendars ?? []);
+  const handleDuplicate = useCallback(() => {
+    if (!event) return;
+    const values = eventDuplicateInitialValues(
+      event,
+      calendars ?? [],
+      resolvedTimezone,
+    );
+    if (values) onDuplicate({ values, reminders: eventReminders });
+  }, [calendars, event, eventReminders, onDuplicate, resolvedTimezone]);
   const { exporting, exportIcs } = useEventIcsExport(
     event,
     calendarInfo?.name,
@@ -265,9 +295,11 @@ export function EventSheet({
             !isLoading
           }
           exporting={exporting}
+          canDuplicate={viewMode === "view" && canDuplicate && !isLoading}
           onCancel={handleCancel}
           onSave={() => formRef.current?.submit()}
           onExport={exportIcs}
+          onDuplicate={handleDuplicate}
         />
         {isLoading ? (
           <CenteredLoader theme={theme} message="Loading…" />
@@ -321,11 +353,16 @@ export function EventSheet({
               onSubmit={handleSubmit}
               onCancel={handleCancel}
               initialValues={initialValues}
-              initialReminders={isCreate ? undefined : eventReminders}
+              initialReminders={
+                mode?.type === "create"
+                  ? mode.duplicate?.reminders
+                  : eventReminders
+              }
               timezone={resolvedTimezone}
               timeFormat={timeFormat}
               isCreate={isCreate}
               defaultDurationMinutes={settings?.defaultEventDuration}
+              defaultReminderMinutes={settings?.defaultReminderMinutes}
             />
           </View>
         )}

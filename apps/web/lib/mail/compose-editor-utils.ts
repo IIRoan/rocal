@@ -1,5 +1,7 @@
+import type { Editor } from "@tiptap/react";
+import type { InlineImageUpload } from "@/components/mail/rich-text-editor";
 import { getComposeInlineImages } from "./compose-inline-images";
-import { sanitizeUntrustedEmailHtml } from "@workspace/calendar-core/sanitize-email-html";
+import { extractComposeInlineImages } from "@workspace/calendar-core";
 
 export type QuotedInlineAttachment = {
   blobId?: string | null;
@@ -10,71 +12,20 @@ export type QuotedInlineAttachment = {
   cid?: string | null;
 };
 
-const HTML_ESCAPE_MAP = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;",
-} as const;
+type ComposeInlineAttachment = {
+  blobId: string | null;
+  name: string;
+  type: string;
+  size: number;
+  disposition: "inline";
+  cid: string;
+  content: Uint8Array;
+};
 
-export const INLINE_IMAGE_PLACEHOLDER =
-  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-
-export function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (char) =>
-    HTML_ESCAPE_MAP[char as keyof typeof HTML_ESCAPE_MAP],
-  );
-}
-
-export function plainTextToComposerBody(text: string): string {
-  if (!text) return "";
-
-  return text
-    .replace(/\r\n?/g, "\n")
-    .split(/\n{2,}/)
-    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`)
-    .join("");
-}
-
-/** Strip unsafe tags from quoted email HTML before embedding in QuotedHtml. */
-export function sanitizeQuotedEmailHtml(html: string): string {
-  if (typeof document === "undefined") {
-    return sanitizeUntrustedEmailHtml(html);
-  }
-  return sanitizeUntrustedEmailHtml(html);
-}
-
-export function rewriteCidImagesForEditor(html: string): string {
-  if (!html || html.indexOf("cid:") === -1) return html;
-  if (typeof document === "undefined") return html;
-  const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
-  let touched = false;
-  doc.querySelectorAll("img").forEach((img) => {
-    const src = img.getAttribute("src") || "";
-    if (!/^cid:/i.test(src)) return;
-    const cid = src.slice(4);
-    if (!cid) return;
-    if (!img.getAttribute("data-cid")) {
-      img.setAttribute("data-cid", cid);
-    }
-    img.setAttribute("src", INLINE_IMAGE_PLACEHOLDER);
-    touched = true;
-  });
-  return touched ? doc.body.innerHTML : html;
-}
-
+/** Points compose images at `cid:` parts: known ones keep their blob, any other embedded image (a reopened draft's) is decoded from its data URL. */
 export function rewriteComposeInlineImages(html: string): {
   html: string;
-  attachments: Array<{
-    blobId: string | null;
-    name: string;
-    type: string;
-    size: number;
-    disposition: "inline";
-    cid: string;
-    content: Uint8Array;
-  }>;
+  attachments: ComposeInlineAttachment[];
 } {
   const known = getComposeInlineImages();
   if (typeof document === "undefined") {
@@ -101,49 +52,53 @@ export function rewriteComposeInlineImages(html: string): {
     p.setAttribute("style", `margin:0;${existing}`);
   });
 
+  const embedded = extractComposeInlineImages(doc.body.innerHTML, () => `${crypto.randomUUID()}@solace`);
   return {
-    html: doc.body.innerHTML,
-    attachments: Array.from(used.values()).map((entry) => ({
-      blobId: entry.blobId,
-      name: entry.name,
-      type: entry.type,
-      size: entry.size,
-      disposition: "inline" as const,
-      cid: entry.cid,
-      content: entry.content,
-    })),
+    html: embedded.html,
+    attachments: [
+      ...Array.from(used.values()).map((entry) => ({
+        blobId: entry.blobId,
+        name: entry.name,
+        type: entry.type,
+        size: entry.size,
+        disposition: "inline" as const,
+        cid: entry.cid,
+        content: entry.content,
+      })),
+      ...embedded.images.map((image) => ({
+        blobId: null,
+        name: image.filename,
+        type: image.contentType,
+        size: image.content.byteLength,
+        disposition: "inline" as const,
+        cid: image.cid,
+        content: image.content,
+      })),
+    ],
   };
 }
 
-export function htmlHasUnhydratedInlinePlaceholders(html: string): boolean {
-  return (
-    html.includes("data-cid") && html.includes(INLINE_IMAGE_PLACEHOLDER)
-  );
-}
-
-export function replaceInlineImagePlaceholders(
-  html: string,
-  cidToDataUrl: Map<string, string>,
-): string {
-  if (!html || cidToDataUrl.size === 0) return html;
-  if (html.indexOf("data-cid") === -1) return html;
-  if (typeof document === "undefined") return html;
-  const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
-  let changed = false;
-  doc.querySelectorAll("img[data-cid]").forEach((img) => {
-    const cid = img.getAttribute("data-cid");
-    if (!cid) return;
-    const dataUrl = cidToDataUrl.get(cid);
-    if (!dataUrl) return;
-    const currentSrc = img.getAttribute("src") || "";
-    if (
-      currentSrc !== INLINE_IMAGE_PLACEHOLDER &&
-      !/^cid:/i.test(currentSrc)
-    ) {
-      return;
-    }
-    img.setAttribute("src", dataUrl);
-    changed = true;
-  });
-  return changed ? doc.body.innerHTML : html;
+/** Uploads each image and inserts it once uploaded, at `position()` when that gives one, else at the cursor. */
+export function insertUploadedImages(
+  editor: Editor,
+  files: File[],
+  upload: (file: File) => Promise<InlineImageUpload | null>,
+  position?: () => number | undefined,
+) {
+  for (const file of files) {
+    // upload (handleComposeImageUpload) reports failures itself and returns null.
+    void upload(file)
+      .then((result) => {
+        if (!result) return;
+        const at = position?.();
+        requestAnimationFrame(() => {
+          if (editor.isDestroyed) return;
+          const image = { type: "image", attrs: { src: result.src, alt: file.name, cid: result.cid } };
+          const chain = editor.chain().focus();
+          if (typeof at === "number") chain.insertContentAt(at, image).run();
+          else chain.insertContent(image).run();
+        });
+      })
+      .catch(() => undefined);
+  }
 }

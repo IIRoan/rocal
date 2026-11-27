@@ -108,6 +108,20 @@ export function createEventSheetStyles(theme: ThemeTokens) {
     viewRowContent: {
       flex: 1,
     },
+    joinButton: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: 6,
+      minHeight: 44,
+      paddingHorizontal: 14,
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: theme.colors.primaryBase,
+    },
+    mapLink: {
+      alignSelf: "flex-start" as const,
+      marginTop: 4,
+      paddingVertical: 4,
+    },
     participantList: {
       gap: 8,
       paddingBottom: 4,
@@ -170,6 +184,16 @@ export function createEventSheetStyles(theme: ThemeTokens) {
     },
     rsvpButtonTextSelected: {
       color: theme.colors.primaryBase,
+    },
+    joinButtonText: {
+      fontSize: theme.typography.fontSize.sm.size,
+      fontWeight: theme.typography.fontWeight
+        .semibold as TextStyle["fontWeight"],
+      color: theme.colors.primaryForeground,
+    },
+    viewLink: {
+      color: theme.colors.primaryBase,
+      textDecorationLine: "underline" as const,
     },
     viewHeaderTitle: {
       flex: 1,

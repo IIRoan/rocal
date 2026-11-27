@@ -685,6 +685,44 @@ export function useMailMutations(
       }),
   });
 
+  const markMailboxAsRead = useMutation({
+    mutationFn: (targetMailboxId: string) => {
+      const rt = requireRuntime();
+      return rt.client.markMailboxAsRead(rt.session, targetMailboxId);
+    },
+    onMutate: async (targetMailboxId) => {
+      const resume = await cancelKeywordReads();
+      const key = QUERY_KEYS.mailMessages(targetMailboxId);
+      const previous = queryClient.getQueryData<MailboxMessagesCacheData>(key);
+      const unreadIds = new Set(
+        flattenMailboxMessagesCache(previous)
+          .filter((message) => !message.keywords?.["$seen"])
+          .map((message) => message.id),
+      );
+      const patched = previous
+        ? patchMailboxMessagesCache(previous, unreadIds, (message) => ({
+            keywords: { ...message.keywords, $seen: true },
+          }))
+        : null;
+      if (patched) queryClient.setQueryData(key, patched);
+      return { resume, previous };
+    },
+    onError: (_error, targetMailboxId, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(
+          QUERY_KEYS.mailMessages(targetMailboxId),
+          context.previous,
+        );
+      }
+    },
+    onSettled: (_count, _error, targetMailboxId, context) => {
+      context?.resume().catch(() => undefined);
+      queryClient
+        .invalidateQueries({ queryKey: QUERY_KEYS.mailMessages(targetMailboxId) })
+        .catch(() => undefined);
+    },
+  });
+
   return {
     markAsRead,
     markAsUnread,
@@ -699,6 +737,7 @@ export function useMailMutations(
     bulkMoveToMailbox,
     bulkDestroyMessages,
     emptyMailbox,
+    markMailboxAsRead,
   };
 }
 
@@ -719,6 +758,7 @@ export interface ComposeMessageInput {
   attachments?: JmapAttachmentInput[];
   pgpMimeCiphertext?: JmapPgpMimeCiphertext;
   pgpMimeMessage?: string;
+  signedMimeMessage?: string;
   sentCopyCiphertext: JmapPgpMimeCiphertext | null;
   inReplyTo?: string[];
   references?: string[];
@@ -961,6 +1001,7 @@ export function useSendMessage(runtime: MailRuntime | undefined) {
         attachments: input.attachments,
         pgpMimeCiphertext: input.pgpMimeCiphertext,
         pgpMimeMessage: input.pgpMimeMessage,
+        signedMimeMessage: input.signedMimeMessage,
         sentCopyCiphertext: input.sentCopyCiphertext,
         inReplyTo: input.inReplyTo,
         references: input.references,

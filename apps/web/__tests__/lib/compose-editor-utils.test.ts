@@ -2,39 +2,13 @@
  * @jest-environment jsdom
  */
 import { describe, expect, it } from "@jest/globals";
-import {
-  rewriteCidImagesForEditor,
-  rewriteComposeInlineImages,
-  sanitizeQuotedEmailHtml,
-} from "@/lib/mail/compose-editor-utils";
+import { rewriteComposeInlineImages } from "@/lib/mail/compose-editor-utils";
 import {
   registerComposeInlineImage,
   resetComposeInlineImages,
 } from "@/lib/mail/compose-inline-images";
 
 describe("compose-editor-utils", () => {
-  it("strips unsafe tags from quoted html", () => {
-    const sanitized = sanitizeQuotedEmailHtml(
-      '<p>Hello</p><script>alert(1)</script><style>.x{}</style>',
-    );
-    expect(sanitized).toContain("Hello");
-    expect(sanitized).not.toMatch(/<script/i);
-    expect(sanitized).not.toMatch(/<style/i);
-  });
-
-  it("blocks javascript: URLs in quoted html", () => {
-    const sanitized = sanitizeQuotedEmailHtml(
-      '<a href="javascript:alert(1)">click</a>',
-    );
-    expect(sanitized.toLowerCase()).not.toContain("javascript:");
-  });
-
-  it("rewrites cid images for the editor", () => {
-    const html = rewriteCidImagesForEditor('<img src="cid:abc@x" alt="logo">');
-    expect(html).toContain('data-cid="abc@x"');
-    expect(html).not.toContain('src="cid:');
-  });
-
   it("rewrites inline compose images back to cid references on send", () => {
     resetComposeInlineImages();
     registerComposeInlineImage({

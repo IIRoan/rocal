@@ -46,6 +46,8 @@ type ConversationDecryptedContent = {
   previews: Record<string, string>;
   /** Attachments per thread message, known once a message is decrypted or loaded in full. */
   attachments: Record<string, MailAttachment[]>;
+  /** True while an earlier message's preview is still being decrypted for the first time. */
+  loading: boolean;
 };
 
 async function loadMessageForPreview(input: {
@@ -122,7 +124,7 @@ export function useConversationDecryptedPreviews(
     messageNeedsDecryptedPreview(message),
   );
 
-  const decryptedById = useQueries({
+  const { byId: decryptedById, loading } = useQueries({
     queries: encryptedMessages.map((message) => {
       const hasSelectedDecrypt =
         message.id === selectedMessageId &&
@@ -149,15 +151,15 @@ export function useConversationDecryptedPreviews(
       };
     }),
     combine: (results) => {
-      const map = new Map<string, ConversationMessageContent>();
+      const byId = new Map<string, ConversationMessageContent>();
       for (let index = 0; index < encryptedMessages.length; index += 1) {
         const message = encryptedMessages[index];
         const data = results[index]?.data;
         if (message && data) {
-          map.set(message.id, data);
+          byId.set(message.id, data);
         }
       }
-      return map;
+      return { byId, loading: results.some((result) => result.isLoading) };
     },
   });
 
@@ -183,5 +185,5 @@ export function useConversationDecryptedPreviews(
       previews[message.id] = snippet;
     }
   }
-  return { previews, attachments };
+  return { previews, attachments, loading };
 }

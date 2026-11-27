@@ -31,12 +31,6 @@ jest.mock("sonner", () => ({
   },
 }));
 
-jest.mock("@workspace/calendar-core", () => ({
-  enrichSelfMailRecipient: (recipient: { email: string; name?: string | null }) =>
-    recipient,
-  isCurrentUserMailAddress: () => false,
-}));
-
 jest.mock("../../components/mail/mail-avatar", () => ({
   SenderAvatar: () => <span>avatar</span>,
 }));
@@ -45,10 +39,7 @@ jest.mock("@workspace/ui/lib/utils", () => ({
   cn: (...args: string[]) => args.filter(Boolean).join(" "),
 }));
 
-import {
-  RecipientPopover,
-  RecipientPopoverList,
-} from "../../components/mail/recipient-popover";
+import { RecipientPopover } from "../../components/mail/recipient-popover";
 import { getMailComposeBridge } from "../../components/mail/mail-compose-bridge";
 
 const mockGetMailComposeBridge = getMailComposeBridge as jest.MockedFunction<
@@ -111,29 +102,6 @@ describe("RecipientPopover", () => {
       email: "alice@example.com",
       name: "Alice",
     });
-  });
-
-  it("reveals recipients past the visible three", () => {
-    act(() => {
-      root.render(
-        <RecipientPopoverList
-          recipients={["a", "b", "c", "d"].map((local) => ({
-            email: `${local}@example.com`,
-          }))}
-        />,
-      );
-    });
-
-    expect(container.textContent).not.toContain("d@example.com");
-    const more = findButton("more recipients");
-    expect(more?.textContent).toBe("+1 more recipients");
-
-    act(() => {
-      more!.click();
-    });
-
-    expect(container.textContent).toContain("d@example.com");
-    expect(findButton("more recipients")).toBeUndefined();
   });
 
   it("copies the email address to the clipboard", async () => {

@@ -148,9 +148,6 @@ export function AppPreview() {
     moveTargets: [],
     spamActions: { canReportSpam: false, canNotSpam: false },
     display: {
-      isMobile: false,
-      narrow: true,
-      density: "comfortable",
       showLabelChips: false,
       threadExpandEnabled: false,
     },

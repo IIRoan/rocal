@@ -39,6 +39,9 @@ export function createDefaultMailSyncedSettings(): MailSyncedSettings {
       attachmentReminderKeywords: [
         ...DEFAULT_MAIL_COMPOSE_SETTINGS.attachmentReminderKeywords,
       ],
+      templates: [],
+      signatures: [],
+      signatureDefaults: [],
     },
     list: { ...DEFAULT_MAIL_LIST_SETTINGS },
   };

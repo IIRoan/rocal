@@ -163,7 +163,7 @@ describe("decryptEncryptedMessage", () => {
     );
   });
 
-  it("passes the sender key into inline PGP decrypt", async () => {
+  it("passes the sender key and address into inline PGP decrypt", async () => {
     (classifyMessageEncryption as jest.Mock).mockReturnValue("inline_pgp");
     const runtime = createRuntime();
     const message = {
@@ -178,10 +178,12 @@ describe("decryptEncryptedMessage", () => {
       "msg-1",
       "-----BEGIN PGP MESSAGE-----",
       "bob-public-key",
+      undefined,
+      "bob@solace.onl",
     );
   });
 
-  it("passes the sender key into PGP/MIME decrypt", async () => {
+  it("passes the sender key and address into PGP/MIME decrypt", async () => {
     (classifyMessageEncryption as jest.Mock).mockReturnValue("pgp_mime");
     const runtime = createRuntime();
     const message = {
@@ -197,6 +199,8 @@ describe("decryptEncryptedMessage", () => {
       "msg-2",
       message.bodyStructure,
       "bob-public-key",
+      undefined,
+      "bob@solace.onl",
     );
   });
 });

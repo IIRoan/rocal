@@ -16,7 +16,7 @@ import {
   EventReminderMessageBodyLoading,
 } from "../event-reminder-message-body";
 import { fadeInMailReaderContent } from "../mail-app/mail-reader-transition";
-import { MessageDecryptingSkeleton } from "../message-decrypting-loader";
+import { MessageBodyPending } from "../message-body-pending";
 import { HtmlEmailRenderer } from "./html-email-renderer";
 import { MessageReaderTrackerLine } from "./message-reader-trackers";
 import type {
@@ -65,23 +65,23 @@ export function MessageReaderBody({
     plaintextBody,
     plaintextQuote,
   } = view;
-  const showSkeleton = isDecrypting || isBodyLoading;
+  const bodyPending = isDecrypting || isBodyLoading;
   const bodyRef = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
-  const wasSkeletonRef = useRef(showSkeleton);
+  const wasPendingRef = useRef(bodyPending);
 
-  // Skeleton and body share the same flex-1 box, so the swap is a fade in place with no layout shift.
+  // The pending surface and the body share the same flex-1 box, so the swap is a fade in place with no layout shift.
   useLayoutEffect(() => {
-    const wasSkeleton = wasSkeletonRef.current;
-    wasSkeletonRef.current = showSkeleton;
+    const wasPending = wasPendingRef.current;
+    wasPendingRef.current = bodyPending;
     const body = bodyRef.current;
-    if (!wasSkeleton || showSkeleton || !body) return;
+    if (!wasPending || bodyPending || !body) return;
     const fade = fadeInMailReaderContent(body, prefersReducedMotion);
     return () => fade?.cancel();
-  }, [showSkeleton, prefersReducedMotion]);
+  }, [bodyPending, prefersReducedMotion]);
 
-  const standardBodyContent = showSkeleton ? (
-    <MessageDecryptingSkeleton
+  const standardBodyContent = bodyPending ? (
+    <MessageBodyPending
       isDark={isDark}
       label={isDecrypting ? undefined : "Loading message"}
     />

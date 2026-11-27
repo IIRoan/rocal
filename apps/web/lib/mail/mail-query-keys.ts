@@ -8,6 +8,9 @@ export const mailQueryKeys = {
     [...mailQueryKeys.messages(), mailboxId] as const,
   message: (messageId: string) =>
     [...mailQueryKeys.all, "message", messageId] as const,
+  threads: () => [...mailQueryKeys.all, "threads"] as const,
+  threadMessages: (threadId: string) =>
+    [...mailQueryKeys.threads(), threadId] as const,
   inlineSearch: (mailboxId: string | null, query: string) =>
     [...mailQueryKeys.all, "inline-search", mailboxId, query] as const,
   inlineSearchWithFilters: (

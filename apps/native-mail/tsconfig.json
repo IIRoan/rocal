@@ -53,6 +53,12 @@
       ],
       "@workspace/logger/*": [
         "../../packages/logger/src/*"
+      ],
+      "@workspace/mail-editor/protocol": [
+        "../../packages/mail-editor/src/protocol.ts"
+      ],
+      "@workspace/mail-editor/webview-script": [
+        "../../packages/mail-editor/src/generated/webview-script.ts"
       ]
     }
   },

@@ -1,4 +1,4 @@
-import type { MailSenderKeyTrustState } from "@workspace/calendar-core";
+import type { MailSenderKeyTrustState, PgpSignatureVerificationState } from "@workspace/calendar-core";
 import {
   normalizeJmapHeaderValues,
   type MailAccountStatus as SharedMailAccountStatus,
@@ -352,11 +352,7 @@ export type GenerateKeyPairResult = {
   fingerprint: string;
 };
 
-export type MailSignatureVerificationState =
-  | "not_signed"
-  | "verified"
-  | "unverified"
-  | "failed";
+export type MailSignatureVerificationState = PgpSignatureVerificationState;
 
 export type MailDecryptResult = {
   /** The decoded text part, shortened to the read limit; null when the message has none or could not be parsed. */

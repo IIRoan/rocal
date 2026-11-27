@@ -1,5 +1,6 @@
 import { useReducer } from "react";
 import {
+  getDefaultReminderMinutes,
   normalizeReminderMinutes,
   roundUpToQuarterHour,
   type CreateEventRequest,
@@ -8,8 +9,6 @@ import {
 } from "@workspace/calendar-core";
 import { parseStoredRecurrence } from "./recurrence-picker-utils";
 import { toTimezonePickerISOString } from "./event-form-utils";
-
-const DEFAULT_REMINDER_MINUTES = 15;
 
 export type OpenSheet =
   | "calendar"
@@ -59,17 +58,23 @@ function merge<T>(current: T, update: Update<T>): T {
   };
 }
 
-function initialFields({
+export function initialFields({
   initialValues,
   initialReminders,
   timezone,
+  defaultReminderMinutes,
+  defaultDurationMinutes = 60,
 }: {
   initialValues?: Partial<CreateEventRequest>;
   initialReminders?: number[];
   timezone: string;
+  defaultReminderMinutes?: number;
+  defaultDurationMinutes?: number;
 }): EventFormFields {
   const defaultStart = roundUpToQuarterHour(new Date());
-  const defaultEnd = new Date(defaultStart.getTime() + 60 * 60 * 1000);
+  const defaultEnd = new Date(
+    defaultStart.getTime() + defaultDurationMinutes * 60 * 1000,
+  );
   return {
     title: initialValues?.title ?? "",
     allDay: initialValues?.allDay ?? false,
@@ -81,12 +86,12 @@ function initialFields({
     description: initialValues?.description ?? "",
     categoryId: initialValues?.categoryId || "",
     recurrenceRule: parseStoredRecurrence(initialValues?.recurrence),
-    // Existing events carry reminders or an explicit legacy reminder key; new events default to 15 minutes.
+    // Existing events carry reminders or an explicit legacy reminder key; only new events take the account default.
     reminders: normalizeReminderMinutes(
       initialReminders ??
         (initialValues != null && "reminder" in initialValues
           ? [initialValues.reminder ?? 0]
-          : [DEFAULT_REMINDER_MINUTES]),
+          : getDefaultReminderMinutes(defaultReminderMinutes)),
     ),
     participants: initialValues?.participants ?? [],
   };

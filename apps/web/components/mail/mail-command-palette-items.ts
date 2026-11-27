@@ -1,4 +1,4 @@
-import { Inbox, SquarePen, type LucideIcon } from "lucide-react";
+import { Inbox, MailOpen, SquarePen, type LucideIcon } from "lucide-react";
 import { getRootBaseSettingsNavigationItems } from "../command-palette/base-navigation";
 import { MAIL_SETTINGS_NAV_ITEMS } from "./mail-settings-navigation";
 
@@ -9,6 +9,13 @@ export interface MailPaletteItem {
   description: string;
 }
 
+export const MARK_ALL_READ_PALETTE_ITEM: MailPaletteItem = {
+  id: "mark-all-read",
+  label: "Mark all as read",
+  icon: MailOpen,
+  description: "Mark every message in the open folder as read",
+};
+
 function rootPreferenceItems(timezone?: string): MailPaletteItem[] {
   return getRootBaseSettingsNavigationItems({ timezone }).map((item) => ({
     id: item.id,
@@ -18,7 +25,10 @@ function rootPreferenceItems(timezone?: string): MailPaletteItem[] {
   }));
 }
 
-export function buildMailSearchableItems(timezone?: string): MailPaletteItem[] {
+export function buildMailSearchableItems(
+  timezone?: string,
+  actions: MailPaletteItem[] = [],
+): MailPaletteItem[] {
   return [
     {
       id: "compose",
@@ -26,6 +36,7 @@ export function buildMailSearchableItems(timezone?: string): MailPaletteItem[] {
       icon: SquarePen,
       description: "Write a new message",
     },
+    ...actions,
     ...MAIL_SETTINGS_NAV_ITEMS.map((item) => ({
       id: item.id,
       label: item.label,
@@ -36,7 +47,10 @@ export function buildMailSearchableItems(timezone?: string): MailPaletteItem[] {
   ];
 }
 
-export function buildMailBrowseItems(timezone?: string): MailPaletteItem[] {
+export function buildMailBrowseItems(
+  timezone?: string,
+  actions: MailPaletteItem[] = [],
+): MailPaletteItem[] {
   return [
     {
       id: "compose",
@@ -44,6 +58,7 @@ export function buildMailBrowseItems(timezone?: string): MailPaletteItem[] {
       icon: SquarePen,
       description: "Write a new message",
     },
+    ...actions,
     {
       id: "mail-settings",
       label: "Mail settings",

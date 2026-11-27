@@ -1,5 +1,5 @@
-name: Native end-to-end
-run-name: ${{ inputs.diagnostic && 'iOS authentication and calendar diagnostics' || 'Native end-to-end' }}
+name: Native end-to-end (iOS)
+run-name: ${{ inputs.diagnostic && 'iOS authentication and calendar diagnostics' || 'Native end-to-end (iOS)' }}
 
 on:
   pull_request:
@@ -40,8 +40,9 @@ on:
 permissions:
   contents: read
 
+# iOS has its own run, so a failed iOS job can be re-run without waiting for the Android emulator.
 concurrency:
-  group: native-e2e-${{ github.event.pull_request.number || github.ref }}${{ inputs.diagnostic && '-diagnostic' || '' }}
+  group: native-e2e-ios-${{ github.event.pull_request.number || github.ref }}${{ inputs.diagnostic && '-diagnostic' || '' }}
   cancel-in-progress: true
 
 jobs:
@@ -56,18 +57,6 @@ jobs:
       platform: ios
       app: ${{ matrix.app }}
 
-  build-android:
-    if: ${{ !inputs.diagnostic }}
-    name: Build ${{ matrix.app }} (android)
-    strategy:
-      fail-fast: false
-      matrix:
-        app: [calendar, mail]
-    uses: ./.github/workflows/native-e2e-build.yml
-    with:
-      platform: android
-      app: ${{ matrix.app }}
-
   ios:
     name: ${{ inputs.diagnostic && 'iOS diagnostics' || format(inputs.ios_full && 'iOS {0}' || 'iOS {0} smoke', matrix.app) }}
     needs: build-ios
@@ -80,14 +69,6 @@ jobs:
     with:
       platform: ios
       diagnostic: ${{ inputs.diagnostic || false }}
-      # iOS runs short smoke journeys; Android and a manual ios_full dispatch run the whole suite.
+      # iOS runs short smoke journeys; a manual ios_full dispatch runs the whole suite.
       smoke: ${{ !inputs.ios_full }}
       app: ${{ matrix.app }}
-
-  android:
-    name: Android
-    needs: build-android
-    if: ${{ always() && !cancelled() && !inputs.diagnostic }}
-    uses: ./.github/workflows/native-e2e-journeys.yml
-    with:
-      platform: android

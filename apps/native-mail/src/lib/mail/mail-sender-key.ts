@@ -144,6 +144,8 @@ export async function decryptEncryptedMessage(
       message.id,
       armoredMessage,
       senderPublicKeyArmored,
+      undefined,
+      message.from?.[0]?.email,
     );
     assertCurrent();
     return { ...result, senderKeyTrustState: verification.senderKeyTrustState };
@@ -155,6 +157,8 @@ export async function decryptEncryptedMessage(
       message.id,
       message.bodyStructure,
       senderPublicKeyArmored,
+      undefined,
+      message.from?.[0]?.email,
     );
     assertCurrent();
     return { ...result, senderKeyTrustState: verification.senderKeyTrustState };

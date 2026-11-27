@@ -1,4 +1,5 @@
 import { stripHtmlTags } from "./html-text";
+import { FORWARDED_MESSAGE_HEADER } from "./mail-quote";
 export type SignatureSource = {
   textSignature?: string | null;
   htmlSignature?: string | null;
@@ -6,7 +7,7 @@ export type SignatureSource = {
 
 export function resolveComposeSignatureIdentity<
   T extends SignatureSource & { id?: string | null },
->(identities: T[], identityId: string | null | undefined): T | null {
+>(identities: readonly T[], identityId: string | null | undefined): T | null {
   const current =
     identities.find((entry) => entry.id === identityId) ?? identities[0] ?? null;
   if (!current) return null;
@@ -62,48 +63,25 @@ export function getPlainTextSignature(
   return "";
 }
 
-function plainTextSignatureSeparator(separator: boolean | undefined): string {
-  return separator === false ? "\n\n" : "\n\n-- \n";
+function plainTextSignatureSeparator(separator: boolean): string {
+  return separator ? "\n\n-- \n" : "\n\n";
 }
 
-function bodyEndsWithPlainTextSignature(body: string, signature: string): boolean {
-  const normalizedBody = normalizeSignatureLineBreaks(body);
-  const normalizedSignature = normalizeSignatureLineBreaks(signature);
-  if (!normalizedSignature) return false;
-  if (normalizedBody === normalizedSignature) return true;
-  if (normalizedBody.endsWith(`-- \n${normalizedSignature}`)) return true;
-  return normalizedBody.endsWith(normalizedSignature);
-}
+const QUOTE_HEADER_LINE = new RegExp(`^(?:On .+ wrote:|${FORWARDED_MESSAGE_HEADER})$`, "m");
 
-function bodyEndsWithHtmlSignature(
-  htmlBody: string,
-  signature: SignatureSource,
-): boolean {
-  const plainTextSignature = getPlainTextSignature(signature);
-  if (!plainTextSignature) return false;
-  return bodyEndsWithPlainTextSignature(htmlToPlainText(htmlBody), plainTextSignature);
-}
-
-export function appendPlainTextSignature(
+/** Adds the signature where a new compose puts it: above a reply or forward quote's header when `aboveQuote`, else at the end. */
+export function insertPlainTextSignature(
   body: string,
-  signature?: SignatureSource | null,
-  options: { separator?: boolean } = {},
+  signature: SignatureSource | null | undefined,
+  options: { separator: boolean; aboveQuote: boolean },
 ): string {
   const plainTextSignature = getPlainTextSignature(signature);
   if (!plainTextSignature) return body;
-  if (bodyEndsWithPlainTextSignature(body, plainTextSignature)) return body;
-  return `${body}${plainTextSignatureSeparator(options.separator)}${plainTextSignature}`;
-}
-
-/** Puts the signature before a seeded reply/forward quote so the quote stays last. */
-export function prependPlainTextSignature(
-  quoteBody: string,
-  signature?: SignatureSource | null,
-  options: { separator?: boolean } = {},
-): string {
-  const plainTextSignature = getPlainTextSignature(signature);
-  if (!plainTextSignature) return quoteBody;
-  return `${plainTextSignatureSeparator(options.separator)}${plainTextSignature}${quoteBody}`;
+  const block = `${plainTextSignatureSeparator(options.separator)}${plainTextSignature}`;
+  const text = body.replace(/\r\n?/g, "\n");
+  const quoteStart = options.aboveQuote ? text.search(QUOTE_HEADER_LINE) : -1;
+  if (quoteStart === -1) return `${text.trimEnd()}${block}`;
+  return `${text.slice(0, quoteStart).trimEnd()}${block}\n\n${text.slice(quoteStart)}`;
 }
 
 /** Locates the signature on its own lines, widened over a directly preceding `--` separator line. */
@@ -130,16 +108,6 @@ function findPlainTextSignatureBlock(
   return null;
 }
 
-/** True when the body already holds the signature on its own lines (quoted `> ` lines never match). */
-export function hasPlainTextSignatureBlock(
-  body: string,
-  signature?: SignatureSource | null,
-): boolean {
-  const plainTextSignature = getPlainTextSignature(signature);
-  if (!plainTextSignature) return false;
-  return findPlainTextSignatureBlock(body.replace(/\r\n?/g, "\n"), plainTextSignature) !== null;
-}
-
 /** Swaps an embedded signature for another identity's; null when the previous one is not in the body. */
 export function replacePlainTextSignatureBlock(
   body: string,
@@ -155,86 +123,6 @@ export function replacePlainTextSignatureBlock(
   const next = getPlainTextSignature(nextSignature);
   const replacement = next ? `${options.separator ? "-- \n" : ""}${next}` : "";
   return `${text.slice(0, block.start)}${replacement}${text.slice(block.end)}`;
-}
-
-export function stripTrailingPlainTextSignature(
-  body: string,
-  signature?: SignatureSource | null,
-  options: { separator?: boolean } = {},
-): string {
-  const plainTextSignature = getPlainTextSignature(signature);
-  if (!plainTextSignature || !bodyEndsWithPlainTextSignature(body, plainTextSignature)) {
-    return body;
-  }
-
-  const normalizedBody = normalizeSignatureLineBreaks(body);
-  const normalizedSignature = normalizeSignatureLineBreaks(plainTextSignature);
-  if (normalizedBody === normalizedSignature) {
-    return "";
-  }
-
-  const sep = plainTextSignatureSeparator(options.separator);
-  const suffix = normalizeSignatureLineBreaks(`${sep}${plainTextSignature}`);
-  if (normalizedBody.endsWith(suffix)) {
-    return normalizedBody.slice(0, normalizedBody.length - suffix.length).replace(/\n+$/, "");
-  }
-
-  if (normalizedBody.endsWith(`-- \n${normalizedSignature}`)) {
-    const altSuffix = `-- \n${normalizedSignature}`;
-    return normalizedBody
-      .slice(0, normalizedBody.length - altSuffix.length)
-      .replace(/\n+$/, "");
-  }
-
-  if (normalizedBody.endsWith(normalizedSignature)) {
-    return normalizedBody
-      .slice(0, normalizedBody.length - normalizedSignature.length)
-      .replace(/\n+$/, "");
-  }
-
-  return body;
-}
-
-export function swapEmbeddedSignatureInPlainText(
-  body: string,
-  previousSignature: SignatureSource | null | undefined,
-  newSignature: SignatureSource | null | undefined,
-  options: { separator: boolean },
-): string | null {
-  const stripped = stripTrailingPlainTextSignature(body, previousSignature, {
-    separator: options.separator,
-  });
-  const hadEmbeddedSignature = stripped !== body;
-  const nextSignature = getPlainTextSignature(newSignature);
-
-  if (!nextSignature) {
-    return hadEmbeddedSignature ? stripped : null;
-  }
-
-  if (!hadEmbeddedSignature && normalizeSignatureLineBreaks(body)) {
-    return null;
-  }
-
-  return appendPlainTextSignature(stripped, newSignature, {
-    separator: options.separator,
-  });
-}
-
-export function appendHtmlSignature(
-  htmlBody: string,
-  signature?: SignatureSource | null,
-  options: { separator?: boolean } = {},
-): string {
-  if (!signature) return htmlBody;
-  if (bodyEndsWithHtmlSignature(htmlBody, signature)) return htmlBody;
-  const sep = options.separator === false ? "<br><br>" : "<br><br>-- <br>";
-  if (signature.htmlSignature?.trim()) {
-    return `${htmlBody}${sep}${signature.htmlSignature}`;
-  }
-  if (signature.textSignature?.trim()) {
-    return `${htmlBody}${sep}${signatureTextToHtml(signature.textSignature)}`;
-  }
-  return htmlBody;
 }
 
 /** True when compose HTML has visible text (any rich-editor output with content). */
@@ -257,27 +145,4 @@ export function resolveComposePlainBody(input: {
     }
   }
   return input.body.trim();
-}
-
-/** True when compose HTML already contains an embedded signature block. */
-export function hasEmbeddedSignature(html: string): boolean {
-  return /data-signature-block=/i.test(html);
-}
-
-/** Resolve multipart/alternative bodies for draft save and send. */
-export function resolveOutgoingComposeBodies(input: {
-  body: string;
-  htmlBody: string;
-  signature?: SignatureSource | null;
-  signatureAlreadyEmbedded?: boolean;
-}): { textBody: string; htmlBody?: string } {
-  const trimmedHtml = input.htmlBody.trim();
-  const plainFromHtml = trimmedHtml ? htmlToPlainText(trimmedHtml).trim() : "";
-  const basePlain = plainFromHtml || input.body.trim();
-  const signature = input.signatureAlreadyEmbedded ? null : input.signature;
-  const textBody = appendPlainTextSignature(basePlain, signature);
-  const htmlBody = trimmedHtml
-    ? appendHtmlSignature(trimmedHtml, signature)
-    : undefined;
-  return { textBody, htmlBody };
 }

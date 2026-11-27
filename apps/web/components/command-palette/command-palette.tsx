@@ -32,7 +32,7 @@ export type CommandPaletteProps = {
   initialSearchQuery?: string;
   eventEditorMode?: EventEditorMode;
   popoverAnchorPosition?: { x: number; y: number } | null;
-  initialEventViewMode?: "view" | "edit";
+  initialEventViewMode?: "view" | "edit" | "duplicate";
   previewEvent?: CalendarEvent | null;
   updatePreviewEvent?: (updates: Partial<CalendarEvent>) => void;
 };

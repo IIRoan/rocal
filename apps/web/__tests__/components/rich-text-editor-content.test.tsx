@@ -3,6 +3,7 @@
 import React, { act, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, jest } from "@jest/globals";
+import type { Editor } from "@tiptap/react";
 import { RichTextEditor } from "../../components/mail/rich-text-editor";
 
 (
@@ -56,6 +57,39 @@ it("restores a controlled draft without emitting empty content while mounting or
     expect(container.querySelector(".tiptap")?.getAttribute("contenteditable"))
       .toBe("false");
     expect(onChange).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+  }
+});
+
+it("keeps the caret on the empty writing line above a seeded signature", async () => {
+  const seeded =
+    '<p></p><p data-signature-block="separator">-- </p><p>Kind regards,<br>Roan</p><p data-signature-block="end"></p>';
+  let editor: Editor | null = null;
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+
+  try {
+    await act(async () => root.render(
+      <RichTextEditor
+        content={seeded}
+        onChange={jest.fn()}
+        onEditorReady={(ready) => {
+          editor = ready;
+        }}
+      />,
+    ));
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+    });
+    const ready: Editor | null = editor;
+    if (!ready) throw new Error("editor not ready");
+    expect(ready.state.doc.textContent).toContain("Roan");
+    expect(ready.state.selection.from).toBe(1);
   } finally {
     await act(async () => root.unmount());
     container.remove();

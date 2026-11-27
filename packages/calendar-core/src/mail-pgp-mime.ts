@@ -107,6 +107,44 @@ export function createMailMessageId(fromEmail: string): string {
   return `${token}@${getEmailDomain(fromEmail) ?? "localhost"}`;
 }
 
+export function createMimeBoundary(prefix: string): string {
+  const random = crypto.getRandomValues(new Uint8Array(12));
+  return prefix + Array.from(random, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function messageHeaderLines(headers: EncryptedMimeHeaders, date: Date): string[] {
+  assertHeaderText(headers.fromEmail);
+  if (!Number.isFinite(date.getTime()))
+    throw new Error("Encrypted message date is invalid.");
+  return [
+    `From: ${formatParsedAddress(headers.fromEmail, headers.fromName)}`,
+    ...addressHeader("To", headers.to),
+    ...addressHeader("Cc", headers.cc),
+    ...addressHeader("Bcc", headers.bcc),
+    `Subject: ${encodeHeader(headers.subject)}`,
+    `Date: ${date.toUTCString().replace(/GMT$/, "+0000")}`,
+    `Message-ID: ${formatMessageId(headers.messageId)}`,
+    ...referenceHeader("In-Reply-To", headers.inReplyTo),
+    ...referenceHeader("References", headers.references),
+    "MIME-Version: 1.0",
+  ];
+}
+
+/** An RFC 3156 signed entity under the same envelope headers as an encrypted import; only the entity is covered by the signature. */
+export function buildSignedMailMessage(
+  headers: EncryptedMimeHeaders,
+  signedEntity: string,
+  date = new Date(),
+): string {
+  if (
+    !/^Content-Type: multipart\/signed; /.test(signedEntity) ||
+    signedEntity.split("\r\n").some((line) => /[\r\n]/.test(line) || line.length > 998)
+  ) {
+    throw new Error("Signed message is not a complete MIME entity.");
+  }
+  return [...messageHeaderLines(headers, date), signedEntity].join("\r\n");
+}
+
 /** A complete RFC 3156 message is imported as bytes so the server preserves its encryption protocol parameter. */
 export function buildPgpMimeMessage(
   headers: EncryptedMimeHeaders,
@@ -126,24 +164,9 @@ export function buildPgpMimeMessage(
   if (normalizedArmor.split("\r\n").some((line) => line.length > 998)) {
     throw new Error("Encrypted message contains an overlong armor line.");
   }
-  const random = crypto.getRandomValues(new Uint8Array(12));
-  const boundary =
-    "solace_encrypted_" +
-    Array.from(random, (byte) => byte.toString(16).padStart(2, "0")).join("");
-  assertHeaderText(headers.fromEmail);
-  if (!Number.isFinite(date.getTime()))
-    throw new Error("Encrypted message date is invalid.");
+  const boundary = createMimeBoundary("solace_encrypted_");
   const lines = [
-    `From: ${formatParsedAddress(headers.fromEmail, headers.fromName)}`,
-    ...addressHeader("To", headers.to),
-    ...addressHeader("Cc", headers.cc),
-    ...addressHeader("Bcc", headers.bcc),
-    `Subject: ${encodeHeader(headers.subject)}`,
-    `Date: ${date.toUTCString().replace(/GMT$/, "+0000")}`,
-    `Message-ID: ${formatMessageId(headers.messageId)}`,
-    ...referenceHeader("In-Reply-To", headers.inReplyTo),
-    ...referenceHeader("References", headers.references),
-    "MIME-Version: 1.0",
+    ...messageHeaderLines(headers, date),
     `Content-Type: multipart/encrypted; protocol="application/pgp-encrypted"; boundary="${boundary}"`,
     "",
     `--${boundary}`,

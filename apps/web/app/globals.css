@@ -492,13 +492,14 @@
     }
   }
 
-  input:focus,
-  textarea:focus,
-  select:focus {
-    @apply ring-2 ring-ring border-ring;
-    box-shadow:
-      0 0 0 2px color-mix(in oklch, var(--ring) 25%, transparent),
-      inset 0 1px 0 color-mix(in oklch, var(--background) 70%, transparent);
+  /* Text fields focus like every other control, with the outline below; a field box ([data-field]) draws it around its icons, chips and buttons too. */
+  [data-field]:has(:is(input, textarea, select):focus-visible) {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  [data-field] :is(input, textarea, select):focus-visible {
+    outline: none;
   }
 
   /* Buttons: color/surface feedback only, never press-scale or indent. */
@@ -841,28 +842,6 @@
   animation: fadeInZoom 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes decrypt-shimmer {
-  0% {
-    transform: translateX(-120%);
-  }
-  100% {
-    transform: translateX(120%);
-  }
-}
-
-.decrypt-shimmer-band {
-  position: absolute;
-  inset: 0;
-  width: 45%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in oklch, var(--foreground) 7%, transparent),
-    transparent
-  );
-  animation: decrypt-shimmer 2.4s ease-in-out infinite;
-}
-
 .tiptap {
   outline: none;
 }
@@ -1027,8 +1006,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-surface-motion][data-state="open"],
-  .decrypt-shimmer-band {
+  [data-surface-motion][data-state="open"] {
     animation: none;
   }
 

@@ -9,7 +9,10 @@ import {
   persistProfileUpdate,
   persistSettingsUpdate,
 } from "../command-palette/command-palette-actions";
-import type { MailPaletteItem } from "./mail-command-palette-items";
+import {
+  MARK_ALL_READ_PALETTE_ITEM,
+  type MailPaletteItem,
+} from "./mail-command-palette-items";
 import type { MailPaletteView } from "./mail-command-palette-ui-state";
 
 export async function runMailSettingUpdate<K extends keyof UserSettings>(input: {
@@ -100,11 +103,17 @@ export function selectMailPaletteItem(input: {
   item: MailPaletteItem;
   onOpenChange: (open: boolean) => void;
   onCompose: () => void;
+  onMarkAllRead?: () => void;
   goForward: (view: MailPaletteView) => void;
 }): void {
   if (input.item.id === "compose") {
     input.onOpenChange(false);
     input.onCompose();
+    return;
+  }
+  if (input.item.id === MARK_ALL_READ_PALETTE_ITEM.id) {
+    input.onOpenChange(false);
+    input.onMarkAllRead?.();
     return;
   }
   input.goForward(input.item.id as MailPaletteView);

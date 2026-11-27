@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   assertMailSendHold,
+  formatScheduledSendShortTime,
   getScheduledSendPresets,
   parseScheduledSendInput,
   resolveMailSendHold,
@@ -73,5 +74,14 @@ describe("send hold caps", () => {
   it("keys the copy by the submission token", () => {
     expect(scheduledSendKeyword("a".repeat(32))).toBe(`$solace-scheduled-${"a".repeat(32)}`);
     expect(() => scheduledSendKeyword("nope")).toThrow();
+  });
+});
+
+describe("formatScheduledSendShortTime", () => {
+  it("names the day and clock time in the account's zone and format, without the year", () => {
+    const sendAt = "2026-11-27T12:00:00Z";
+    expect(formatScheduledSendShortTime(sendAt, zone, "24h")).toBe("Nov 27, 13:00");
+    expect(formatScheduledSendShortTime(sendAt, zone, "12h")).toBe("Nov 27, 1:00 PM");
+    expect(formatScheduledSendShortTime("2026-11-27T23:30:00Z", zone, "24h")).toBe("Nov 28, 00:30");
   });
 });

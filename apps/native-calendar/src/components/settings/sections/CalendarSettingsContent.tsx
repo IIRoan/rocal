@@ -1,5 +1,10 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { partitionCalendarsByKind } from "@workspace/calendar-core";
+import {
+  DEFAULT_REMINDER_MINUTES,
+  DEFAULT_REMINDER_SETTING_OPTIONS,
+  eventDurationOptions,
+  partitionCalendarsByKind,
+} from "@workspace/calendar-core";
 import { SettingsPage } from "@workspace/native-core/components/settings/SettingsPage";
 import {
   SheetCenteredState,
@@ -71,7 +76,9 @@ export function CalendarSettingsContent() {
   );
 
   const weekStartDay = settings?.weekStartDay ?? 0;
-  const weekStartPending = pendingKeys.has("weekStartDay");
+  const eventDuration = settings?.defaultEventDuration ?? 60;
+  const defaultReminder =
+    settings?.defaultReminderMinutes ?? DEFAULT_REMINDER_MINUTES;
 
   if (isLoading && !settings) {
     return (
@@ -104,24 +111,31 @@ export function CalendarSettingsContent() {
           )}
         </SheetSection>
 
-        <SheetSection title="Week starts on">
-          <SheetGroup>
-            {WEEK_START_OPTIONS.map((option) => {
-              const selected = weekStartDay === option.value;
-              return (
-                <SheetItem
-                  key={option.value}
-                  label={option.label}
-                  checked={selected}
-                  pending={selected && weekStartPending}
-                  onPress={() => updateSetting({ weekStartDay: option.value })}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected }}
-                />
-              );
-            })}
-          </SheetGroup>
-        </SheetSection>
+        <RadioSection
+          title="Default event duration"
+          footer="Used for new events."
+          options={eventDurationOptions(eventDuration)}
+          value={eventDuration}
+          pending={pendingKeys.has("defaultEventDuration")}
+          onSelect={(value) => updateSetting({ defaultEventDuration: value })}
+        />
+
+        <RadioSection
+          title="Default reminder"
+          footer="New events start with this reminder."
+          options={DEFAULT_REMINDER_SETTING_OPTIONS}
+          value={defaultReminder}
+          pending={pendingKeys.has("defaultReminderMinutes")}
+          onSelect={(value) => updateSetting({ defaultReminderMinutes: value })}
+        />
+
+        <RadioSection
+          title="Week starts on"
+          options={WEEK_START_OPTIONS}
+          value={weekStartDay}
+          pending={pendingKeys.has("weekStartDay")}
+          onSelect={(value) => updateSetting({ weekStartDay: value })}
+        />
 
         <SheetSection
           title="Working days"
@@ -145,5 +159,42 @@ export function CalendarSettingsContent() {
         </SheetSection>
       </SheetScroll>
     </SettingsPage>
+  );
+}
+
+function RadioSection({
+  title,
+  footer,
+  options,
+  value,
+  pending,
+  onSelect,
+}: {
+  title: string;
+  footer?: string;
+  options: readonly { value: number; label: string }[];
+  value: number;
+  pending: boolean;
+  onSelect: (value: number) => void;
+}) {
+  return (
+    <SheetSection title={title} footer={footer}>
+      <SheetGroup>
+        {options.map((option) => {
+          const selected = value === option.value;
+          return (
+            <SheetItem
+              key={option.value}
+              label={option.label}
+              checked={selected}
+              pending={selected && pending}
+              onPress={() => onSelect(option.value)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected }}
+            />
+          );
+        })}
+      </SheetGroup>
+    </SheetSection>
   );
 }

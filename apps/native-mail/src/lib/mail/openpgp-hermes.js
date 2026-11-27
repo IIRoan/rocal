@@ -17,7 +17,9 @@
 import "@workspace/native-core/lib/install-native-crypto";
 import * as openpgp from "openpgp/dist/openpgp.min.mjs";
 import { applyHermesPacketListPatch } from "./openpgp-hermes-patch";
+import { silenceOpenPgpDebugLogs } from "./openpgp-debug-filter";
 
 applyHermesPacketListPatch(openpgp.PacketList);
+if (__DEV__) silenceOpenPgpDebugLogs();
 
 export * from "openpgp/dist/openpgp.min.mjs";

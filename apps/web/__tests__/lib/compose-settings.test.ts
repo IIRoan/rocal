@@ -27,13 +27,13 @@ describe("compose-settings", () => {
     writeMailComposeSettings({
       ...DEFAULT_MAIL_COMPOSE_SETTINGS,
       plainTextMode: true,
-      signaturePosition: "above_quote",
+      replySignaturePosition: "above_quote",
     });
 
     expect(readMailComposeSettings()).toEqual(
       expect.objectContaining({
         plainTextMode: true,
-        signaturePosition: "above_quote",
+        replySignaturePosition: "above_quote",
       }),
     );
   });

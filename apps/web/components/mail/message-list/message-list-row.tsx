@@ -1,18 +1,13 @@
 "use client";
 
-import type { ComponentProps } from "react";
-import { ChevronDown, ChevronRight, RotateCcw } from "lucide-react";
+import { ChevronDown, RotateCcw, Star } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import {
   ContextDropdown,
-  FilledVariant,
   Icon,
-  IconButton,
   Icons,
   Size,
-  Type,
   Typography,
-  TypographySize,
   TypographyWeight,
 } from "@workspace/ui/solace";
 import type { JmapEmailMessage } from "@/lib/mail/types";
@@ -21,12 +16,10 @@ import { SenderAvatar } from "../mail-avatar";
 import { getAllMessageLabels } from "@/lib/mail/mail-labels";
 import { resolveLabelDisplayColor, type TimeFormat } from "@workspace/calendar-core";
 import {
-  buildMailPreviewSnippet,
-  ENCRYPTED_MAIL_PREVIEW_PLACEHOLDER,
-} from "@/lib/mail/mail-preview";
-import {
   formatThreadSenders,
+  getListPreviewSnippet,
   getSecondaryThreadMessages,
+  getThreadAvatarSenders,
   type MessageListThreadRow,
 } from "./message-list-utils";
 import type {
@@ -40,16 +33,18 @@ import { MessageListRowOverflowMenu } from "./message-list-row-overflow-menu";
 function MessageLabelChips({
   messageLabels,
   max = 2,
+  className,
 }: {
   messageLabels: { id: string; name: string; color?: string }[];
   max?: number;
+  className: string;
 }) {
   if (messageLabels.length === 0) return null;
   const visible = messageLabels.slice(0, max);
   const overflow = messageLabels.length - visible.length;
 
   return (
-    <div className="mt-0.5 flex min-w-0 items-center gap-1 overflow-hidden pr-4">
+    <div className={cn("flex items-center gap-1", className)}>
       {visible.map((label) => {
         const displayColor = resolveLabelDisplayColor(label.color);
         return (
@@ -80,114 +75,46 @@ function MessageLabelChips({
 }
 
 function rowShellClassName({
-  stacked,
-  density,
   isChecked,
   isSelected,
   isRead,
 }: {
-  stacked: boolean;
-  density: "compact" | "comfortable";
   isChecked: boolean;
   isSelected: boolean;
   isRead: boolean;
 }) {
-  const padding =
-    stacked || density === "comfortable" ? "px-[18px] py-3" : "px-5 py-3";
   const tone = isChecked || isSelected
     ? "bg-[var(--bg-cell-active)]"
     : isRead
       ? "hover:bg-[var(--bg-cell-hover)]"
       : "bg-[var(--bg-cell-unread)] hover:border-b-[var(--border-primary)]";
   return cn(
-    "group/row relative w-full overflow-hidden text-left cursor-pointer border-b border-[var(--border-tertiary)] box-border transition-colors duration-150",
-    padding,
+    "group/row relative w-full overflow-hidden text-left cursor-pointer border-b border-[var(--border-tertiary)] box-border transition-colors duration-150 pl-3.5 pr-4 py-2.5",
     tone,
   );
 }
 
-function MessageListRowSelectAvatar({
-  email,
-  name,
-  isChecked,
-  onToggleSelect,
-}: {
-  email: string;
-  name?: string;
-  isChecked: boolean;
-  onToggleSelect: (event: React.MouseEvent) => void;
-}) {
-  return (
-    <div className="mr-3 flex shrink-0 items-center gap-3">
-      <IconButton
-        aria-label="Select message"
-        aria-pressed={isChecked}
-        className="relative z-2"
-        icon={isChecked ? Icon.CheckboxFilled : Icon.CheckboxEmpty}
-        onClick={onToggleSelect}
-        size={Size.SMALL}
-        type={Type.TERTIARY}
-        variant={FilledVariant.UNFILLED}
-      />
-      <SenderAvatar email={email} name={name} className="size-8" />
-    </div>
-  );
-}
-
 function MessageListRowSubject({
-  className,
   isRead,
   subject,
   previewSnippet,
-  thread,
-  onToggleThreadExpand,
 }: {
-  className?: string;
   isRead: boolean;
   subject: string;
   previewSnippet: string;
-  thread: {
-    id: string;
-    expanded: boolean;
-    loading: boolean;
-  } | null;
-  onToggleThreadExpand: (threadId: string) => void;
 }) {
   const weight = isRead ? TypographyWeight.REGULAR : TypographyWeight.MEDIUM;
   return (
-    <div className={cn("ml-1 flex min-w-0 flex-1 items-center", className)}>
-      {thread ? (
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            onToggleThreadExpand(thread.id);
-          }}
-          // A 24px target (WCAG 2.5.8) whose negative margins keep the chevron's 16px slot; the text clip sits on the sibling so it can't cut it.
-          className="relative z-2 -my-1 -ml-1 shrink-0 rounded p-1.5 text-[var(--icon-tertiary)] hover:text-[var(--icon-primary)]"
-          aria-label="Show thread messages"
-          aria-expanded={thread.expanded}
-        >
-          {thread.loading ? (
-            <RotateCcw className="size-3 animate-spin" strokeWidth={2} />
-          ) : thread.expanded ? (
-            <ChevronDown className="size-3" strokeWidth={2.25} />
-          ) : (
-            <ChevronRight className="size-3" strokeWidth={2.25} />
-          )}
-        </button>
-      ) : null}
-      <div className="flex min-w-0 flex-1 items-center overflow-hidden">
-        <Typography color={isRead ? "secondary" : "primary"} minWidth="auto" weight={weight}>
-          {subject || "(No subject)"}
+    <div className="flex min-w-0 flex-1 items-center overflow-hidden">
+      <Typography color={isRead ? "secondary" : "primary"} minWidth="auto" weight={weight}>
+        {subject || "(No subject)"}
+      </Typography>
+      {previewSnippet ? (
+        <Typography color={isRead ? "tertiary" : "secondary"}>
+          <span>&nbsp;–&nbsp;</span>
+          {previewSnippet}
         </Typography>
-        {previewSnippet ? (
-          <Typography color={isRead ? "tertiary" : "secondary"}>
-            <span>&nbsp;–&nbsp;</span>
-            {previewSnippet}
-          </Typography>
-        ) : null}
-      </div>
+      ) : null}
     </div>
   );
 }
@@ -199,6 +126,35 @@ export type MessageListRowProps = {
   presentation: MessageListRowPresentation;
   height?: number;
 };
+
+/** A day heading in the list; while selecting it checks or clears that day's conversations. */
+export function MessageListDayHeader({
+  label,
+  selectionActive,
+  allSelected,
+  onToggleDay,
+}: {
+  label: string;
+  selectionActive: boolean;
+  allSelected: boolean;
+  onToggleDay: (event: React.MouseEvent) => void;
+}) {
+  return (
+    <div className="flex h-[30px] items-center justify-between px-4 text-xs font-medium text-[var(--text-tertiary)]">
+      <h2>{label}</h2>
+      {selectionActive ? (
+        <button
+          type="button"
+          onClick={onToggleDay}
+          className="-mx-1.5 cursor-pointer rounded px-1.5 py-0.5 hover:bg-[var(--bg-overlay-tertiary)] hover:text-[var(--text-primary)]"
+        >
+          {allSelected ? "Clear" : "Select all"}
+          <span className="sr-only"> from {label}</span>
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 function buildMessageListRowView({
   row,
@@ -232,9 +188,7 @@ function buildMessageListRowView({
   const hasAttachments = row.messages.some(
     (entry) => entry.hasAttachment === true || (entry.attachments?.length ?? 0) > 0,
   );
-  const snippet = buildMailPreviewSnippet(message);
-  // A list row shows only the subject for encrypted mail; the reader names the encryption.
-  const previewSnippet = snippet === ENCRYPTED_MAIL_PREVIEW_PLACEHOLDER ? "" : snippet;
+  const previewSnippet = getListPreviewSnippet(message);
   const senderLabel =
     row.messages.length > 1
       ? formatThreadSenders(row.messages)
@@ -242,13 +196,13 @@ function buildMessageListRowView({
   return {
     row,
     message,
+    avatarSenders: getThreadAvatarSenders(row.messages),
     onSelect,
     onToggleSelect,
     onToggleThreadExpand,
     labels,
     moveTargets,
     spamActions,
-    display,
     timeFormat,
     timezone,
     mailboxActions,
@@ -273,7 +227,6 @@ function buildMessageListRowView({
       .join(", "),
     senderTone: (isRead ? "secondary" : "primary") as "secondary" | "primary",
     senderWeight: isRead ? TypographyWeight.REGULAR : TypographyWeight.BOLD,
-    unreadOpacity: isRead ? 0 : 1,
     thread: threaded
       ? {
           id: row.id,
@@ -289,170 +242,169 @@ function buildMessageListRowView({
   };
 }
 
-function MessageListRowTrailing({
-  hasAttachments,
-  messageLabels,
-  dateLabel,
-  hover,
-}: {
-  hasAttachments: boolean;
-  messageLabels: { id: string; name: string; color?: string }[];
-  dateLabel: string;
-  hover: ComponentProps<typeof MessageListRowHoverActions>;
-}) {
-  return (
-    <div className="ml-auto flex shrink-0 items-center gap-4">
-      <div className="flex items-center gap-1">
-        {hasAttachments ? (
-          <Icons color="tertiary" icon={Icon.PaperClip} size={Size.SMALL} />
-        ) : null}
-        <MessageLabelChips messageLabels={messageLabels} />
-      </div>
-      <Typography
-        className="group-hover/row:hidden"
-        color="tertiary"
-        mono
-        size={TypographySize.SMALL}
-      >
-        {dateLabel}
-      </Typography>
-      <MessageListRowHoverActions {...hover} />
-    </div>
-  );
-}
+type MessageListRowView = ReturnType<typeof buildMessageListRowView>;
 
-function UnreadDot({ opacity }: { opacity: number }) {
+/** Two overlapping avatars for a conversation with more than one sender, else the one sender. */
+function MessageListRowAvatars({ senders }: { senders: MessageListRowView["avatarSenders"] }) {
+  const [latest, other] = senders;
+  if (!latest) return <span aria-hidden className="size-8 shrink-0" />;
+  if (!other) return <SenderAvatar email={latest.email} name={latest.name} className="size-8 shrink-0" />;
   return (
-    <span className="ml-1 flex h-2 w-2.5 shrink-0 items-center">
-      <span className="size-2 rounded-full bg-accent" style={{ opacity }} />
+    <span aria-hidden className="relative flex size-8 shrink-0">
+      <SenderAvatar email={latest.email} name={latest.name} className="absolute top-0 left-0 size-[23px]" />
+      <SenderAvatar
+        email={other.email}
+        name={other.name}
+        className="absolute right-0 bottom-0 size-[23px] rounded-full ring-2 ring-[var(--bg-l2-solid)]"
+      />
     </span>
   );
 }
 
-/** Phone widths and the narrow desktop list stack sender/date over subject so the subject keeps the full row width. */
-function MessageListRowStacked({
-  view,
+function MessageListRowThreadCount({
+  count,
+  thread,
+  onToggleThreadExpand,
 }: {
-  view: ReturnType<typeof buildMessageListRowView>;
+  count: number;
+  thread: NonNullable<MessageListRowView["thread"]>;
+  onToggleThreadExpand: (threadId: string) => void;
 }) {
-  const { message, row } = view;
-  const showMenu = view.display.narrow;
-  const date = view.dateLabel;
   return (
-    <div className="flex h-full items-start">
-      <MessageListRowSelectAvatar
-        email={message.from?.[0]?.email ?? ""}
-        name={message.from?.[0]?.name ?? undefined}
-        isChecked={view.isChecked}
-        onToggleSelect={(event) => view.onToggleSelect(event, row.messageIds)}
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        onToggleThreadExpand(thread.id);
+      }}
+      className="relative z-2 -my-1 inline-flex h-6 shrink-0 cursor-pointer items-center gap-0.5 rounded px-1 text-xs tabular-nums text-[var(--text-tertiary)] hover:bg-[var(--bg-overlay-tertiary)] hover:text-[var(--text-primary)]"
+      aria-label="Show thread messages"
+      aria-expanded={thread.expanded}
+    >
+      {count}
+      {thread.loading ? (
+        <RotateCcw aria-hidden className="size-3 animate-spin" strokeWidth={2} />
+      ) : (
+        <ChevronDown aria-hidden className={cn("size-3", thread.expanded && "rotate-180")} strokeWidth={2.25} />
+      )}
+    </button>
+  );
+}
+
+/** Only a list wide enough to keep the sender readable swaps the date for read, trash, star and the actions menu on hover or keyboard focus. */
+function MessageListRowInlineActions({ view }: { view: MessageListRowView }) {
+  const { message, row } = view;
+  return (
+    <div className="relative z-2 -my-1 ml-auto hidden shrink-0 items-center gap-0.5 @min-[480px]/list:group-hover/row:flex @min-[480px]/list:group-has-[:focus-visible]/row:flex @min-[480px]/list:group-has-[[data-state=open]]/row:flex">
+      <MessageListRowHoverActions
+        isRead={view.isRead}
+        isFlagged={view.isFlagged}
+        isBulk={row.messageIds.length > 1}
+        messageId={message.id}
+        messageIds={row.messageIds}
+        onMarkAsUnread={view.mailboxActions.onMarkAsUnread}
+        onMarkAsRead={view.mailboxActions.onMarkAsRead}
+        onBulkMarkAsUnread={view.mailboxActions.onBulkMarkAsUnread}
+        onBulkMarkAsRead={view.mailboxActions.onBulkMarkAsRead}
+        onDelete={view.mailboxActions.onDelete}
+        onBulkDelete={view.mailboxActions.onBulkDelete}
+        onToggleFlagged={view.mailboxActions.onToggleFlagged}
       />
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div className={cn("flex min-w-0 items-center gap-1", showMenu && "h-6")}>
-          <div className="flex min-w-0 flex-1 overflow-hidden">
-            <Typography color={view.senderTone} weight={view.senderWeight}>
-              {view.senderLabel}
-            </Typography>
-          </div>
-          <UnreadDot opacity={view.unreadOpacity} />
-          {view.hasAttachments ? (
-            <Icons color="tertiary" icon={Icon.PaperClip} size={Size.SMALL} />
-          ) : null}
-          {showMenu ? (
-            <div className="group/actions relative z-2 flex shrink-0 items-center">
-              <Typography
-                className="group-hover/row:hidden group-has-[[data-state=open]]/actions:hidden"
-                color="tertiary"
-                mono
-                size={TypographySize.SMALL}
-              >
-                {date}
-              </Typography>
-              <div className="hidden transition-opacity duration-150 ease-in-out group-hover/row:flex group-has-[[data-state=open]]/actions:flex starting:opacity-0">
-                <MessageListRowOverflowMenu
-                  message={message}
-                  messageIds={row.messageIds}
-                  isRead={view.isRead}
-                  isFlagged={view.isFlagged}
-                  labels={view.labels}
-                  moveTargets={view.moveTargets}
-                  spamActions={view.spamActions}
-                  mailboxActions={view.mailboxActions}
-                />
-              </div>
-            </div>
-          ) : (
-            <Typography color="tertiary" mono size={TypographySize.SMALL}>
-              {date}
-            </Typography>
-          )}
-        </div>
-        <MessageListRowSubject
-          className="ml-0 w-full flex-none"
-          isRead={view.isRead}
-          subject={message.subject ?? ""}
-          previewSnippet={view.previewSnippet}
-          thread={view.thread}
-          onToggleThreadExpand={view.onToggleThreadExpand}
-        />
-        <MessageLabelChips messageLabels={view.messageLabels} />
-      </div>
+      <MessageListRowOverflowMenu
+        message={message}
+        messageIds={row.messageIds}
+        isRead={view.isRead}
+        isFlagged={view.isFlagged}
+        labels={view.labels}
+        moveTargets={view.moveTargets}
+        spamActions={view.spamActions}
+        mailboxActions={view.mailboxActions}
+      />
     </div>
   );
 }
 
-function MessageListRowInline({
-  view,
-}: {
-  view: ReturnType<typeof buildMessageListRowView>;
-}) {
+/** The checkbox takes the avatar's place on the hovered or focused row and on checked rows; every other row keeps its avatar. */
+function MessageListRowSelect({ view }: { view: MessageListRowView }) {
+  const { row } = view;
+  const checkbox = (
+    <Icons
+      color={view.isChecked ? "primary" : "secondary"}
+      icon={view.isChecked ? Icon.CheckboxFilled : Icon.CheckboxEmpty}
+      size={Size.SMALL}
+    />
+  );
+  return (
+    <button
+      type="button"
+      aria-label="Select message"
+      aria-pressed={view.isChecked}
+      onClick={(event) => view.onToggleSelect(event, row.messageIds)}
+      className="group/select relative z-2 flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full"
+    >
+      {view.isChecked ? (
+        checkbox
+      ) : (
+        <>
+          <span className="flex group-hover/row:hidden group-focus-visible/select:hidden">
+            <MessageListRowAvatars senders={view.avatarSenders} />
+          </span>
+          <span className="hidden group-hover/row:flex group-focus-visible/select:flex">{checkbox}</span>
+        </>
+      )}
+    </button>
+  );
+}
+
+/** Phones and the desktop list stack sender, subject and preview so each keeps the full row width. */
+function MessageListRowStacked({ view }: { view: MessageListRowView }) {
   const { message, row } = view;
   return (
-    <div className="flex h-full items-center">
-      <MessageListRowSelectAvatar
-        email={message.from?.[0]?.email ?? ""}
-        name={message.from?.[0]?.name ?? undefined}
-        isChecked={view.isChecked}
-        onToggleSelect={(event) => view.onToggleSelect(event, row.messageIds)}
-      />
-      <div className="flex min-w-[140px] w-[16vw] max-w-[220px] shrink-0 items-center overflow-hidden">
-        <Typography color={view.senderTone} weight={view.senderWeight}>
-          {view.senderLabel}
-        </Typography>
+    <div className="flex h-full items-center gap-2.5">
+      <MessageListRowSelect view={view} />
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex h-[18px] min-w-0 items-center gap-1.5">
+          {view.isRead ? null : <span aria-hidden className="size-[7px] shrink-0 rounded-full bg-accent" />}
+          <div className="flex min-w-0 overflow-hidden">
+            <Typography color={view.senderTone} weight={view.senderWeight}>
+              {view.senderLabel}
+            </Typography>
+          </div>
+          {view.thread ? (
+            <MessageListRowThreadCount
+              count={row.messages.length}
+              thread={view.thread}
+              onToggleThreadExpand={view.onToggleThreadExpand}
+            />
+          ) : null}
+          {/* The date keeps a fixed column so attachment and star icons line up from row to row. */}
+          <span className="ml-auto flex shrink-0 items-center gap-1.5 @min-[480px]/list:group-hover/row:hidden @min-[480px]/list:group-has-[:focus-visible]/row:hidden @min-[480px]/list:group-has-[[data-state=open]]/row:hidden">
+            {view.hasAttachments ? (
+              <Icons color="tertiary" icon={Icon.PaperClip} size={Size.SMALL} />
+            ) : null}
+            {view.isFlagged ? <Star aria-label="Starred" className="size-3 fill-current text-accent" /> : null}
+            <span className="min-w-12 text-right text-xs tabular-nums whitespace-nowrap text-[var(--text-tertiary)]">
+              {view.dateLabel}
+            </span>
+          </span>
+          <MessageListRowInlineActions view={view} />
+        </div>
+        <div className="flex h-5 min-w-0 items-center gap-1.5">
+          <MessageListRowSubject
+            isRead={view.isRead}
+            subject={message.subject ?? ""}
+            previewSnippet={view.previewSnippet}
+          />
+          <MessageLabelChips messageLabels={view.messageLabels} className="max-w-[60%] shrink-0 overflow-hidden" />
+        </div>
       </div>
-      <UnreadDot opacity={view.unreadOpacity} />
-      <MessageListRowSubject
-        isRead={view.isRead}
-        subject={message.subject ?? ""}
-        previewSnippet={view.previewSnippet}
-        thread={view.thread}
-        onToggleThreadExpand={view.onToggleThreadExpand}
-      />
-      <MessageListRowTrailing
-        hasAttachments={view.hasAttachments}
-        messageLabels={view.messageLabels}
-        dateLabel={view.dateLabel}
-        hover={{
-          isRead: view.isRead,
-          isFlagged: view.isFlagged,
-          isBulk: row.messageIds.length > 1,
-          messageId: message.id,
-          messageIds: row.messageIds,
-          onMarkAsUnread: view.mailboxActions.onMarkAsUnread,
-          onMarkAsRead: view.mailboxActions.onMarkAsRead,
-          onBulkMarkAsUnread: view.mailboxActions.onBulkMarkAsUnread,
-          onBulkMarkAsRead: view.mailboxActions.onBulkMarkAsRead,
-          onDelete: view.mailboxActions.onDelete,
-          onBulkDelete: view.mailboxActions.onBulkDelete,
-          onToggleFlagged: view.mailboxActions.onToggleFlagged,
-        }}
-      />
     </div>
   );
 }
 
 export function MessageListRow(props: MessageListRowProps) {
   const view = buildMessageListRowView(props);
-  const { message, row, display } = view;
+  const { message, row } = view;
 
   return (
     <>
@@ -462,8 +414,6 @@ export function MessageListRow(props: MessageListRowProps) {
         <div
           style={{ height: props.height }}
           className={rowShellClassName({
-            stacked: display.isMobile || display.narrow,
-            density: display.density,
             isChecked: view.isChecked,
             isSelected: view.isSelected,
             isRead: view.isRead,
@@ -477,11 +427,7 @@ export function MessageListRow(props: MessageListRowProps) {
             onClick={() => view.onSelect(message.id)}
             className="absolute inset-0 z-1 cursor-pointer focus-visible:-outline-offset-2"
           />
-          {display.isMobile || display.narrow ? (
-            <MessageListRowStacked view={view} />
-          ) : (
-            <MessageListRowInline view={view} />
-          )}
+          <MessageListRowStacked view={view} />
         </div>
         }
       >
@@ -521,16 +467,18 @@ function MessageListRowThreadChildren({
   onSelect: (id: string) => void;
 }) {
   if (!visible) return null;
+  // Lined up under the row's text; each line names who wrote it, since a thread shares one subject.
   return (
-    <div className="border-l-2 border-border/30 ml-2 mt-0.5 mb-1">
+    <div className="mr-1.5 mb-1.5 ml-14 border-l-2 border-border/30">
       {messages.map((threadMsg) => {
         const threadRead = threadMsg.keywords?.["$seen"];
+        const preview = getListPreviewSnippet(threadMsg);
         return (
           <button
             key={threadMsg.id}
             type="button"
             onClick={() => onSelect(threadMsg.id)}
-            className="flex w-full items-center gap-2 px-2.5 py-1 cursor-pointer text-left hover:bg-muted/40 transition-colors border-b border-border/20"
+            className="flex w-full cursor-pointer items-center gap-2 px-2.5 py-1.5 text-left transition-colors hover:bg-muted/40"
           >
             <span
               className={cn(
@@ -542,13 +490,16 @@ function MessageListRowThreadChildren({
             </span>
             <span
               className={cn(
-                "flex-1 min-w-0 truncate text-[11px]",
-                threadRead ? "text-muted-foreground" : "font-medium text-foreground/80",
+                "max-w-[45%] shrink-0 truncate text-xs",
+                threadRead ? "text-foreground/80" : "font-medium text-foreground",
               )}
             >
-              {threadMsg.subject || "(No subject)"}
+              {formatAddress(threadMsg.from)}
             </span>
-            <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums whitespace-nowrap">
+            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+              {preview || threadMsg.subject || "(No subject)"}
+            </span>
+            <span className="min-w-12 shrink-0 text-right text-xs text-muted-foreground tabular-nums whitespace-nowrap">
               {formatMessageDate(threadMsg.receivedAt, timeFormat, timezone)}
             </span>
           </button>

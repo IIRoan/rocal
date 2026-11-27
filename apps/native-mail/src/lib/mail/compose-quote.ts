@@ -1,7 +1,10 @@
 import {
+  buildForwardQuoteHtml,
+  buildReplyQuoteHtml,
   FORWARDED_MESSAGE_HEADER,
   formatQuotedMailDate,
   formatReplyQuoteHeader,
+  prepareQuotedComposeHtml,
   resolveReplyRecipients,
   stripHtmlTags,
   type QuotedDateOptions,
@@ -45,15 +48,55 @@ function messageText(message: JmapEmailMessage, plaintext?: string): string {
   return bodies.text?.trim() || stripHtmlToText(bodies.html);
 }
 
+function replySender(message: JmapEmailMessage): string {
+  return (
+    message.from?.[0]?.name?.trim() ||
+    message.from?.[0]?.email?.trim() ||
+    "Unknown sender"
+  );
+}
+
+/** The quoted message's own HTML (or its text as paragraphs), sanitized, with `cid:` images awaiting their download. */
+function quotedHtml(message: JmapEmailMessage, plaintext?: string): string {
+  const rawBodies = extractMessageBodies(message);
+  return prepareQuotedComposeHtml(
+    limitMailQuoteContent({ text: plaintext ?? rawBodies.text, html: rawBodies.html }),
+  );
+}
+
+export function buildReplyHtml(
+  message: JmapEmailMessage,
+  dateOptions: QuotedDateOptions,
+  plaintext?: string,
+): string {
+  return buildReplyQuoteHtml({
+    date: formatQuotedMailDate(message.receivedAt, dateOptions),
+    sender: replySender(message),
+    quoteHtml: quotedHtml(message, plaintext),
+  });
+}
+
+export function buildForwardHtml(
+  message: JmapEmailMessage,
+  dateOptions: QuotedDateOptions,
+  plaintext?: string,
+): string {
+  return buildForwardQuoteHtml({
+    from: getReplyRecipients(message) || "Unknown sender",
+    date: formatQuotedMailDate(message.receivedAt, dateOptions),
+    subject: message.subject?.trim() || "(no subject)",
+    to: formatAddressList(message.to),
+    cc: formatAddressList(message.cc),
+    quoteHtml: quotedHtml(message, plaintext),
+  });
+}
+
 export function buildReplyBody(
   message: JmapEmailMessage,
   dateOptions: QuotedDateOptions,
   plaintext?: string,
 ): string {
-  const sender =
-    message.from?.[0]?.name?.trim() ||
-    message.from?.[0]?.email?.trim() ||
-    "Unknown sender";
+  const sender = replySender(message);
   const receivedAt = formatQuotedMailDate(message.receivedAt, dateOptions);
   const source = messageText(message, plaintext);
   const quoted = `> ${source.replace(/\r?\n/g, "\n> ")}`;
@@ -68,14 +111,8 @@ export function buildForwardBody(
 ): string {
   const textBody = messageText(message, plaintext);
   const from = getReplyRecipients(message) || "Unknown sender";
-  const to = (message.to ?? [])
-    .map((entry) => entry.email?.trim())
-    .filter((value): value is string => Boolean(value))
-    .join(", ");
-  const cc = (message.cc ?? [])
-    .map((entry) => entry.email?.trim())
-    .filter((value): value is string => Boolean(value))
-    .join(", ");
+  const to = formatAddressList(message.to);
+  const cc = formatAddressList(message.cc);
   const date = formatQuotedMailDate(message.receivedAt, dateOptions);
 
   return [

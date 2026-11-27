@@ -1,4 +1,4 @@
-import { collapseRecipientChips, composeTitle } from "./compose-display";
+import { collapseRecipientChips, composeTitle, isThreadReply } from "./compose-display";
 
 describe("collapseRecipientChips", () => {
   it("shows every chip when expanded", () => {
@@ -24,10 +24,19 @@ describe("collapseRecipientChips", () => {
 });
 
 describe("composeTitle", () => {
-  it("prefers the subject and falls back to New message", () => {
-    expect(composeTitle(" Re: Prototype Designs ")).toBe(
-      "Re: Prototype Designs",
-    );
-    expect(composeTitle("   ")).toBe("New message");
+  it("names what the drawer is for, never the subject", () => {
+    expect(composeTitle(undefined)).toBe("New message");
+    expect(composeTitle("reply")).toBe("Reply");
+    expect(composeTitle("reply-all")).toBe("Reply all");
+    expect(composeTitle("forward")).toBe("Forward");
+    expect(composeTitle("draft")).toBe("Draft");
+  });
+
+  it("locks recipients and subject only for replies", () => {
+    expect(isThreadReply("reply")).toBe(true);
+    expect(isThreadReply("reply-all")).toBe(true);
+    expect(isThreadReply("forward")).toBe(false);
+    expect(isThreadReply("draft")).toBe(false);
+    expect(isThreadReply(undefined)).toBe(false);
   });
 });

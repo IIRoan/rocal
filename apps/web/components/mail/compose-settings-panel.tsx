@@ -44,7 +44,7 @@ export function ComposeSettingsPanel({ goBack }: { goBack: () => void }) {
       <SettingToggleRow
         icon={AlignLeft}
         label="Plain text only"
-        description="Compose and send without rich formatting"
+        description="New messages start without rich formatting; the Plain text button in compose switches one message"
         checked={settings.plainTextMode}
         onToggle={() =>
           updateSettings({ plainTextMode: !settings.plainTextMode })
@@ -86,10 +86,10 @@ export function ComposeSettingsPanel({ goBack }: { goBack: () => void }) {
         <PaletteSelect
           id="mail-signature-position"
           label="Signature position"
-          value={settings.signaturePosition}
+          value={settings.replySignaturePosition}
           options={SIGNATURE_POSITION_OPTIONS}
-          onValueChange={(signaturePosition) =>
-            updateSettings({ signaturePosition })
+          onValueChange={(replySignaturePosition) =>
+            updateSettings({ replySignaturePosition })
           }
         />
       </PaletteField>

@@ -43,6 +43,7 @@
     "@workspace/design-tokens": "workspace:*",
     "@workspace/e2ee": "workspace:*",
     "@workspace/logger": "workspace:*",
+    "@workspace/mail-editor": "workspace:*",
     "@workspace/native-core": "workspace:*",
     "@workspace/runtime": "workspace:*",
     "better-auth": "^1.7.15",

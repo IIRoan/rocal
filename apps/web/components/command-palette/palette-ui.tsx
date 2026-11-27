@@ -366,6 +366,48 @@ export function PaletteFormActions({ children }: { children: ReactNode }) {
   );
 }
 
+export function PaletteFieldError({ id, message }: { id: string; message?: string }) {
+  return message ? (
+    <p id={id} className="text-[13px] leading-[130%] text-destructive">
+      {message}
+    </p>
+  ) : null;
+}
+
+/** An edit form's own error, then Delete (when editing), Cancel and Save. */
+export function PaletteFormFooter({
+  formError,
+  onCancel,
+  onDelete,
+}: {
+  formError?: string;
+  onCancel: () => void;
+  onDelete?: () => void;
+}) {
+  return (
+    <>
+      {formError ? (
+        <p role="alert" className="px-2 text-[13px] leading-[130%] text-destructive">
+          {formError}
+        </p>
+      ) : null}
+      <PaletteFormActions>
+        {onDelete ? (
+          <PaletteButton variant="destructive" className="mr-auto" onClick={onDelete}>
+            Delete
+          </PaletteButton>
+        ) : null}
+        <PaletteButton variant="ghost" onClick={onCancel}>
+          Cancel
+        </PaletteButton>
+        <PaletteButton type="submit" variant="primary">
+          Save
+        </PaletteButton>
+      </PaletteFormActions>
+    </>
+  );
+}
+
 export function PaletteEmptyState({ children }: { children: ReactNode }) {
   return (
     <div className="flex flex-col items-center gap-1 px-2 py-6 text-center text-[13px] leading-[130%] text-muted-foreground">

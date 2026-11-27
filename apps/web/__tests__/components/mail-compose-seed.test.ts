@@ -1,7 +1,7 @@
 /** @jest-environment jsdom */
 
-import { expect, it } from "@jest/globals";
-import { buildDraftSeed, buildForwardSeed, buildMailtoSeed, buildReplySeed } from "@/components/mail/mail-compose-seed";
+import { describe, expect, it } from "@jest/globals";
+import { buildDraftSeed, buildForwardSeed, buildMailtoSeed, buildOpenNewComposeSeed, buildReplySeed } from "@/components/mail/mail-compose-seed";
 import type { JmapEmailMessage, JmapIdentity } from "@/lib/mail/types";
 import { MAX_MAIL_DISPLAY_CHARACTERS } from "@workspace/calendar-core/mail-mime-limits";
 
@@ -131,4 +131,68 @@ it("seeds a new message from a mailto link with its body above the signature", (
   } finally {
     localStorage.removeItem("mail:composeSettings");
   }
+});
+
+describe("the signature a compose opens with", () => {
+  const signed: JmapIdentity[] = [{ id: "primary", email: "me@solace.test", name: "Me", textSignature: "Me\nSolace" }];
+  const BLOCK = '<p data-signature-block="separator">-- </p><p>Me<br>Solace</p><p data-signature-block="end"></p>';
+  const withSettings = (settings: object, run: () => void) => {
+    localStorage.setItem("mail:composeSettings", JSON.stringify(settings));
+    try {
+      run();
+    } finally {
+      localStorage.removeItem("mail:composeSettings");
+    }
+  };
+
+  it("puts a new message's signature below an empty writing line", () => {
+    expect(buildOpenNewComposeSeed(signed, "primary").patch).toMatchObject({ composeBody: "", composeHtmlBody: `<p></p>${BLOCK}` });
+    withSettings({ plainTextMode: true }, () => {
+      expect(buildOpenNewComposeSeed(signed, "primary").patch).toMatchObject({ composeBody: "\n\n-- \nMe\nSolace", composeHtmlBody: "" });
+    });
+    withSettings({ plainTextMode: true, signatureSeparatorEnabled: false }, () => {
+      expect(buildOpenNewComposeSeed(signed, "primary").patch.composeBody).toBe("\n\nMe\nSolace");
+    });
+  });
+
+  it("puts a reply's signature above the quote or at the very bottom, as the signature position says", () => {
+    withSettings({ replySignaturePosition: "above_quote" }, () => {
+      expect(buildReplySeed(conversation, "Hello", signed, "primary", DATE_OPTIONS).patch.composeHtmlBody).toMatch(
+        new RegExp(`^<p></p>${BLOCK}<div><p>On .+ wrote:</p></div><div data-quoted-html>`),
+      );
+    });
+    withSettings({ replySignaturePosition: "below_quote" }, () => {
+      expect(buildReplySeed(conversation, "Hello", signed, "primary", DATE_OPTIONS).patch.composeHtmlBody).toMatch(
+        new RegExp(`^<p></p><div><p>On .+ wrote:</p></div><div data-quoted-html>.*</div>${BLOCK}$`),
+      );
+    });
+    withSettings({ plainTextMode: true, replySignaturePosition: "above_quote" }, () => {
+      expect(buildReplySeed(conversation, "Hello", signed, "primary", DATE_OPTIONS).patch.composeBody).toMatch(
+        /^\n\n-- \nMe\nSolace\n\nOn .+ wrote:\n> Hello$/,
+      );
+    });
+    withSettings({ plainTextMode: true, replySignaturePosition: "below_quote" }, () => {
+      expect(buildReplySeed(conversation, "Hello", signed, "primary", DATE_OPTIONS).patch.composeBody).toMatch(
+        /^\n\nOn .+ wrote:\n> Hello\n\n-- \nMe\nSolace$/,
+      );
+    });
+  });
+
+  it("puts a forward's signature above or below the forwarded message", () => {
+    withSettings({ replySignaturePosition: "above_quote" }, () => {
+      expect(buildForwardSeed(conversation, "Hello", signed, "primary", DATE_OPTIONS).patch.composeHtmlBody).toMatch(
+        new RegExp(`^<p></p>${BLOCK}<div>---------- Forwarded message ----------`),
+      );
+    });
+    withSettings({ plainTextMode: true, replySignaturePosition: "below_quote" }, () => {
+      expect(buildForwardSeed(conversation, "Hello", signed, "primary", DATE_OPTIONS).patch.composeBody).toMatch(
+        /^\n\n---------- Forwarded message ----------\n[\s\S]*\n\nHello\n\n-- \nMe\nSolace$/,
+      );
+    });
+  });
+
+  it("reopens a draft as saved, without adding a signature", () => {
+    const seed = buildDraftSeed(conversation, signed, "primary", { plaintext: "Draft text", html: "<p>Draft text</p>" });
+    expect(seed.patch).toMatchObject({ composeBody: "Draft text", composeHtmlBody: "<p>Draft text</p>" });
+  });
 });

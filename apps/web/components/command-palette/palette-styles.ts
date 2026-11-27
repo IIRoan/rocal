@@ -14,4 +14,4 @@ export const PALETTE_COMPACT_SELECT_CLASS =
   "h-8 cursor-pointer rounded-lg bg-muted text-[15px] shadow-none";
 
 export const PALETTE_INPUT_CLASS =
-  "h-11 min-w-0 w-full rounded-lg border-0 bg-muted px-3 text-base text-foreground shadow-none outline-none transition-shadow placeholder:text-muted-foreground focus:border-0 focus:shadow-none focus:ring-2 focus:ring-ring disabled:opacity-50 md:h-9 md:text-[15px]";
+  "h-11 min-w-0 w-full rounded-lg border-0 bg-muted px-3 text-base text-foreground shadow-none placeholder:text-muted-foreground disabled:opacity-50 md:h-9 md:text-[15px]";

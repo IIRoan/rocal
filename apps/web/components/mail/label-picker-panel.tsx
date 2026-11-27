@@ -148,7 +148,7 @@ export function LabelPickerPanel({
                       if (e.key === "Enter") void handleSaveEdit();
                       if (e.key === "Escape") cancelEditing();
                     }}
-                    className="h-7 w-full rounded bg-background px-2 text-[15px] text-foreground outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                    className="h-7 w-full rounded bg-background px-2 text-[15px] text-foreground disabled:opacity-50"
                     aria-label="Edit label name"
                     aria-invalid={editNameMissing || undefined}
                     aria-describedby={editNameMissing ? nameErrorId : undefined}
@@ -344,7 +344,7 @@ function NewLabelForm({
         }}
         placeholder="Label name…"
         disabled={isSaving}
-        className="h-7 w-full text-[12px] bg-muted/60 border-0 rounded px-2 outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground disabled:opacity-50"
+        className="h-7 w-full text-[12px] bg-muted/60 border-0 rounded px-2 placeholder:text-muted-foreground disabled:opacity-50"
       />
       {nameMissing ? (
         <p id={nameErrorId} className="px-1 text-[13px] text-destructive">

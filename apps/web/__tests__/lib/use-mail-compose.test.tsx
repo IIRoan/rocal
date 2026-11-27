@@ -14,6 +14,7 @@ import {
   registerComposeCloseActions,
   registerComposeDraftSaver,
 } from "@/components/mail/mail-compose-bridge";
+import { registerComposeInlineImage } from "@/lib/mail/compose-inline-images";
 import { clearMailSendAttempts, completeMailSendAttempt, getMailSendAttemptStore, isMailSendScopeOpen, sendJmapMessage, resolveMailServerLimits } from "@workspace/calendar-core";
 
 jest.mock("sonner", () => ({
@@ -153,6 +154,113 @@ describe("useMailCompose", () => {
         replyContext: null,
       }),
     );
+  });
+
+  it("applies an html body updater to the latest body, as quoted image loading does", async () => {
+    let latest: ReturnType<typeof useMailCompose> | null = null;
+    await act(async () => {
+      root.render(
+        <MailComposeProvider mailServerLimits={fallbackMailServerLimits} quoteDateOptions={{ timeFormat: "24h" }}>
+          <ComposeProbe onReady={(value) => { latest = value; }} />
+        </MailComposeProvider>,
+      );
+    });
+
+    await act(async () => {
+      latest!.setComposeHtmlBody("<p>Typed</p>");
+      latest!.setComposeHtmlBody((current) => `${current}<p>Loaded</p>`);
+    });
+
+    expect(getMailComposeBridge()?.getDraft()).toEqual(
+      expect.objectContaining({ htmlBody: "<p>Typed</p><p>Loaded</p>", body: "Typed\nLoaded" }),
+    );
+  });
+
+  it("switches one message between rich and plain text without losing edits or the rich body", async () => {
+    let latest: ReturnType<typeof useMailCompose> | null = null;
+    await act(async () => {
+      root.render(
+        <MailComposeProvider mailServerLimits={fallbackMailServerLimits} quoteDateOptions={{ timeFormat: "24h" }}>
+          <ComposeProbe onReady={(value) => { latest = value; }} />
+        </MailComposeProvider>,
+      );
+    });
+    const rich = "<p>Hi <strong>Sam</strong></p><ul><li>One</li></ul>";
+    await act(async () => latest!.setComposeHtmlBody(rich));
+
+    await act(async () => latest!.setPlainTextMode(true));
+    expect(getMailComposeBridge()?.getDraft()).toEqual(
+      expect.objectContaining({ plainTextMode: true, body: "Hi Sam\n\n- One" }),
+    );
+
+    // Back without edits: the formatting comes back untouched.
+    await act(async () => latest!.setPlainTextMode(false));
+    expect(getMailComposeBridge()?.getDraft()).toEqual(expect.objectContaining({ plainTextMode: false, htmlBody: rich }));
+
+    // Back after an edit: the edited text becomes the body.
+    await act(async () => latest!.setPlainTextMode(true));
+    await act(async () => latest!.setComposeBody("Hi Sam\n\n- One\n\nAdded"));
+    await act(async () => latest!.setPlainTextMode(false));
+    expect(getMailComposeBridge()?.getDraft()).toEqual(
+      expect.objectContaining({ plainTextMode: false, htmlBody: "<p>Hi Sam</p><p>- One</p><p>Added</p>" }),
+    );
+    expect(localStorage.getItem("mail:composeSettings")).toBeNull();
+  });
+
+  it("gives a draft opened as plain text its rich body back when switched to rich unedited", async () => {
+    localStorage.setItem("mail:composeSettings", JSON.stringify({ plainTextMode: true }));
+    let latest: ReturnType<typeof useMailCompose> | null = null;
+    try {
+      await act(async () => {
+        root.render(
+          <MailComposeProvider mailServerLimits={fallbackMailServerLimits} quoteDateOptions={{ timeFormat: "24h" }}>
+            <ComposeProbe onReady={(value) => { latest = value; }} />
+          </MailComposeProvider>,
+        );
+      });
+      const rich = "<p>Hi <strong>Sam</strong></p><div data-quoted-html><p>Old</p></div>";
+      await act(async () => {
+        getMailComposeBridge()?.seedDraft({ id: "draft-1", subject: "Draft", to: [], keywords: { $draft: true } } as never, {
+          plaintext: "Hi Sam",
+          html: rich,
+        });
+      });
+      expect(getMailComposeBridge()?.getDraft().plainTextMode).toBe(true);
+
+      await act(async () => latest!.setPlainTextMode(false));
+
+      expect(getMailComposeBridge()?.getDraft()).toEqual(expect.objectContaining({ plainTextMode: false, htmlBody: rich }));
+    } finally {
+      localStorage.removeItem("mail:composeSettings");
+    }
+  });
+
+  it("counts an inserted image as content even when the text matches the seed", async () => {
+    let latest: ReturnType<typeof useMailCompose> | null = null;
+    await act(async () => {
+      root.render(
+        <MailComposeProvider mailServerLimits={fallbackMailServerLimits} quoteDateOptions={{ timeFormat: "24h" }}>
+          <ComposeProbe onReady={(value) => { latest = value; }} />
+        </MailComposeProvider>,
+      );
+    });
+    await act(async () => latest!.openNewCompose());
+    expect(getMailComposeBridge()?.hasUserContent()).toBe(false);
+
+    registerComposeInlineImage({
+      cid: "pasted@solace",
+      blobId: null,
+      type: "image/png",
+      name: "pasted.png",
+      size: 3,
+      dataUrl: "data:image/png;base64,AAAA",
+      content: new Uint8Array([1, 2, 3]),
+    });
+    await act(async () =>
+      latest!.setComposeHtmlBody('<p><img src="data:image/png;base64,AAAA" data-cid="pasted@solace"></p>'),
+    );
+
+    expect(getMailComposeBridge()?.hasUserContent()).toBe(true);
   });
 
   it("resetDraft clears compose state", async () => {

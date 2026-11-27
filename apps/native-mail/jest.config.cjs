@@ -23,6 +23,8 @@ module.exports = {
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "mjs", "json", "node"],
   moduleNameMapper: {
     ...nativeJestModuleNameMapper("<rootDir>/../.."),
+    "^@workspace/mail-editor/protocol$": "<rootDir>/../../packages/mail-editor/src/protocol.ts",
+    "^@workspace/mail-editor/webview-script$": "<rootDir>/../../packages/mail-editor/src/generated/webview-script.ts",
     "^@/(.*)$": "<rootDir>/$1",
   },
 };

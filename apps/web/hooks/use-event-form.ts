@@ -11,11 +11,14 @@ import type {
   EventParticipantInput,
 } from "@workspace/calendar-core";
 import {
+  buildEventDuplicate,
+  canDuplicateEvent,
   formatCalendarDayKey,
   getErrorMessage,
   getEventPickerDateRange,
   getOperationWarningMessages,
   eventNotificationsQueryKey,
+  getDefaultReminderMinutes,
   getReminderMinutes,
   parseCalendarDayKey,
   pickerDateAndTimeToUtc,
@@ -240,6 +243,8 @@ interface UseEventFormReturn {
   handleNotificationChange: (notifications: EventNotification[]) => void;
   applyQuickAdd: (result: QuickAddResult) => void;
   loadEventData: (event: CalendarEvent) => void;
+  canDuplicate: boolean;
+  duplicateEvent: (event: CalendarEvent) => void;
   resetForm: () => void;
   handleEventSave: (
     calendarData: Pick<
@@ -401,7 +406,10 @@ export function useEventForm({
     },
   });
 
-  const loadEventData = async (event: CalendarEvent) => {
+  const loadEventData = async (
+    event: CalendarEvent,
+    copiedNotifications?: EventNotification[],
+  ) => {
     const isNewEvent = !event.id || event.id === "" || event.id === undefined;
     const fallbackNotifications = getFallbackNotifications(event.reminder);
 
@@ -451,7 +459,14 @@ export function useEventForm({
         recurrenceRule: parsedRule,
         notifications,
       });
-    const loadedNotifications = isNewEvent ? [] : fallbackNotifications;
+    // A new event takes the account's default reminder unless it arrives carrying its own.
+    const loadedNotifications =
+      copiedNotifications ??
+      (isNewEvent && !("reminder" in event)
+        ? getDefaultReminderMinutes(localSettings.defaultReminderMinutes).map(
+            createLegacyReminderNotification,
+          )
+        : fallbackNotifications);
     const generation = ++loadGenerationRef.current;
 
     setSelectedEvent(event);
@@ -494,6 +509,26 @@ export function useEventForm({
       }
       setNotificationsLoading(false);
     }
+  };
+
+  /** Opens an unsaved copy of `source` for creating, with its saved reminders. */
+  const duplicateEvent = (source: CalendarEvent) => {
+    const copy = buildEventDuplicate(source, calendarsRef.current ?? []);
+    if (!copy) return;
+    const generation = ++loadGenerationRef.current;
+    const loadCopy = async () => {
+      const saved = await fetchEmailNotifications(queryClient, source.id).catch(
+        () => null,
+      );
+      if (generation !== loadGenerationRef.current) return;
+      await loadEventData(
+        copy,
+        saved && saved.length > 0 ? saved : getFallbackNotifications(source.reminder),
+      );
+    };
+    loadCopy().catch((error: unknown) => {
+      log.error("Failed to duplicate event:", error);
+    });
   };
 
   const resetForm = () => {
@@ -763,6 +798,8 @@ export function useEventForm({
           allDay: eventData.allDay,
           location: eventData.location,
           calendarId: eventData.calendarId,
+          // Only a duplicate arrives carrying its source's own colour.
+          ...(selectedEvent?.color ? { color: selectedEvent.color } : {}),
           ...categoryField,
           reminder: eventData.reminder ?? null,
           recurrence: eventData.recurrence ?? undefined,
@@ -1024,6 +1061,8 @@ export function useEventForm({
     handleNotificationChange,
     applyQuickAdd,
     loadEventData,
+    canDuplicate: selectedEvent ? canDuplicateEvent(selectedEvent, calendars) : false,
+    duplicateEvent,
     resetForm,
     handleEventSave,
     handleEventDelete,

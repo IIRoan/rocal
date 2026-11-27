@@ -6,13 +6,19 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
+import { Lock, X } from "lucide-react";
 import {
   formatRecentContactForField,
   getContactDisplayLabel,
+  getEmailDomain,
   insertRecipientSuggestion,
+  isValidEmailAddress,
+  joinRecipientField,
   normalizeEmailAddress,
   parseAddressList,
+  parseRecipientString,
   resolveRecipientSuggestions,
+  splitRecipientField,
   type RecentContactEntry,
 } from "@workspace/calendar-core";
 import { Input } from "@workspace/ui/components/ui/input";
@@ -37,26 +43,78 @@ type RecipientSuggestionsListProps = {
   suggestions: RecentContactEntry[];
   highlightedIndex: number;
   heading: string;
+  internalDomain?: string | null;
   onSelect: (entry: RecentContactEntry) => void;
 };
+
+function Key({ children }: { children: string }) {
+  return (
+    <kbd className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded border border-[var(--border-secondary,var(--border))] px-1 font-sans text-[10.5px] text-[var(--text-secondary,var(--muted-foreground))]">
+      {children}
+    </kbd>
+  );
+}
+
+function RecipientChip({
+  token,
+  encrypted,
+  onRemove,
+}: {
+  token: string;
+  encrypted: boolean;
+  onRemove: () => void;
+}) {
+  const { name, email } = parseRecipientString(token);
+  const label = name || email;
+  const invalid = !isValidEmailAddress(token);
+  return (
+    <span
+      title={token}
+      className={cn(
+        "inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-full pl-1 pr-1 text-[13px]",
+        invalid
+          ? "bg-destructive/10 text-destructive"
+          : "bg-[var(--bg-overlay-tertiary,var(--muted))] text-[var(--text-primary,var(--foreground))]",
+      )}
+    >
+      <SenderAvatar name={label} email={email} className="size-5 shrink-0" />
+      <span className="min-w-0 truncate">{label}</span>
+      {encrypted && !invalid ? (
+        <Lock aria-hidden className="size-3 shrink-0 text-[var(--icon-tertiary,var(--muted-foreground))]" />
+      ) : null}
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label={`Remove ${label}`}
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={onRemove}
+        className="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-[var(--icon-tertiary,var(--muted-foreground))] hover:bg-[var(--bg-overlay-secondary,var(--hover))] hover:text-[var(--icon-primary,var(--foreground))]"
+      >
+        <X className="size-3" aria-hidden />
+      </button>
+    </span>
+  );
+}
 
 function RecipientSuggestionsList({
   listboxId,
   suggestions,
   highlightedIndex,
   heading,
+  internalDomain,
   onSelect,
 }: RecipientSuggestionsListProps) {
   const headingId = `${listboxId}-heading`;
+  const domain = internalDomain?.trim().toLowerCase();
   return (
-    <div className="max-h-64 overflow-y-auto overscroll-contain">
-      <div
-        id={headingId}
-        className="px-2 pt-1.5 pb-1 text-[13px] font-medium text-[var(--text-tertiary,var(--muted-foreground))]"
-      >
-        {heading}
+    <div className="flex max-h-80 flex-col">
+      <div className="flex items-center justify-between px-2.5 pt-1.5 pb-1 text-xs font-medium text-[var(--text-tertiary,var(--muted-foreground))]">
+        <span id={headingId}>{heading}</span>
+        <span aria-hidden className="tabular-nums">
+          {suggestions.length === 1 ? "1 contact" : `${suggestions.length} contacts`}
+        </span>
       </div>
-      <div id={listboxId} role="listbox" aria-labelledby={headingId}>
+      <div id={listboxId} role="listbox" aria-labelledby={headingId} className="min-h-0 overflow-y-auto overscroll-contain">
         {suggestions.map((entry, index) => {
           const label = getContactDisplayLabel(entry);
           return (
@@ -72,7 +130,7 @@ function RecipientSuggestionsList({
                 onSelect(entry);
               }}
               className={cn(
-                "flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors",
+                "flex min-h-11 w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left transition-colors",
                 index === highlightedIndex
                   ? "bg-[var(--bg-cell-hover,var(--hover))]"
                   : "hover:bg-[var(--bg-cell-hover,var(--hover))]",
@@ -81,21 +139,39 @@ function RecipientSuggestionsList({
               <SenderAvatar
                 name={label}
                 email={entry.email}
-                className="size-7 shrink-0"
+                className="size-[30px] shrink-0"
               />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[15px] leading-[130%] text-[var(--text-primary,var(--foreground))]">
+                <span className="block truncate text-sm font-medium leading-[135%] text-[var(--text-primary,var(--foreground))]">
                   {label}
                 </span>
                 {entry.displayName ? (
-                  <span className="block truncate text-[13px] leading-[130%] text-[var(--text-secondary,var(--muted-foreground))]">
+                  <span className="block truncate text-xs leading-[135%] text-[var(--text-secondary,var(--muted-foreground))]">
                     {entry.email}
                   </span>
                 ) : null}
               </span>
+              {domain && getEmailDomain(entry.email) === domain ? (
+                <span className="inline-flex h-5 shrink-0 items-center gap-1 rounded-full bg-accent/15 px-2 text-[11px] font-medium text-accent">
+                  <Lock className="size-2.5" aria-hidden />
+                  Solace
+                </span>
+              ) : null}
             </button>
           );
         })}
+      </div>
+      <div
+        aria-hidden
+        className="mt-1 flex items-center gap-1.5 border-t border-[var(--border-tertiary,var(--border))] px-2.5 pt-2 pb-1 text-[11px] text-[var(--text-tertiary,var(--muted-foreground))]"
+      >
+        <Key>↑</Key>
+        <Key>↓</Key>
+        <span className="mr-2">to choose</span>
+        <Key>↵</Key>
+        <span className="mr-2">to add</span>
+        <Key>Esc</Key>
+        <span>to close</span>
       </div>
     </div>
   );
@@ -116,6 +192,10 @@ export type RecipientSuggestInputProps = {
   /** Bare inline input for mail compose rows; styled field for forms. */
   appearance?: "compose" | "field";
   mode?: "mail" | "calendar";
+  /** Marks Solace contacts in suggestions; mail between them is end-to-end encrypted. */
+  internalDomain?: string | null;
+  /** The whole message will be end-to-end encrypted, so each recipient chip shows a lock. */
+  encrypted?: boolean;
   onSelectSuggestion?: (entry: RecentContactEntry) => void;
   onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
 };
@@ -134,11 +214,23 @@ export function RecipientSuggestInput({
   inputClassName,
   appearance = "compose",
   mode = "mail",
+  internalDomain,
+  encrypted = false,
   onSelectSuggestion,
   onKeyDown,
 }: RecipientSuggestInputProps) {
   const listboxId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
+  // Mail compose shows finished addresses as chips; the field value stays the same comma-separated text.
+  const chips = appearance === "compose" && mode === "mail";
+  const field = chips ? splitRecipientField(value) : { tokens: [], draft: value };
+  // The same address can be typed twice, so repeats get a count to keep their keys apart.
+  const seenTokens = new Map<string, number>();
+  const chipKeys = field.tokens.map((token) => {
+    const count = (seenTokens.get(token) ?? 0) + 1;
+    seenTokens.set(token, count);
+    return count > 1 ? `${token}#${count}` : token;
+  });
   const selectingRef = useRef(false);
   const [open, setOpen] = useState(false);
   const [highlightState, setHighlightState] = useState({
@@ -212,6 +304,13 @@ export function RecipientSuggestInput({
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    const lastToken = field.tokens.at(-1);
+    // Backspace in an empty draft brings the last chip back as text to edit.
+    if (event.key === "Backspace" && chips && !field.draft && lastToken) {
+      event.preventDefault();
+      onChange(joinRecipientField(field.tokens.slice(0, -1), lastToken));
+      return;
+    }
     if (!showSuggestions) {
       if (
         (event.key === "ArrowDown" || event.key === "ArrowUp") &&
@@ -268,10 +367,10 @@ export function RecipientSuggestInput({
     id,
     "aria-invalid": ariaInvalid,
     "aria-describedby": ariaDescribedBy,
-    value,
+    value: field.draft,
     autoFocus,
     onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
-      onChange(event.target.value);
+      onChange(chips ? joinRecipientField(field.tokens, event.target.value) : event.target.value);
       setOpen(true);
     },
     onFocus: () => {
@@ -285,10 +384,13 @@ export function RecipientSuggestInput({
           setOpen(false);
         }
       }, 0);
+      if (chips && field.draft.trim() && !selectingRef.current) {
+        onChange(joinRecipientField([...field.tokens, field.draft.trim()], ""));
+      }
       onBlur?.();
     },
     onKeyDown: handleKeyDown,
-    placeholder,
+    placeholder: field.tokens.length > 0 ? undefined : placeholder,
     disabled,
     autoComplete: "off" as const,
     role: "combobox" as const,
@@ -313,8 +415,25 @@ export function RecipientSuggestInput({
       <PopoverAnchor asChild>
         <div
           ref={containerRef}
-          className={cn("relative flex-1 min-w-0", className)}
+          // The chips and the input are one field, so its focus outline wraps them together.
+          data-field={chips || undefined}
+          className={cn(
+            "relative flex-1 min-w-0",
+            // Padding keeps the outline off the text; the matching negative margin keeps it aligned with the other rows.
+            chips && "-ml-2 flex flex-wrap items-center gap-1.5 rounded-lg px-2 py-1.5",
+            className,
+          )}
         >
+          {field.tokens.map((token, index) => (
+            <RecipientChip
+              key={chipKeys[index]}
+              token={token}
+              encrypted={encrypted}
+              onRemove={() =>
+                onChange(joinRecipientField(field.tokens.filter((_, other) => other !== index), field.draft))
+              }
+            />
+          ))}
           {appearance === "field" ? (
             <Input {...sharedInputProps} className={inputClassName} />
           ) : (
@@ -322,7 +441,8 @@ export function RecipientSuggestInput({
               type="text"
               {...sharedInputProps}
               className={cn(
-                "w-full h-8 bg-transparent border-0 text-sm placeholder:text-muted-foreground",
+                "h-7 min-w-[8ch] flex-1 bg-transparent border-0 text-sm placeholder:text-muted-foreground",
+                !chips && "w-full h-8",
                 inputClassName,
               )}
             />
@@ -331,7 +451,7 @@ export function RecipientSuggestInput({
       </PopoverAnchor>
 
       <PopoverContent
-        className="w-[var(--radix-popover-anchor-width)] min-w-[16rem] max-w-[min(24rem,calc(100dvw-2rem))] overflow-hidden rounded-xl border-[var(--border-secondary,var(--border))] bg-[var(--bg-l3-solid,var(--popover))] p-1 shadow-[var(--shadow-l2,0_8px_24px_rgb(0_0_0/0.24))]"
+        className="w-[var(--radix-popover-anchor-width)] min-w-[20rem] max-w-[min(28rem,calc(100dvw-2rem))] overflow-hidden rounded-xl border-[var(--border-secondary,var(--border))] bg-[var(--bg-l3-solid,var(--popover))] p-1.5 shadow-[var(--shadow-l2,0_8px_24px_rgb(0_0_0/0.24))]"
         align="start"
         sideOffset={4}
         onOpenAutoFocus={(event) => event.preventDefault()}
@@ -356,6 +476,7 @@ export function RecipientSuggestInput({
             suggestions={suggestions}
             highlightedIndex={highlightedIndex}
             heading={suggestionsHeading}
+            internalDomain={internalDomain}
             onSelect={selectSuggestion}
           />
         )}

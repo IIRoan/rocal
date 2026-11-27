@@ -1,5 +1,5 @@
 import { APP_SCHEME, CALENDAR_SCHEME } from "../../../lib/constants";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Alert,
   Platform,
@@ -42,7 +42,8 @@ import { useAuth } from "../../../providers/AuthProvider";
 import { useTheme } from "../../../providers/ThemeProvider";
 import { useToast } from "../../../providers/ToastProvider";
 
-export function SecuritySettingsContent() {
+/** `children` are app-specific sections, shown after Encryption. */
+export function SecuritySettingsContent({ children }: { children?: ReactNode }) {
   const { theme } = useTheme();
   const skin = useMailSkin();
   const styles = useMemo(() => createStyles(skin), [skin]);
@@ -177,6 +178,8 @@ export function SecuritySettingsContent() {
             />
           </SheetGroup>
         </SheetSection>
+
+        {children}
 
         <SheetSection
           title="Recovery"

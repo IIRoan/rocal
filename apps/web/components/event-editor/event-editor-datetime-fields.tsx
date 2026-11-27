@@ -29,6 +29,7 @@ import {
 import { Check, ChevronDown, Clock, Repeat } from "lucide-react";
 
 import { getRecurringRuleSummary } from "@/lib/event-editor-view-model";
+import { pickerTimeToWallClock, wallClockToPickerTime } from "@/lib/picker-time";
 import type { RecurrenceRule, UserSettings } from "@/lib/types/calendar";
 import { RecurringEventForm } from "../command-palette/recurring-event-form";
 import { EventEditorRow } from "./event-editor-row";
@@ -36,15 +37,6 @@ import { chipClass } from "./event-editor-styles";
 import type { EventEditorFormState } from "./types";
 
 const DEFAULT_CUSTOM_RULE: RecurrenceRule = { frequency: "weekly", interval: 1 };
-
-function toPickerTime(time: string): Date {
-  const [hours, minutes] = time.split(":").map(Number);
-  return new Date(2000, 0, 1, hours || 0, minutes || 0, 0, 0);
-}
-
-function formatWallClockTime(date: Date): string {
-  return `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
-}
 
 function DateChip({
   align,
@@ -261,9 +253,9 @@ export function EventEditorDateTimeFields({
           <ShadcnAutocomleteTimePicker
             inline
             label="Start time"
-            value={toPickerTime(eventForm.eventStartTime)}
+            value={wallClockToPickerTime(eventForm.eventStartTime)}
             onChange={(date) =>
-              eventForm.handleStartTimeChange(formatWallClockTime(date))
+              eventForm.handleStartTimeChange(pickerTimeToWallClock(date))
             }
             timeFormat={timeFormat}
             className={chipClass(desktop)}
@@ -276,9 +268,9 @@ export function EventEditorDateTimeFields({
           <ShadcnAutocomleteTimePicker
             inline
             label="End time"
-            value={toPickerTime(eventForm.eventEndTime)}
+            value={wallClockToPickerTime(eventForm.eventEndTime)}
             onChange={(date) =>
-              eventForm.handleEndTimeChange(formatWallClockTime(date))
+              eventForm.handleEndTimeChange(pickerTimeToWallClock(date))
             }
             timeFormat={timeFormat}
             className={chipClass(desktop)}

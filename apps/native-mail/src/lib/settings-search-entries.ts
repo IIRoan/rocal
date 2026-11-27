@@ -51,6 +51,24 @@ export const MAIL_SETTINGS_SEARCH_ENTRIES: AccountSheetSearchEntry[] = [
     keywords: "keywords forgot",
   },
   {
+    pageId: "security",
+    label: "Sign messages with my key",
+    location: "Security · Signing",
+    keywords: "pgp openpgp signature verify public key fingerprint",
+  },
+  {
+    pageId: "templates",
+    label: "Templates",
+    location: "Templates",
+    keywords: "saved reply canned response snippet",
+  },
+  {
+    pageId: "signatures",
+    label: "Signatures",
+    location: "Signatures",
+    keywords: "sign-off sign off footer default new message reply forward",
+  },
+  {
     pageId: "auto-reply",
     label: "Auto-reply",
     location: "Auto-reply",
