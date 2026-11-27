@@ -13,8 +13,9 @@ import {
   utcToPickerDate,
 } from "./timezone";
 
-export type EventDateInput = Pick<CalendarEvent, "start" | "end" | "allDay"> & {
-  timezone?: string | null;
+export type EventDateInput = Pick<CalendarEvent, "allDay" | "timezone"> & {
+  start: Date | string;
+  end: Date | string;
 };
 
 export type PickerDateRangeDisplay = {
@@ -93,10 +94,7 @@ export function getPickerDateRangeDisplay(
   startDate: Date,
   endDate: Date,
 ): PickerDateRangeDisplay {
-  const isSameDay =
-    startDate.getFullYear() === endDate.getFullYear() &&
-    startDate.getMonth() === endDate.getMonth() &&
-    startDate.getDate() === endDate.getDate();
+  const isSameDay = isSamePickerDay(startDate, endDate);
   const label = formatPickerDate(startDate, "EEEE, MMMM d, yyyy");
   const startLabel = formatPickerDate(startDate, "EEE, MMM d");
   const endLabel = isSameDay
@@ -117,17 +115,11 @@ export function formatEventSpanLabel(
   timezone?: string | null,
 ): string {
   const { startDate, endDate } = getEventPickerDateRange(event, timezone);
-  const sameYear = startDate.getFullYear() === endDate.getFullYear();
-  const sameDay =
-    sameYear &&
-    startDate.getMonth() === endDate.getMonth() &&
-    startDate.getDate() === endDate.getDate();
-
-  if (sameDay) {
+  if (isSamePickerDay(startDate, endDate)) {
     return formatPickerDate(startDate, "MMM d");
   }
 
-  if (sameYear) {
+  if (startDate.getFullYear() === endDate.getFullYear()) {
     return `${formatPickerDate(startDate, "MMM d")} – ${formatPickerDate(endDate, "MMM d")}`;
   }
 

@@ -75,6 +75,20 @@ describe("mail conversation threading", () => {
     );
   });
 
+  it("groups a long chain of linked conversations without exhausting the call stack", () => {
+    const messages = Array.from({ length: 20_000 }, (_, i) => ({
+      id: `message-${i}`,
+      messageId: [`header-${i}`],
+    }));
+    const links = messages.slice(1).map((_, i) => ({
+      id: `link-${i}`,
+      references: [`header-${i}`, `header-${i + 1}`],
+    }));
+    const conversations = buildMailConversations([...messages, ...links]);
+    expect(conversations).toHaveLength(1);
+    expect(conversations[0]?.messages).toHaveLength(messages.length + links.length);
+  });
+
   it("preserves relevance order for search results instead of sorting by date", () => {
     const messages = [
       createMessage("exact", {

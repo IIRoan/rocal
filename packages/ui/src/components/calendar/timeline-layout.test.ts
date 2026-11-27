@@ -1,24 +1,14 @@
 import { describe, expect, it } from "@jest/globals";
 
-import type { CalendarEvent } from "./types";
+import { createEvent } from "../../../test/calendar-event";
 import {
   TIME_GRID_QUARTERS,
   layoutTimelineEvents,
   normalizeTimeGridRange,
 } from "./timeline-layout";
 
-function makeEvent(
-  id: string,
-  start: string,
-  end: string,
-): CalendarEvent {
-  return {
-    id,
-    title: id,
-    start: new Date(start),
-    end: new Date(end),
-    calendarId: "cal-1",
-  };
+function makeEvent(id: string, start: string, end: string) {
+  return createEvent({ id, title: id, start, end });
 }
 
 function assertNoHorizontalOverlap(

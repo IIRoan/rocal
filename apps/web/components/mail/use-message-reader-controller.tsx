@@ -23,6 +23,10 @@ import {
   resolveMailServerLimits,
   resolveTimezone,
   type MailThreadParticipant,
+  extractLinkedCalendarEventId,
+  extractReminderLeadMinutes,
+  getCalendarEventLinkSource,
+  isSolaceEventReminderEmail,
 } from "@workspace/calendar-core";
 import { useQuery } from "@tanstack/react-query";
 import { Clock, MapPin } from "lucide-react";
@@ -50,12 +54,6 @@ import {
   useMailDisplaySettings,
 } from "@/lib/mail/mail-display-settings";
 import { analyzeEmailHtml } from "@workspace/calendar-core/mail-html";
-import {
-  extractLinkedCalendarEventId,
-  extractReminderLeadMinutes,
-  getCalendarEventLinkSource,
-  isSolaceEventReminderEmail,
-} from "@/lib/mail/calendar-event-link";
 import { calendarApiService } from "@/lib/calendar-api-service";
 import { webQueryKeys } from "@/lib/query-keys";
 import { useMailCalendarInvitation } from "@/hooks/use-mail-calendar-invitation";
@@ -218,8 +216,8 @@ export function useMessageReaderController(props: MessageReaderProps) {
   const calendarEventLinkSource = message
     ? getCalendarEventLinkSource(message, plaintext)
     : null;
-  const linkedCalendarEventId = message && calendarEventLinkSource
-    ? extractLinkedCalendarEventId(message, plaintext)
+  const linkedCalendarEventId = calendarEventLinkSource
+    ? extractLinkedCalendarEventId(calendarEventLinkSource)
     : null;
   const calendarInvitation = useMailCalendarInvitation({
     message,

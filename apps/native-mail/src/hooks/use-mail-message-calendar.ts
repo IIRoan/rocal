@@ -5,17 +5,15 @@ import {
   isDecryptedEventReminderContent,
   isEventNotFoundError,
   resolveTimezone,
+  extractLinkedCalendarEventId,
+  extractReminderLeadMinutes,
+  getCalendarEventLinkSource,
+  isSolaceEventReminderEmail,
 } from "@workspace/calendar-core";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import { calendarApiService } from "@workspace/native-core/lib/api";
 import type { MailRuntime } from "../lib/mail/mail-runtime";
 import type { JmapAttachment, JmapEmailMessage } from "../lib/mail/types";
-import {
-  extractLinkedCalendarEventId,
-  extractReminderLeadMinutes,
-  getCalendarEventLinkSource,
-  isSolaceEventReminderEmail,
-} from "../lib/mail/calendar-event-link";
 import { useE2ee } from "@workspace/native-core/providers/E2eeProvider";
 import { useMailCalendarInvitation } from "./use-mail-calendar-invitation";
 import { useUserTimeFormat } from "@workspace/native-core/hooks/use-user-time-format";
@@ -37,7 +35,7 @@ export function useMailMessageCalendar({
 }) {
   const { isReady: isE2eeReady } = useE2ee();
   const calendarEventLinkSource = (message ? getCalendarEventLinkSource(message, plainContent) : null);
-  const linkedCalendarEventId = (message ? extractLinkedCalendarEventId(message, plainContent) : null);
+  const linkedCalendarEventId = calendarEventLinkSource ? extractLinkedCalendarEventId(calendarEventLinkSource) : null;
 
   const calendarInvitation = useMailCalendarInvitation({
     message,

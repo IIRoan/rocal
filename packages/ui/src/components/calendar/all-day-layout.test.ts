@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 
 import { layoutAllDayRowEvents } from "./all-day-layout";
-import type { CalendarEvent } from "./types";
+import { createEvent } from "../../../test/calendar-event";
 
 const timezone = "Europe/Amsterdam";
 const week = [
@@ -13,18 +13,6 @@ const week = [
   new Date(2026, 7, 29),
   new Date(2026, 7, 30),
 ];
-
-function createEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
-  return {
-    id: "event-1",
-    title: "Event",
-    start: "2026-08-26T05:45:00.000Z",
-    end: "2026-08-26T06:45:00.000Z",
-    allDay: false,
-    color: "blue",
-    ...overrides,
-  };
-}
 
 describe("layoutAllDayRowEvents", () => {
   it("places a timed multi-day event as one card spanning its visible days", () => {

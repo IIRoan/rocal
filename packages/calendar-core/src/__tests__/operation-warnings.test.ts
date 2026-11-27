@@ -32,16 +32,13 @@ describe("operation-warnings", () => {
   });
 
   it("builds invite feedback that reflects delivery failures", () => {
-    expect(
-      getInviteCreateFeedback("friend@example.com", { id: "invite-1" }),
-    ).toEqual({
+    expect(getInviteCreateFeedback("friend@example.com", {})).toEqual({
       tone: "success",
       text: "Invite email sent to friend@example.com.",
     });
 
     expect(
       getInviteCreateFeedback("friend@example.com", {
-        id: "invite-1",
         warnings: [
           {
             code: OPERATION_WARNING_CODES.EMAIL_DELIVERY_FAILED,

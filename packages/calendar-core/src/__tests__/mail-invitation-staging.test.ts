@@ -33,7 +33,6 @@ function eventFixture(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
     end: new Date("2026-05-27T11:00:00.000Z"),
     allDay: false,
     timezone: "UTC",
-    isPrivate: false,
     isCancelled: false,
     isSynced: false,
     calendarId: "invitations-cal-1",

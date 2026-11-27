@@ -4,6 +4,7 @@ import { pickerDateToAllDayUtcRange } from "@workspace/calendar-core";
 import { layoutAllDayRowEvents } from "./all-day-layout";
 import { buildDraggedEventUpdate } from "./event-calendar-mutations";
 import type { CalendarEvent } from "./types";
+import { createEvent } from "../../../test/calendar-event";
 import {
   getAgendaEventsForDay,
   getAllEventsForDay,
@@ -32,7 +33,7 @@ function createAllDayEvent(
   overrides: Partial<CalendarEvent> = {},
 ): CalendarEvent {
   const { start, end } = pickerDateToAllDayUtcRange(firstDay, lastDay, timezone);
-  return {
+  return createEvent({
     id: "all-day",
     title: "All day",
     start,
@@ -41,7 +42,7 @@ function createAllDayEvent(
     timezone,
     color: "blue",
     ...overrides,
-  };
+  });
 }
 
 function ids(events: CalendarEvent[]) {
@@ -122,15 +123,14 @@ describe("all-day events rendered in another timezone", () => {
   });
 
   it("renders legacy UTC-encoded all-day events on one day", () => {
-    const legacy: CalendarEvent = {
+    const legacy = createEvent({
       id: "legacy",
       title: "Legacy",
       start: new Date("2026-09-22T00:00:00.000Z"),
       end: new Date("2026-09-22T23:59:59.000Z"),
       allDay: true,
       timezone: SAVED_IN,
-      color: "blue",
-    };
+    });
 
     for (const viewer of VIEWER_TIMEZONES) {
       expect(layoutAllDayRowEvents([legacy], week, viewer).placements).toEqual([

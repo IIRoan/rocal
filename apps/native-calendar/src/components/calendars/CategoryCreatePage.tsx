@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import type { EventColor } from "@workspace/calendar-core";
+import React, { useRef, useState } from "react";
+import { CATEGORY_NAME_MAX_LENGTH, validateCategoryName, type EventColor } from "@workspace/calendar-core";
 import { useSheetPageNavigator } from "@workspace/native-core/components/sheet/SheetPageStack";
 import {
   SheetButton,
@@ -11,22 +11,21 @@ import {
   SheetTextField,
 } from "@workspace/native-core/components/sheet/SheetSections";
 import { useCategories, useCreateCategory } from "../../hooks/use-categories";
-import { CATEGORY_NAME_MAX_LENGTH, validateCategoryName } from "../../lib/categories-model";
 import { ColorPicker } from "../event/ColorPicker";
 
 export function CategoryCreatePage() {
   const { back } = useSheetPageNavigator();
   const categoriesQuery = useCategories();
   const createCategory = useCreateCategory();
-  const [name, setName] = useState("");
+  const name = useRef("");
   const [color, setColor] = useState<EventColor>("blue");
   const [nameError, setNameError] = useState<string>();
 
   const handleCreate = () => {
-    const error = validateCategoryName(name, categoriesQuery.data ?? []);
+    const error = validateCategoryName(name.current, categoriesQuery.data ?? []);
     setNameError(error);
     if (error) return;
-    createCategory.mutate({ name: name.trim(), color }, { onSuccess: back });
+    createCategory.mutate({ name: name.current.trim(), color }, { onSuccess: back });
   };
 
   return (
@@ -36,7 +35,7 @@ export function CategoryCreatePage() {
           <SheetTextField
             // Uncontrolled: on Android a re-render pushing a stale `value` wiped text the keyboard had just entered.
             onChangeText={(value) => {
-              setName(value);
+              name.current = value;
               setNameError(undefined);
             }}
             placeholder="Category name"

@@ -1,5 +1,11 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
+  buildOptimisticCategory,
+  insertCategory,
+  patchCategory,
+  removeCategory,
+  replaceCategory,
+  sortCategories,
   getErrorMessage,
   type CreateCategoryRequest,
   type EventCategory,
@@ -10,14 +16,6 @@ import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
 import { useAuth } from "@workspace/native-core/providers/AuthProvider";
 import { useToast } from "@workspace/native-core/providers/ToastProvider";
 import { generateOptimisticId } from "../lib/optimistic-events";
-import {
-  buildOptimisticCategory,
-  insertCategory,
-  patchCategory,
-  removeCategory,
-  replaceCategory,
-  sortCategories,
-} from "../lib/categories-model";
 
 export { useCategoryDeletePending } from "@workspace/calendar-client/use-category-delete-pending";
 

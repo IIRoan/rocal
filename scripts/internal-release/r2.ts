@@ -1,7 +1,9 @@
 import { S3Client } from "bun";
 import {
   PROFILES,
-  RELEASE_PREFIX,
+  releaseKeys,
+  releasePrefix,
+  type ReleaseApp,
   objectUrl,
 } from "./install-artifacts";
 
@@ -34,10 +36,15 @@ export function resolveUrl(client: S3Client, key: string): string {
 /** Keeps at most one artifact per profile under the release prefix for an extension. */
 export async function pruneReleaseArtifacts(
   client: S3Client,
-  extension: string,
-  allowedKeys: Set<string>,
+  app: ReleaseApp,
+  artifact: "ipa" | "apk",
 ): Promise<string[]> {
-  const listed = await client.list({ prefix: RELEASE_PREFIX });
+  const prefix = releasePrefix(app);
+  const extension = `.${artifact}`;
+  const allowedKeys = new Set(
+    PROFILES.map((profile) => releaseKeys(app, profile)[artifact]),
+  );
+  const listed = await client.list({ prefix });
   for (const entry of listed.contents ?? []) {
     const key = entry.key;
     if (!key?.endsWith(extension) || allowedKeys.has(key)) continue;
@@ -46,14 +53,14 @@ export async function pruneReleaseArtifacts(
   }
 
   const remaining =
-    (await client.list({ prefix: RELEASE_PREFIX })).contents
+    (await client.list({ prefix })).contents
       ?.map((entry) => entry.key)
       .filter((key): key is string => Boolean(key?.endsWith(extension)))
       .sort() ?? [];
 
   if (remaining.length > PROFILES.length) {
     throw new Error(
-      `Expected at most ${PROFILES.length} ${extension} artifacts under ${RELEASE_PREFIX}, found ${remaining.join(", ")}`,
+      `Expected at most ${PROFILES.length} ${extension} artifacts under ${prefix}, found ${remaining.join(", ")}`,
     );
   }
 

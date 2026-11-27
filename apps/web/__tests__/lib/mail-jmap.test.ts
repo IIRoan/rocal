@@ -118,6 +118,42 @@ describe("mail JMAP helpers", () => {
 });
 
 describe("StalwartJmapClient", () => {
+  it("refreshes flags in mailbox order and shows drafts as read", async () => {
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost",
+      accessToken: "test-token",
+      fetcher: async () => Response.json({
+        methodResponses: [
+          ["Email/query", { ids: ["draft", "unread"], total: 2 }, "q1"],
+          ["Email/get", { list: [
+            { id: "unread", keywords: {} },
+            { id: "draft", keywords: { $draft: true } },
+          ] }, "g1"],
+        ],
+      }),
+    });
+    const session = { apiUrl: "http://localhost/jmap", accounts: { a: {} }, primaryAccounts: {} };
+    await expect(client.getMailboxMessageFlags(session, "inbox", { limit: 2 })).resolves.toEqual({
+      flags: [{ id: "draft", keywords: { $draft: true, $seen: true } }, { id: "unread", keywords: {} }],
+      total: 2,
+    });
+  });
+
+  it("rejects a partially refused bulk delete even when the HTTP request succeeds", async () => {
+    const client = new StalwartJmapClient({
+      baseUrl: "http://localhost",
+      accessToken: "test-token",
+      fetcher: async () => Response.json({
+        methodResponses: [["Email/set", {
+          destroyed: ["m1"],
+          notDestroyed: { m2: { type: "forbidden" } },
+        }, "c1"]],
+      }),
+    });
+    const session = { apiUrl: "http://localhost/jmap", accounts: { a: {} }, primaryAccounts: {} };
+    await expect(client.bulkDestroyMessages(session, ["m1", "m2"])).rejects.toThrow("forbidden");
+  });
+
   it("discovers and normalizes the JMAP session through the backend proxy", async () => {
     const fetcher = jest.fn<
       (input: string, init?: RequestInit) => Promise<Response>
@@ -543,6 +579,8 @@ describe("StalwartJmapClient", () => {
         },
       }),
     );
+    expect(request.methodCalls[1]?.[1].properties).not.toContain("bodyValues");
+    expect(request.methodCalls[1]?.[1]).not.toHaveProperty("fetchAllBodyValues");
   });
 
   it("passes complex AND filters through searchMailboxMessagesWithFilter", async () => {

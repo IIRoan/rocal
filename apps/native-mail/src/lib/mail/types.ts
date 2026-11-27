@@ -1,137 +1,34 @@
-/** Native mail types: the web `lib/mail/types.ts` subset the native client needs, reusing calendar-core contracts. */
-import type {
-  MailAccountStatus as SharedMailAccountStatus,
-  MailAuthResultsFields,
-  MailSimpleLoginFields,
-  MailUnsubscribeFields,
-  MailDemoConfig as SharedMailDemoConfig,
-  MailOAuthConfig as SharedMailOAuthConfig,
-  MailSignup as SharedMailSignup,
-  MailVaultKdfParams as SharedMailVaultKdfParams,
-  MessageEncryptionState as SharedMessageEncryptionState,
+import type { JmapEmailMessage as Message, MailAttachment } from "@workspace/calendar-core";
+
+export type {
+  JmapBodyPartRef,
+  JmapBodyStructure,
+  JmapBodyValue,
+  JmapEmailChanges,
+  JmapIdentity,
+  JmapMailbox,
+  JmapSession,
+  MailAccountStatus,
+  MailAddress,
+  MailAttachment as JmapAttachment,
+  MailAttachmentContent,
+  MailBootstrapRequest,
+  MailDemoConfig,
+  MailOAuthConfig,
+  MailSignup as MailSignupResponse,
+  MailVaultKdfParams,
+  MessageEncryptionState,
 } from "@workspace/calendar-core";
 
-export type MailVaultKdfParams = SharedMailVaultKdfParams;
-export type MailOAuthConfig = SharedMailOAuthConfig;
-export type MailDemoConfig = SharedMailDemoConfig;
-export type MailAccountStatus = SharedMailAccountStatus;
-export type MailSignupResponse = SharedMailSignup;
+export type JmapEmailMessage = Message<MailAttachment>;
 
-export type MailBootstrapRequest = {
-  publicKeyArmored: string;
-  fingerprint: string;
-  algorithm: string;
-  createdAt: string;
-  vaultVersion: number;
-  encryptedVaultB64: string;
-  kdf: string;
-  kdfParams: MailVaultKdfParams;
-  wrappedSecret: string;
-  wrapAlgorithm: string;
-};
-
-export type MailAddress = {
-  email: string;
-  name?: string | null;
-};
-
-export type JmapSession = {
-  accounts: Record<string, { name?: string }>;
-  primaryAccounts: Record<string, string>;
-  apiUrl: string;
-  downloadUrl?: string;
-  uploadUrl?: string;
-  eventSourceUrl?: string;
-  username?: string;
-  capabilities?: Record<string, unknown>;
-};
-
-export type JmapMailbox = {
-  id: string;
-  name: string;
-  role?: string | null;
-  parentId?: string | null;
-  sortOrder?: number;
-};
-
-export type JmapIdentity = {
-  id: string;
-  email: string;
-  name?: string | null;
-  textSignature?: string | null;
-  htmlSignature?: string | null;
-};
-
-export type JmapBodyPartRef = {
-  partId?: string;
-};
-
-export type JmapBodyValue = {
-  value?: string;
-  isTruncated?: boolean;
-};
-
-export type JmapBodyStructure = {
-  type?: string;
-  blobId?: string;
-  name?: string;
-  subParts?: JmapBodyStructure[];
-};
-
-export type MailAttachmentContent = ArrayBuffer | Uint8Array | string;
-
-export type JmapAttachment = {
-  blobId?: string | null;
-  name?: string | null;
-  type?: string | null;
-  size?: number | null;
-  disposition?: string | null;
-  cid?: string | null;
-  content?: MailAttachmentContent | null;
-};
-
-/** Keys stay unique across a thread: decrypted attachments have no blob id. */
-export type KeyedAttachment = { key: string; attachment: JmapAttachment };
-
-export type JmapEmailMessage = MailSimpleLoginFields & MailUnsubscribeFields & MailAuthResultsFields & {
-  id: string;
-  threadId?: string;
-  messageId?: string[];
-  inReplyTo?: string[];
-  references?: string[];
-  mailboxIds?: Record<string, boolean>;
-  subject?: string | null;
-  preview?: string | null;
-  from?: MailAddress[];
-  to?: MailAddress[];
-  cc?: MailAddress[];
-  bcc?: MailAddress[];
-  receivedAt?: string;
-  keywords?: Record<string, boolean>;
-  size?: number;
-  bodyStructure?: JmapBodyStructure;
-  bodyValues?: Record<string, JmapBodyValue>;
-  textBody?: JmapBodyPartRef[];
-  htmlBody?: JmapBodyPartRef[];
-  attachments?: JmapAttachment[];
-};
+/** Keys stay unique across a thread because decrypted attachments have no blob id. */
+export type KeyedAttachment = { key: string; attachment: MailAttachment };
 
 export type JmapEmailPlacement = Pick<
   JmapEmailMessage,
   "id" | "mailboxIds" | "keywords"
 >;
-
-export type JmapEmailChanges = {
-  oldState: string;
-  newState: string;
-  hasMoreChanges?: boolean;
-  created: string[];
-  updated: string[];
-  destroyed: string[];
-};
-
-/** Plaintext, server-side encrypted-at-rest, or end-to-end PGP; re-exported from calendar-core. */
-export type MessageEncryptionState = SharedMessageEncryptionState;
 
 export type LabelDef = {
   id: string;

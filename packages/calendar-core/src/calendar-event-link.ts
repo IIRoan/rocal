@@ -1,3 +1,6 @@
+import { extractMessageBodies } from "./mail-message-bodies";
+import type { JmapEmailMessage } from "./mail-jmap-types";
+
 const EVENT_ID_LINE_REGEX =
   /\bEvent\s+ID\s*:\s*([A-Za-z0-9][A-Za-z0-9_.:-]{2,})\b/i;
 const EVENT_QUERY_REGEX = /[?&]eventId=([^&#\s<>"']+)/i;
@@ -23,6 +26,22 @@ function cleanEventId(value: string): string | null {
   while (end > 0 && "),.;]".includes(decoded.charAt(end - 1))) end -= 1;
   const cleaned = decoded.slice(0, end);
   return cleaned.length > 0 ? cleaned : null;
+}
+
+export function getCalendarEventLinkSource(
+  message: JmapEmailMessage,
+  plaintext?: string | null,
+): CalendarEventLinkSource {
+  const { text, html } = extractMessageBodies(message);
+  return {
+    subject: message.subject,
+    bodies: [
+      plaintext ?? "",
+      text ?? "",
+      html ?? "",
+      ...Object.values(message.bodyValues ?? {}).map((body) => body.value ?? ""),
+    ],
+  };
 }
 
 export function extractLinkedCalendarEventId(

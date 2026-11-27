@@ -1,133 +1,37 @@
-import type { MailSenderKeyTrustState, PgpSignatureVerificationState } from "@workspace/calendar-core";
 import {
   normalizeJmapHeaderValues,
-  type MailAccountStatus as SharedMailAccountStatus,
-  type MailAuthResultsFields,
-  type MailDemoConfig,
-  type MailDirectoryKey as SharedMailDirectoryKey,
-  type MailOAuthConfig,
-  type MailSignup as SharedMailSignup,
-  type MailSimpleLoginFields,
-  type MailUnsubscribeFields,
-  type MailVaultBackup as SharedMailVaultBackup,
   type MailVaultKdfParams,
+  type JmapBodyStructure,
+  type JmapEmailMessage,
+  type JmapMailbox,
+  type MailSenderKeyTrustState,
+  type PgpSignatureVerificationState,
 } from "@workspace/calendar-core";
 import type { ParsedMailAttachment } from "@workspace/calendar-core/mail-mime-parser";
 import { z } from "@workspace/calendar-core/zod";
 
-export type { MailDemoConfig, MailOAuthConfig, MailVaultKdfParams };
-
-export type MailAccountStatus = SharedMailAccountStatus;
-
-export type MailSignupResponse = SharedMailSignup;
-
-export type MailBootstrapRequest = {
-  publicKeyArmored: string;
-  fingerprint: string;
-  algorithm: string;
-  createdAt: string;
-  vaultVersion: number;
-  encryptedVaultB64: string;
-  kdf: string;
-  kdfParams: MailVaultKdfParams;
-  wrappedSecret: string;
-  wrapAlgorithm: string;
-};
-
-export type MailDirectoryKey = SharedMailDirectoryKey;
-
-export type MailVaultBackupRecord = SharedMailVaultBackup;
-
-export type MailAddress = {
-  email: string;
-  name?: string | null;
-};
-
-export type JmapSession = {
-  accounts: Record<string, { name?: string }>;
-  primaryAccounts: Record<string, string>;
-  apiUrl: string;
-  downloadUrl?: string;
-  uploadUrl?: string;
-  eventSourceUrl?: string;
-  username?: string;
-  capabilities?: Record<string, unknown>;
-};
-
-export type JmapMailbox = {
-  id: string;
-  name: string;
-  role?: string | null;
-  parentId?: string | null;
-  sortOrder?: number;
-};
-
-export type JmapIdentity = {
-  id: string;
-  email: string;
-  name?: string | null;
-  textSignature?: string | null;
-  htmlSignature?: string | null;
-};
-
-export type JmapBodyPartRef = {
-  partId?: string;
-  type?: string;
-};
-
-export type JmapBodyValue = {
-  value?: string;
-  isTruncated?: boolean;
-};
-
-export type JmapBodyStructure = {
-  type?: string;
-  blobId?: string;
-  name?: string;
-  subParts?: JmapBodyStructure[];
-};
-
-export type MailAttachmentContent = ArrayBuffer | Uint8Array | string;
-
-export type MailAttachment = {
-  blobId?: string | null;
-  name?: string | null;
-  type?: string | null;
-  size?: number | null;
-  disposition?: string | null;
-  cid?: string | null;
-  content?: MailAttachmentContent | null;
-};
-
-export type JmapAttachment = Omit<MailAttachment, "content">;
-
-export type JmapEmailMessage = MailSimpleLoginFields & MailUnsubscribeFields & MailAuthResultsFields & {
-  id: string;
-  threadId?: string;
-  messageId?: string[];
-  inReplyTo?: string[];
-  references?: string[];
-  mailboxIds?: Record<string, boolean>;
-  subject?: string | null;
-  from?: MailAddress[];
-  to?: MailAddress[];
-  cc?: MailAddress[];
-  bcc?: MailAddress[];
-  receivedAt?: string;
-  keywords?: Record<string, boolean>;
-  preview?: string | null;
-  hasAttachment?: boolean;
-  size?: number;
-  bodyStructure?: JmapBodyStructure;
-  bodyValues?: Record<string, JmapBodyValue>;
-  textBody?: JmapBodyPartRef[];
-  htmlBody?: JmapBodyPartRef[];
-  attachments?: JmapAttachment[];
-  /** JMAP header:* property — Received header values */
-  "header:Received"?: string[] | null;
-  /** JMAP header:* property — DKIM-Signature header values */
-  "header:DKIM-Signature"?: string[] | null;
-};
+export type {
+  JmapAttachment,
+  JmapBodyPartRef,
+  JmapBodyStructure,
+  JmapBodyValue,
+  JmapEmailChanges,
+  JmapEmailMessage,
+  JmapIdentity,
+  JmapMailbox,
+  JmapSession,
+  MailAccountStatus,
+  MailAddress,
+  MailAttachment,
+  MailAttachmentContent,
+  MailBootstrapRequest,
+  MailDemoConfig,
+  MailDirectoryKey,
+  MailOAuthConfig,
+  MailSignup as MailSignupResponse,
+  MailVaultBackup as MailVaultBackupRecord,
+  MailVaultKdfParams,
+} from "@workspace/calendar-core";
 
 export type MailRealtimeEvent = {
   type: "mail.changed";
@@ -158,15 +62,6 @@ export type MailSyncCollection<T> = {
   updated: string[];
   destroyed: string[];
   records: T[];
-};
-
-export type JmapEmailChanges = {
-  oldState: string;
-  newState: string;
-  hasMoreChanges?: boolean;
-  created: string[];
-  updated: string[];
-  destroyed: string[];
 };
 
 export type MailSyncResponse = {

@@ -1,3 +1,5 @@
+import type { JmapEmailMessage, MailAttachment } from "./mail-jmap-types";
+
 export type MailCalendarInvite = {
   uid: string;
   method: "REQUEST" | "CANCEL" | "REPLY" | string;
@@ -215,4 +217,38 @@ export function parseMailCalendarInviteFromIcs(
     end: parseIcsDate(readProperty(eventLines, "DTEND")),
     icsContent,
   };
+}
+
+export function extractMailCalendarInvite(input: {
+  message?: JmapEmailMessage | null;
+  plaintext?: string | null;
+  attachments?: MailAttachment[] | null;
+}): MailCalendarInvite | null {
+  const subject = input.message?.subject ?? null;
+  for (const body of Object.values(input.message?.bodyValues ?? {})) {
+    const text = body?.value?.trim();
+    if (text && looksLikeCalendarPayload(text)) {
+      return parseMailCalendarInviteFromIcs(text, subject);
+    }
+  }
+
+  const plaintext = input.plaintext?.trim();
+  if (plaintext && looksLikeCalendarPayload(plaintext)) {
+    return parseMailCalendarInviteFromIcs(plaintext, subject);
+  }
+
+  for (const { content } of input.attachments ?? []) {
+    let text: string;
+    if (typeof content === "string") {
+      text = content.trim();
+    } else if (content instanceof ArrayBuffer || ArrayBuffer.isView(content)) {
+      text = new TextDecoder().decode(content).trim();
+    } else {
+      continue;
+    }
+    if (looksLikeCalendarPayload(text)) {
+      return parseMailCalendarInviteFromIcs(text, subject);
+    }
+  }
+  return null;
 }

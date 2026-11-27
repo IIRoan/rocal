@@ -3,7 +3,7 @@ import {
   extractLinkedCalendarEventId,
   getCalendarEventLinkSource,
   isSolaceEventReminderEmail,
-} from "./calendar-event-link";
+} from "@workspace/calendar-core";
 
 const reminderMessage = {
   id: "msg-1",
@@ -31,7 +31,7 @@ describe("native calendar-event-link", () => {
 
     const source = getCalendarEventLinkSource(reminderMessage, plaintext);
     expect(isSolaceEventReminderEmail(source)).toBe(true);
-    expect(extractLinkedCalendarEventId(reminderMessage, plaintext)).toBe(
+    expect(extractLinkedCalendarEventId(source)).toBe(
       "event-1",
     );
   });

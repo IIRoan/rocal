@@ -1,6 +1,6 @@
 ﻿import { describe, expect, it } from "@jest/globals";
 
-import type { CalendarEvent } from "./types";
+import { createEvent } from "../../../test/calendar-event";
 import {
   getAgendaEventsForDay,
   getAllEventsForDay,
@@ -10,20 +10,6 @@ import {
   sortEvents,
 } from "./utils";
 import { getInclusiveCalendarDayRange } from "@workspace/calendar-core";
-
-function createEvent(
-  overrides: Partial<CalendarEvent> = {},
-): CalendarEvent {
-  return {
-    id: "event-1",
-    title: "Timezone event",
-    start: "2026-06-16T10:00:00.000Z",
-    end: "2026-06-16T11:00:00.000Z",
-    allDay: false,
-    color: "blue",
-    ...overrides,
-  };
-}
 
 describe("inclusive calendar day range", () => {
   const timezone = "Europe/Amsterdam";
