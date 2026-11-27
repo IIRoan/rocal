@@ -1,12 +1,12 @@
 import { useEffect, useEffectEvent, useRef, type Dispatch } from "react";
 import {
-  dropInlineImagePlaceholders,
   htmlHasUnhydratedInlinePlaceholders,
   INLINE_IMAGE_PLACEHOLDER,
   replaceInlineImagePlaceholders,
 } from "@workspace/calendar-core";
 import { bytesToBase64 } from "../lib/mail/binary-utils";
 import type { ComposeFormAction } from "../lib/mail/compose-form";
+import { INLINE_IMAGE_TYPE } from "../lib/mail/compose-attachments";
 import type { MailRuntime } from "../lib/mail/mail-runtime";
 import type { JmapEmailMessage } from "../lib/mail/types";
 
@@ -18,7 +18,6 @@ export type QuotedImages = {
 const NO_IMAGES: QuotedImages = { loaded: new Map(), failed: new Set() };
 const NO_PENDING_IMAGES = Promise.resolve(NO_IMAGES);
 const IMG_TAG = /<img\b[^>]*>/gi;
-const EMBEDDABLE_IMAGE = /^image\/(?:png|gif|jpe?g|webp|bmp|avif)$/i;
 
 /** Downloads the quoted message's inline images as data URLs; one that cannot be loaded or shown is reported as failed. */
 export async function loadQuotedImages(
@@ -34,7 +33,7 @@ export async function loadQuotedImages(
     inline.map(async (attachment) => {
       const cid = attachment.cid ?? "";
       const type = attachment.type ?? "";
-      if (!EMBEDDABLE_IMAGE.test(type) || !attachment.blobId) {
+      if (!INLINE_IMAGE_TYPE.test(type) || !attachment.blobId) {
         failed.add(cid);
         return;
       }
@@ -51,8 +50,7 @@ export async function loadQuotedImages(
 
 /** Fills a quote's loaded images and drops every image still waiting, so a send never carries a placeholder. */
 export function finalizeQuotedImages(html: string, images: QuotedImages): string {
-  const filled = dropInlineImagePlaceholders(replaceInlineImagePlaceholders(html, images.loaded), images.failed);
-  return filled.replace(IMG_TAG, (tag) => (tag.includes(INLINE_IMAGE_PLACEHOLDER) ? "" : tag));
+  return replaceInlineImagePlaceholders(html, images.loaded).replace(IMG_TAG, (tag) => (tag.includes(INLINE_IMAGE_PLACEHOLDER) ? "" : tag));
 }
 
 /** Loads a reply or forward's quoted inline images once its body shows their placeholders. */

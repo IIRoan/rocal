@@ -1,12 +1,7 @@
-import { useEffect, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { StyleSheet, type ViewStyle } from "react-native";
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
-import { afterPaint } from "@workspace/calendar-core";
+import Animated, { useAnimatedStyle } from "react-native-reanimated";
+import { useAfterPaintProgress } from "../../hooks/use-after-paint-progress";
 import type { ComposeKeyboard } from "../../hooks/use-compose-keyboard";
 
 const ENTER_MS = 200;
@@ -26,18 +21,8 @@ export function ComposeFormatDock({
   bottomInset: number;
   children: ReactNode;
 }) {
-  const progress = useSharedValue(0);
+  const progress = useAfterPaintProgress(visible, ENTER_MS, EXIT_MS);
   const { height } = keyboard;
-
-  useEffect(() => {
-    if (!visible) {
-      progress.set(withTiming(0, { duration: EXIT_MS }));
-      return;
-    }
-    return afterPaint(() => {
-      progress.set(withTiming(1, { duration: ENTER_MS, easing: Easing.out(Easing.cubic) }));
-    });
-  }, [progress, visible]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: progress.get(),

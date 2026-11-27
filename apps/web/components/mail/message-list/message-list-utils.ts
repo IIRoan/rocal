@@ -1,18 +1,13 @@
 import type { JmapEmailMessage } from "@/lib/mail/types";
 import { buildMailboxThreadRows } from "@/lib/mail/conversation-thread";
-import { getAllMessageLabels } from "@/lib/mail/mail-labels";
-import type { LabelDef } from "@/lib/mail/types";
 import {
   buildMailPreviewSnippet,
   ENCRYPTED_MAIL_PREVIEW_PLACEHOLDER,
 } from "@/lib/mail/mail-preview";
 import { formatAddress } from "../mail-helpers";
 
-export const ROW_HEIGHT_DESKTOP = 56;
-export const ROW_HEIGHT_DESKTOP_COMFORTABLE = 72;
-export const ROW_HEIGHT_WITH_LABELS = 56;
-export const ROW_HEIGHT_WITH_LABELS_COMFORTABLE = 72;
-export const ROW_HEIGHT_NARROW = 76;
+/** One height for every row: the preview and labels share the subject's line. */
+export const ROW_HEIGHT = 76;
 export const DAY_HEADER_HEIGHT = 30;
 export const SCROLL_LOAD_THRESHOLD = 62;
 
@@ -31,26 +26,6 @@ export type MessageListItem =
 export function getListPreviewSnippet(message: JmapEmailMessage): string {
   const snippet = buildMailPreviewSnippet(message);
   return snippet === ENCRYPTED_MAIL_PREVIEW_PLACEHOLDER ? "" : snippet;
-}
-
-export function getRowHeight(
-  message: JmapEmailMessage,
-  labels: LabelDef[],
-  isMobile: boolean,
-  density: "compact" | "comfortable" = "compact",
-  showLabelChips: boolean = true,
-  narrow: boolean = false,
-): number {
-  // Phones render the same stacked row as the narrow desktop list, one height for every row: the preview and labels share the subject's line.
-  if (isMobile || narrow) return ROW_HEIGHT_NARROW;
-  const hasLabels =
-    showLabelChips && getAllMessageLabels(message, labels).length > 0;
-  if (density === "comfortable") {
-    return hasLabels
-      ? ROW_HEIGHT_WITH_LABELS_COMFORTABLE
-      : ROW_HEIGHT_DESKTOP_COMFORTABLE;
-  }
-  return hasLabels ? ROW_HEIGHT_WITH_LABELS : ROW_HEIGHT_DESKTOP;
 }
 
 export function formatThreadSenders(messages: JmapEmailMessage[]): string {

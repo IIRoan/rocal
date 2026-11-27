@@ -22,9 +22,10 @@ import {
   Save,
   Trash2,
 } from "lucide-react";
+import { Fragment } from "react";
 
 import { isRecurringEventDeleteCandidate } from "@/lib/event-editor-view-model";
-import type { EventEditorFooterProps } from "./types";
+import type { EventEditorFooterProps, EventEditorInvitationResponseStatus } from "./types";
 import { SimpleTooltip } from "@workspace/ui/components/ui/tooltip";
 
 type InvitationActionProps = Pick<
@@ -78,6 +79,12 @@ function InvitationResponseButtons({
   );
 }
 
+const INVITATION_STATUS_OPTIONS: readonly (readonly [EventEditorInvitationResponseStatus, string])[] = [
+  ["accepted", "Accept"],
+  ["tentative", "Maybe"],
+  ["declined", "Decline"],
+];
+
 function InvitationStatusMenu({
   invitationResponsePending,
   invitationStatus,
@@ -104,44 +111,24 @@ function InvitationStatusMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-28">
-        <DropdownMenuItem
-          onClick={() => onInvitationResponse("accepted")}
-          className={cn(invitationStatus === "accepted" && "font-medium")}
-        >
-          <Check
-            className={cn(
-              "size-4",
-              invitationStatus !== "accepted" && "opacity-0",
-            )}
-          />
-          Accept
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => onInvitationResponse("tentative")}
-          className={cn(invitationStatus === "tentative" && "font-medium")}
-        >
-          <Check
-            className={cn(
-              "size-4",
-              invitationStatus !== "tentative" && "opacity-0",
-            )}
-          />
-          Maybe
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          variant="destructive"
-          onClick={() => onInvitationResponse("declined")}
-          className={cn(invitationStatus === "declined" && "font-medium")}
-        >
-          <Check
-            className={cn(
-              "size-4",
-              invitationStatus !== "declined" && "opacity-0",
-            )}
-          />
-          Decline
-        </DropdownMenuItem>
+        {INVITATION_STATUS_OPTIONS.map(([status, label]) => (
+          <Fragment key={status}>
+            {status === "declined" && <DropdownMenuSeparator />}
+            <DropdownMenuItem
+              variant={status === "declined" ? "destructive" : undefined}
+              onClick={() => onInvitationResponse(status)}
+              className={cn(invitationStatus === status && "font-medium")}
+            >
+              <Check
+                className={cn(
+                  "size-4",
+                  invitationStatus !== status && "opacity-0",
+                )}
+              />
+              {label}
+            </DropdownMenuItem>
+          </Fragment>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );

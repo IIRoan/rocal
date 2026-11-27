@@ -64,7 +64,6 @@ function withSeed(
   return {
     ...state,
     ...fields,
-    htmlBody,
     bodySourceVersion: state.bodySourceVersion + 1,
     showCcBcc: state.showCcBcc || Boolean(fields.cc || fields.bcc),
     seed: text,

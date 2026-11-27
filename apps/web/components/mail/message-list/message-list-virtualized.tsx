@@ -1,7 +1,7 @@
 "use client";
 "use no memo";
 
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { AppLoadingState } from "@workspace/ui/components/ui";
 import { cn } from "@workspace/ui/lib/utils";
@@ -13,7 +13,7 @@ import type {
 } from "./message-list-types";
 import {
   DAY_HEADER_HEIGHT,
-  getRowHeight,
+  ROW_HEIGHT,
   SCROLL_LOAD_THRESHOLD,
   type MessageListItem,
 } from "./message-list-utils";
@@ -30,16 +30,8 @@ export type MessageListVirtualizedProps = {
   reserveBarSpace: boolean;
 };
 
-type ItemHeightOptions = Pick<MessageListRowPresentation, "labels"> &
-  Pick<MessageListRowPresentation["display"], "isMobile" | "density" | "showLabelChips">;
-
-function itemHeight(
-  item: MessageListItem | undefined,
-  { labels, isMobile, density, showLabelChips }: ItemHeightOptions,
-  narrow: boolean,
-) {
-  if (!item || item.kind === "day") return DAY_HEADER_HEIGHT;
-  return getRowHeight(item.row.latestMessage, labels, isMobile, density, showLabelChips, narrow);
+function itemHeight(item: MessageListItem | undefined) {
+  return item?.kind === "row" ? ROW_HEIGHT : DAY_HEADER_HEIGHT;
 }
 
 function findThreadRowIndex(
@@ -65,8 +57,6 @@ export function MessageListVirtualized({
 }: MessageListVirtualizedProps) {
   "use no memo";
   const { selectedMessageId, selectedIds, onToggleSelect } = interaction;
-  const { labels, display } = presentation;
-  const { isMobile, narrow, density, showLabelChips } = display;
   const { hasMore, isLoadingMore, onLoadMore } = pagination;
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadMoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -76,8 +66,7 @@ export function MessageListVirtualized({
     loadMoreStateRef.current = pagination;
   });
 
-  const estimateRowSize = (index: number) =>
-    itemHeight(items[index], { labels, isMobile, density, showLabelChips }, narrow);
+  const estimateRowSize = (index: number) => itemHeight(items[index]);
 
   const virtualizer = useVirtualizer({
     count: items.length,
@@ -149,46 +138,12 @@ export function MessageListVirtualized({
     };
   }, [items.length, isLoadingMore]);
 
-  const renderedNarrowRef = useRef(narrow);
-  // Row heights change with `narrow`; keep the selected (else top) row at the same screen position so nothing jumps.
-  useLayoutEffect(() => {
-    if (renderedNarrowRef.current === narrow) return;
-    renderedNarrowRef.current = narrow;
-    const element = scrollRef.current;
-    if (!element) return;
-    const scrollTop = element.scrollTop;
-    const previousStarts: number[] = [];
-    const nextStarts: number[] = [];
-    let previous = 0;
-    let next = 0;
-    let topIndex = 0;
-    items.forEach((item, index) => {
-      previousStarts.push(previous);
-      nextStarts.push(next);
-      if (previous <= scrollTop) topIndex = index;
-      const heightOptions = { labels, isMobile, density, showLabelChips };
-      previous += itemHeight(item, heightOptions, !narrow);
-      next += itemHeight(item, heightOptions, narrow);
-    });
-    const selectedIndex = findThreadRowIndex(items, selectedMessageId);
-    const selectedStart = previousStarts[selectedIndex];
-    const selectedVisible =
-      selectedStart !== undefined &&
-      selectedStart >= scrollTop &&
-      selectedStart < scrollTop + element.clientHeight;
-    const anchor = selectedVisible ? selectedIndex : topIndex;
-    const previousStart = previousStarts[anchor];
-    const nextStart = nextStarts[anchor];
-    if (previousStart === undefined || nextStart === undefined) return;
-    element.scrollTop = nextStart + (scrollTop - previousStart);
-  }, [narrow, items, selectedMessageId, labels, isMobile, density, showLabelChips]);
-
   useEffect(() => {
     const index = findThreadRowIndex(items, selectedMessageId);
     if (index >= 0) {
       virtualizer.scrollToIndex(index, { align: "auto" });
     }
-  }, [selectedMessageId, items, virtualizer, narrow]);
+  }, [selectedMessageId, items, virtualizer]);
 
   return (
     <div

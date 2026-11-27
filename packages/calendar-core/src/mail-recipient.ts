@@ -8,7 +8,7 @@ export type MailRecipientRef = {
 /** A recipient, marked when the address is one of the signed-in user's own. */
 export type SummarizedMailRecipient = MailRecipientRef & { self: boolean };
 
-export type MailRecipientGroup = {
+type MailRecipientGroup = {
   kind: "to" | "cc" | "bcc";
   recipients: SummarizedMailRecipient[];
 };

@@ -18,6 +18,7 @@ import {
   LockOpen,
   Trash2,
   Type,
+  type LucideIcon,
 } from "lucide-react";
 import { useEffectEvent, useId, useRef, useState, useEffect } from "react";
 import type { Editor } from "@tiptap/react";
@@ -62,10 +63,18 @@ import {
   shouldEncryptOutgoingMail,
   validateComposeRecipients,
   pickOutgoingAttachmentFiles,
+  getPlainTextSignature,
+  htmlToPlainText,
+  plainTextToComposeHtml,
   type MailTemplate,
   type SignatureSource,
   type SimpleLoginComposeNotice,
 } from "@workspace/calendar-core";
+import {
+  insertEmbeddedSignatureHtml,
+  serializeEditorContent,
+  swapEmbeddedSignatureInHtml,
+} from "@workspace/mail-editor";
 import {
   ComposeSimpleLoginRequiredFromRow,
   ComposeSimpleLoginViaRow,
@@ -74,20 +83,12 @@ import { RichTextEditor, type InlineImageUpload } from "./rich-text-editor";
 import { RichTextEditorToolbar } from "./rich-text-editor-toolbar";
 import { RecipientSuggestInput } from "./recipient-suggest-input";
 import {
-  getPlainTextSignature,
-  htmlToPlainText,
-  insertEmbeddedSignatureHtml,
-  swapEmbeddedSignatureInHtml,
-} from "@/lib/mail/signature-utils";
-import {
   useMailComposeSettings,
   shouldWarnAboutMissingAttachment,
 } from "@/lib/mail/compose-settings";
 import { useComposeQuotedInlineImages } from "@/hooks/use-compose-quoted-inline-images";
 import type { StalwartJmapClient } from "@/lib/mail/jmap-client";
 import type { JmapSession } from "@/lib/mail/types";
-import { serializeEditorContent } from "./quoted-html";
-import { plainTextToComposerBody } from "@/lib/mail/compose-editor-utils";
 import { prepareOutgoingImageFiles } from "@/lib/mail/strip-image-metadata";
 import { toast } from "@workspace/ui/lib/toast";
 import { cn } from "@workspace/ui/lib/utils";
@@ -229,32 +230,35 @@ function ClearComposeButton({
   );
 }
 
-function ComposeSignedIndicator() {
-  return (
-    <SimpleTooltip content={COMPOSE_SIGNED_DESCRIPTION}>
-      <p className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-        <FileSignature className="size-3.5 shrink-0" aria-hidden />
-        <span className="sr-only sm:not-sr-only">{COMPOSE_SIGNED_LABEL}</span>
-        <span className="sr-only">. {COMPOSE_SIGNED_DESCRIPTION}</span>
-      </p>
-    </SimpleTooltip>
-  );
-}
-
 type ComposeEncryption = "encrypted" | "external" | null;
 
 /** Mail is end-to-end encrypted only when every recipient is on Solace, the same rule the send path uses. */
-function ComposeEncryptionStatus({ state }: { state: ComposeEncryption }) {
-  if (!state) return null;
-  const encrypted = state === "encrypted";
-  const label = encrypted ? "End-to-end encrypted" : "Not end-to-end encrypted";
-  const description = encrypted
-    ? "Everyone you're writing to uses Solace, so only they can read it."
-    : "People outside Solace get this message unencrypted.";
+const ENCRYPTION_NOTES = {
+  encrypted: {
+    icon: Lock,
+    label: "End-to-end encrypted",
+    description: "Everyone you're writing to uses Solace, so only they can read it.",
+  },
+  external: {
+    icon: LockOpen,
+    label: "Not end-to-end encrypted",
+    description: "People outside Solace get this message unencrypted.",
+  },
+};
+
+function ComposeStatusNote({
+  icon: Icon,
+  label,
+  description,
+}: {
+  icon: LucideIcon;
+  label: string;
+  description: string;
+}) {
   return (
     <SimpleTooltip content={description}>
       <p className="inline-flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
-        {encrypted ? <Lock className="size-3.5 shrink-0" aria-hidden /> : <LockOpen className="size-3.5 shrink-0" aria-hidden />}
+        <Icon className="size-3.5 shrink-0" aria-hidden />
         <span className="sr-only sm:not-sr-only">{label}</span>
         <span className="sr-only">. {description}</span>
       </p>
@@ -730,7 +734,7 @@ export function ComposeForm({
   const insertTemplate = (template: MailTemplate) => {
     setComposeSubject(resolveMailTemplateSubject(composeSubject, template));
     if (!plainTextMode) {
-      editorRef.current?.chain().focus().insertContent(plainTextToComposerBody(template.body)).run();
+      editorRef.current?.chain().focus().insertContent(plainTextToComposeHtml(template.body)).run();
       return;
     }
     insertAtTextareaCaret(template.body);
@@ -1219,8 +1223,14 @@ export function ComposeForm({
           </button>
         </SimpleTooltip>
         <div className="ml-auto flex min-w-0 items-center gap-3.5 pl-2">
-          <ComposeEncryptionStatus state={encryption} />
-          {composeSettings.signOutgoingMail ? <ComposeSignedIndicator /> : null}
+          {encryption ? <ComposeStatusNote {...ENCRYPTION_NOTES[encryption]} /> : null}
+          {composeSettings.signOutgoingMail ? (
+            <ComposeStatusNote
+              icon={FileSignature}
+              label={COMPOSE_SIGNED_LABEL}
+              description={COMPOSE_SIGNED_DESCRIPTION}
+            />
+          ) : null}
           {visibleErrors.body ? (
             <ComposeFieldError id={errorId("body")} message={visibleErrors.body} />
           ) : (

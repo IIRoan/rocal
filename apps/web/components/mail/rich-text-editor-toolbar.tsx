@@ -17,6 +17,7 @@ import { DROPDOWN_PANEL_ROW_CLASS, DropdownPanel } from "@workspace/ui/solace";
 import { Button } from "@workspace/ui/components/ui/button";
 import { Input } from "@workspace/ui/components/ui/input";
 import { cn } from "@workspace/ui/lib/utils";
+import { insertUploadedImages } from "@/lib/mail/compose-editor-utils";
 import type { InlineImageUpload } from "./rich-text-editor";
 import {
   Bold,
@@ -381,19 +382,7 @@ export function RichTextEditorToolbar({
   const insertImages = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []).filter((file) => file.type.startsWith("image/"));
     event.target.value = "";
-    for (const file of files) {
-      // onImageUpload (handleComposeImageUpload) reports failures itself and returns null.
-      onImageUpload?.(file)
-        .then((result) => {
-          if (!result || editor.isDestroyed) return;
-          editor
-            .chain()
-            .focus()
-            .insertContent({ type: "image", attrs: { src: result.src, alt: file.name, cid: result.cid } })
-            .run();
-        })
-        .catch(() => undefined);
-    }
+    if (onImageUpload) insertUploadedImages(editor, files, onImageUpload);
   };
 
   return (

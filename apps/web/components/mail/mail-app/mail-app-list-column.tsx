@@ -28,16 +28,9 @@ function useSearchNoticeToasts(coverageText: string | null, issues: string[], de
   }, [coverageText]);
 
   const issuesText = debouncing ? "" : issues.join(" ");
-  const issuesShownRef = useRef(false);
   useEffect(() => {
-    if (issuesText) {
-      issuesShownRef.current = true;
-      toast.warning(issuesText, { id: SEARCH_ISSUES_TOAST });
-      return;
-    }
-    if (!issuesShownRef.current) return;
-    issuesShownRef.current = false;
-    toast.dismiss(SEARCH_ISSUES_TOAST);
+    if (issuesText) toast.warning(issuesText, { id: SEARCH_ISSUES_TOAST });
+    else toast.dismiss(SEARCH_ISSUES_TOAST);
   }, [issuesText]);
 }
 
@@ -358,11 +351,9 @@ export function MailAppListColumn({
               }
               hasMore={searchActive ? false : hasMoreMessages}
               isLoadingMore={isLoadingMore}
-              density={listSettings.density}
               showLabelChips={listSettings.showLabelChipsInList}
               threadExpandEnabled={listSettings.threadExpandInList}
               preserveMessageOrder={searchActive}
-              narrow={!isMobile}
               cachedThreadMessages={cachedThreadMessages}
               onExpandThread={activeMailbox ? loadThreadMessages : undefined}
             />

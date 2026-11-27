@@ -8,7 +8,7 @@ import {
   mailTemplateToDraft,
   saveMailTemplate,
   validateMailTemplateDraft,
-  type MailTemplate,
+  mailTemplatePreview,
   type MailTemplateDraft,
 } from "@workspace/calendar-core";
 import type { ThemeTokens } from "@workspace/design-tokens";
@@ -75,7 +75,7 @@ export function MailTemplatesSettingsContent() {
                   key={template.id}
                   icon="file-text"
                   label={template.name}
-                  detail={templatePreview(template)}
+                  detail={mailTemplatePreview(template)}
                   chevron
                   onPress={() => navigate(`${EDIT_TEMPLATE_PREFIX}${template.id}`)}
                   accessibilityLabel={`Edit ${template.name}`}
@@ -97,10 +97,6 @@ export function MailTemplatesSettingsContent() {
       </SheetScroll>
     </SettingsPage>
   );
-}
-
-function templatePreview(template: MailTemplate): string {
-  return template.subject || template.body.replace(/\s+/g, " ").trim();
 }
 
 function MailTemplateEditor({ templateId }: { templateId: string | null }) {

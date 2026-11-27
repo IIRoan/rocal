@@ -1249,11 +1249,15 @@ export function collectMailboxRestores(
 }
 
 /** Applies a change to a mailbox's first page until it is drained; stops when a batch makes no progress so a refusing server cannot loop forever. */
-async function drainMailboxInBatches(
-  listIds: (limit: number) => Promise<string[]>,
-  apply: (ids: string[]) => Promise<void>,
-  batchSize: number,
-): Promise<number> {
+export async function drainMailboxInBatches({
+  listIds,
+  apply,
+  batchSize = EMPTY_MAILBOX_BATCH_SIZE,
+}: {
+  listIds: (limit: number) => Promise<string[]>;
+  apply: (ids: string[]) => Promise<void>;
+  batchSize?: number;
+}): Promise<number> {
   let applied = 0;
   let previousBatchKey: string | null = null;
 
@@ -1269,19 +1273,6 @@ async function drainMailboxInBatches(
   }
 
   return applied;
-}
-
-/** Destroys a mailbox's messages page by page. */
-export function destroyMailboxMessagesInBatches(input: {
-  listIds: (limit: number) => Promise<string[]>;
-  destroy: (ids: string[]) => Promise<void>;
-  batchSize?: number;
-}): Promise<number> {
-  return drainMailboxInBatches(
-    input.listIds,
-    input.destroy,
-    input.batchSize ?? EMPTY_MAILBOX_BATCH_SIZE,
-  );
 }
 
 /** First page of a mailbox's unread messages; marking them read drops them from the query, so the next page is again at 0. */
@@ -1310,17 +1301,4 @@ export function buildEmailMarkReadMethodCall(
     messageIds.map((id) => [id, { "keywords/$seen": true }]),
   );
   return ["Email/set", { accountId, update }, "c1"];
-}
-
-/** Marks every unread message in a mailbox read page by page; returns how many were marked. */
-export function markMailboxMessagesReadInBatches(input: {
-  listUnreadIds: (limit: number) => Promise<string[]>;
-  markRead: (ids: string[]) => Promise<void>;
-  batchSize?: number;
-}): Promise<number> {
-  return drainMailboxInBatches(
-    input.listUnreadIds,
-    input.markRead,
-    input.batchSize ?? EMPTY_MAILBOX_BATCH_SIZE,
-  );
 }

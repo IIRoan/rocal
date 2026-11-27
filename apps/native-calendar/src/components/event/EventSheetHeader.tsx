@@ -78,36 +78,22 @@ export function EventSheetHeader({
           {title}
         </BottomSheetTitle>
         {canDuplicate ? (
-          <Pressable
+          <HeaderIconButton
+            styles={styles}
+            icon="copy"
+            label="Duplicate event"
+            busy={isPending}
             onPress={onDuplicate}
-            disabled={isPending}
-            hitSlop={8}
-            style={({ pressed }) => [
-              styles.headerIconButton,
-              (pressed || isPending) && styles.headerIconButtonPressed,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel="Duplicate event"
-            accessibilityState={{ disabled: isPending }}
-          >
-            <Feather name="copy" size={18} color={theme.colors.foreground} />
-          </Pressable>
+          />
         ) : null}
         {canExport ? (
-          <Pressable
+          <HeaderIconButton
+            styles={styles}
+            icon="share"
+            label="Export .ics"
+            busy={exporting}
             onPress={onExport}
-            disabled={exporting}
-            hitSlop={8}
-            style={({ pressed }) => [
-              styles.headerIconButton,
-              (pressed || exporting) && styles.headerIconButtonPressed,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel="Export .ics"
-            accessibilityState={{ disabled: exporting }}
-          >
-            <Feather name="share" size={18} color={theme.colors.foreground} />
-          </Pressable>
+          />
         ) : null}
       </View>
     </BottomSheetHeader>
@@ -116,3 +102,35 @@ export function EventSheetHeader({
 
 // BottomSheet slots chrome by direct-child displayName, so this wrapper must claim the header slot.
 EventSheetHeader.displayName = "BottomSheetHeader";
+
+function HeaderIconButton({
+  styles,
+  icon,
+  label,
+  busy,
+  onPress,
+}: {
+  styles: EventSheetStyles;
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  busy: boolean;
+  onPress: () => void;
+}) {
+  const { theme } = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={busy}
+      hitSlop={8}
+      style={({ pressed }) => [
+        styles.headerIconButton,
+        (pressed || busy) && styles.headerIconButtonPressed,
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: busy }}
+    >
+      <Feather name={icon} size={18} color={theme.colors.foreground} />
+    </Pressable>
+  );
+}

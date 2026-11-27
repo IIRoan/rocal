@@ -39,17 +39,17 @@ export function useMailReaderDrawer(openKey: string | null, ready: boolean) {
 /** One conversation's surface: hidden until revealed, sliding in when `slideIn`; without children it keeps its last frame, inert. */
 export function MailReaderLayer({
   revealed,
-  slideIn = false,
-  leaving = false,
+  slideIn,
+  leaving,
   onEntered,
   onLeft,
   children,
 }: {
   revealed: boolean;
-  slideIn?: boolean;
-  leaving?: boolean;
-  onEntered?: () => void;
-  onLeft?: () => void;
+  slideIn: boolean;
+  leaving: boolean;
+  onEntered: () => void;
+  onLeft: () => void;
   children?: ReactNode;
 }) {
   const layerRef = useRef<HTMLDivElement>(null);
@@ -57,8 +57,8 @@ export function MailReaderLayer({
   const [heldChildren, setHeldChildren] = useState(children);
   if (children !== undefined && children !== heldChildren) setHeldChildren(children);
   const shouldSlideIn = useEffectEvent(() => slideIn);
-  const entered = useEffectEvent(() => onEntered?.());
-  const left = useEffectEvent(() => onLeft?.());
+  const entered = useEffectEvent(() => onEntered());
+  const left = useEffectEvent(() => onLeft());
 
   useLayoutEffect(() => {
     const layer = layerRef.current;
@@ -67,12 +67,16 @@ export function MailReaderLayer({
       duration: MAIL_READER_DRAWER_MS,
       easing: MOTION_EASING.reveal,
     });
+    const finish = () => entered();
     if (!enter) {
-      entered();
+      finish();
       return;
     }
-    enter.addEventListener("finish", () => entered(), { once: true });
-    return () => enter.cancel();
+    enter.addEventListener("finish", finish);
+    return () => {
+      enter.removeEventListener("finish", finish);
+      enter.cancel();
+    };
   }, [revealed]);
 
   useLayoutEffect(() => {
@@ -82,14 +86,18 @@ export function MailReaderLayer({
       duration: MAIL_READER_DRAWER_MS,
       easing: MOTION_EASING.reveal,
     });
+    const finish = () => left();
     if (!exit) {
-      left();
+      finish();
       return;
     }
     // Closing renders the empty reader underneath, so the slide waits for that paint instead of dropping its first frames.
     playAfterPaint(exit);
-    exit.addEventListener("finish", () => left(), { once: true });
-    return () => exit.cancel();
+    exit.addEventListener("finish", finish);
+    return () => {
+      exit.removeEventListener("finish", finish);
+      exit.cancel();
+    };
   }, [leaving]);
 
   return (

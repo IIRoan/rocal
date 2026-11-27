@@ -2,7 +2,6 @@
 
 import { mailListDayLabel, type TimeFormat } from "@workspace/calendar-core";
 import { useLayoutEffect, useReducer, useRef, useState } from "react";
-import { useIsMobile } from "@workspace/ui/hooks";
 import { MOTION_EASING, slideFadeIn } from "@workspace/ui/lib/motion";
 import type { JmapEmailMessage, JmapMailbox, LabelDef } from "@/lib/mail/types";
 import {
@@ -139,7 +138,6 @@ export interface MessageListProps {
   onLoadMore?: () => void;
   hasMore?: boolean;
   isLoadingMore?: boolean;
-  density?: "compact" | "comfortable";
   showLabelChips?: boolean;
   threadExpandEnabled?: boolean;
   onExpandThread?: (threadId: string) => Promise<JmapEmailMessage[]> | void;
@@ -147,8 +145,6 @@ export interface MessageListProps {
   cachedThreadMessages?: (threadId: string) => JmapEmailMessage[] | undefined;
   /** Keep search relevance order instead of re-sorting threads by date. */
   preserveMessageOrder?: boolean;
-  /** Stack rows and collapse hover actions into a menu when the reader is open beside the list. */
-  narrow?: boolean;
 }
 
 export function MessageList({
@@ -179,20 +175,17 @@ export function MessageList({
   onLoadMore,
   hasMore,
   isLoadingMore,
-  density = "compact",
   showLabelChips = true,
   threadExpandEnabled = true,
   onExpandThread,
   cachedThreadMessages,
   preserveMessageOrder = false,
-  narrow = false,
 }: MessageListProps) {
   const [state, dispatch] = useReducer(
     messageListReducer,
     initialMessageListState,
   );
   const barRef = useRef<HTMLDivElement>(null);
-  const isMobile = useIsMobile();
   // Day headings are counted from when this mailbox opened; switching mailboxes remounts the list.
   const [openedAt] = useState(() => new Date());
 
@@ -262,13 +255,7 @@ export function MessageList({
     labels,
     moveTargets,
     spamActions: { canReportSpam, canNotSpam },
-    display: {
-      isMobile,
-      narrow: narrow && !isMobile,
-      density,
-      showLabelChips,
-      threadExpandEnabled,
-    },
+    display: { showLabelChips, threadExpandEnabled },
     threadUi: {
       expandedThreads: state.expandedThreads,
       expandedThreadMessages: state.expandedThreadMessages,

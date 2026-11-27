@@ -5,8 +5,7 @@ import {
   buildEmailRestoreMailboxesMethodCall,
   buildUnreadMailboxQueryMethodCall,
   collectMailboxRestores,
-  destroyMailboxMessagesInBatches,
-  markMailboxMessagesReadInBatches,
+  drainMailboxInBatches,
 } from "../mail-jmap-email-set";
 
 describe("mail JMAP Email/set builders", () => {
@@ -49,14 +48,14 @@ describe("mail JMAP Email/set builders", () => {
   });
 });
 
-describe("destroyMailboxMessagesInBatches", () => {
+describe("drainMailboxInBatches, emptying a mailbox", () => {
   it("destroys page by page until the mailbox is empty", async () => {
     let remaining = Array.from({ length: 5 }, (_, i) => `m${i}`);
     const destroyed: string[][] = [];
-    const count = await destroyMailboxMessagesInBatches({
+    const count = await drainMailboxInBatches({
       batchSize: 2,
       listIds: async (limit) => remaining.slice(0, limit),
-      destroy: async (ids) => {
+      apply: async (ids) => {
         destroyed.push(ids);
         remaining = remaining.filter((id) => !ids.includes(id));
       },
@@ -68,24 +67,24 @@ describe("destroyMailboxMessagesInBatches", () => {
   it("returns zero for an empty mailbox", async () => {
     const destroy = jest.fn(async () => undefined);
     await expect(
-      destroyMailboxMessagesInBatches({ listIds: async () => [], destroy }),
+      drainMailboxInBatches({ listIds: async () => [], apply: destroy }),
     ).resolves.toBe(0);
     expect(destroy).not.toHaveBeenCalled();
   });
 
   it("stops when the server keeps returning the same batch", async () => {
     const destroy = jest.fn(async () => undefined);
-    const count = await destroyMailboxMessagesInBatches({
+    const count = await drainMailboxInBatches({
       batchSize: 2,
       listIds: async () => ["m1", "m2"],
-      destroy,
+      apply: destroy,
     });
     expect(count).toBe(2);
     expect(destroy).toHaveBeenCalledTimes(1);
   });
 });
 
-describe("markMailboxMessagesReadInBatches", () => {
+describe("drainMailboxInBatches, marking a mailbox read", () => {
   it("queries only the mailbox's unread messages from the first position", () => {
     expect(buildUnreadMailboxQueryMethodCall("acc", "inbox", 50)).toEqual([
       "Email/query",
@@ -107,10 +106,10 @@ describe("markMailboxMessagesReadInBatches", () => {
   it("marks unread messages read page by page until none are left", async () => {
     let unread = Array.from({ length: 5 }, (_, i) => `m${i}`);
     const marked: string[][] = [];
-    const count = await markMailboxMessagesReadInBatches({
+    const count = await drainMailboxInBatches({
       batchSize: 2,
-      listUnreadIds: async (limit) => unread.slice(0, limit),
-      markRead: async (ids) => {
+      listIds: async (limit) => unread.slice(0, limit),
+      apply: async (ids) => {
         marked.push(ids);
         unread = unread.filter((id) => !ids.includes(id));
       },
@@ -121,10 +120,10 @@ describe("markMailboxMessagesReadInBatches", () => {
 
   it("stops when the server keeps the same messages unread", async () => {
     const markRead = jest.fn(async () => undefined);
-    const count = await markMailboxMessagesReadInBatches({
+    const count = await drainMailboxInBatches({
       batchSize: 2,
-      listUnreadIds: async () => ["m1", "m2"],
-      markRead,
+      listIds: async () => ["m1", "m2"],
+      apply: markRead,
     });
     expect(count).toBe(2);
     expect(markRead).toHaveBeenCalledTimes(1);
@@ -132,9 +131,9 @@ describe("markMailboxMessagesReadInBatches", () => {
 
   it("surfaces a failed write instead of reporting progress", async () => {
     await expect(
-      markMailboxMessagesReadInBatches({
-        listUnreadIds: async () => ["m1"],
-        markRead: async () => {
+      drainMailboxInBatches({
+        listIds: async () => ["m1"],
+        apply: async () => {
           throw new Error("refused");
         },
       }),

@@ -1,7 +1,6 @@
 import type { AnyExtension } from "@tiptap/core";
 import Paragraph from "@tiptap/extension-paragraph";
 import Heading from "@tiptap/extension-heading";
-import Underline from "@tiptap/extension-underline";
 import TextAlign from "@tiptap/extension-text-align";
 import { TextStyle } from "@tiptap/extension-text-style";
 import Color from "@tiptap/extension-color";
@@ -71,11 +70,9 @@ export function createMailEditorExtensions(options: {
       heading: false,
       paragraph: false,
       link: false,
-      underline: false,
     }),
     StyledParagraph,
     StyledHeading.configure({ levels: [1, 2] }),
-    Underline,
     LiteralLink,
     TextAlign.configure({
       types: ["heading", "paragraph"],

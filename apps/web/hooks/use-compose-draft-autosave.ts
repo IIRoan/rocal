@@ -13,12 +13,12 @@ import {
   useMailComposeChrome,
 } from "@/components/mail/mail-compose-context";
 import {
+  resolveOutgoingComposeBodies,
   sealMailForSelf,
   splitRecipientList,
   validateOutgoingJmapMessage,
 } from "@workspace/calendar-core";
 import type { MailServerPolicy } from "@workspace/calendar-core";
-import { resolveOutgoingComposeBodies } from "@/lib/mail/signature-utils";
 import { createMailSealer } from "@/lib/mail/mail-app-helpers";
 
 const log = createLogger("compose-draft-autosave");

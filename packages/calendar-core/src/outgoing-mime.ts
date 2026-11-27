@@ -1,3 +1,5 @@
+import { createMimeBoundary } from "./mail-pgp-mime";
+
 export type OutgoingMimeAttachment = {
   filename: string;
   contentType: string;
@@ -44,10 +46,6 @@ function normalizeMimeText(value: string): string {
 
 function toMimeLines(value: string): string {
   return normalizeMimeText(value).replace(/\n/g, "\r\n");
-}
-
-function createMimeBoundary(prefix: string): string {
-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 /** True when decrypted PGP plaintext should be parsed as a MIME envelope. */
@@ -121,9 +119,9 @@ function buildAlternativeBodyParts(input: {
   const htmlPart = textPartLines("html", trimmedHtml, base64);
   // Inline images sit beside the HTML that cites them, so readers show them in place instead of as attachments.
   const richPart = input.related.length
-    ? multipartLines("related", "solace_rel", [htmlPart, ...input.related.map(attachmentPartLines)], false)
+    ? multipartLines("related", "solace_rel_", [htmlPart, ...input.related.map(attachmentPartLines)], false)
     : htmlPart;
-  return multipartLines("alternative", "solace_alt", [textPartLines("plain", input.text, base64), richPart], true);
+  return multipartLines("alternative", "solace_alt_", [textPartLines("plain", input.text, base64), richPart], true);
 }
 
 /** PGP MIME payload: rich text as multipart/alternative with inline images in multipart/related, files in multipart/mixed after the body. */
@@ -142,5 +140,5 @@ export function buildOutgoingMimeMessage(input: {
     return bodyPart.join("\r\n");
   }
 
-  return multipartLines("mixed", "solace_mixed", [bodyPart, ...files.map(attachmentPartLines)], true).join("\r\n");
+  return multipartLines("mixed", "solace_mixed_", [bodyPart, ...files.map(attachmentPartLines)], true).join("\r\n");
 }

@@ -5,6 +5,7 @@ import {
   resolveComposeSignatureIdentity,
   type SignatureSource,
 } from "./mail-signature";
+import { encodedSize, entryNameError, entryPreview, normalizeEntries } from "./mail-settings-entries";
 import { z } from "./zod";
 
 export const MAIL_SIGNATURE_LIMITS = {
@@ -53,26 +54,6 @@ export const EMPTY_MAIL_SIGNATURE_DRAFT: MailSignatureDraft = { name: "", body: 
 export const MAIL_SIGNATURES_DESCRIPTION =
   "Sign off the mail you write. Signatures are encrypted and sync to your devices.";
 
-/** Invalid entries are dropped one at a time, so one bad entry never hides the rest. */
-function normalizeEntries<T>(
-  input: unknown,
-  schema: z.ZodType<T>,
-  key: (entry: T) => string,
-  limit: number,
-): T[] {
-  if (!Array.isArray(input)) return [];
-  const entries: T[] = [];
-  const keys = new Set<string>();
-  for (const entry of input) {
-    const parsed = schema.safeParse(entry);
-    if (!parsed.success || keys.has(key(parsed.data))) continue;
-    keys.add(key(parsed.data));
-    entries.push(parsed.data);
-    if (entries.length === limit) break;
-  }
-  return entries;
-}
-
 export function normalizeMailSignatures(input: unknown): MailSignature[] {
   return normalizeEntries(
     input,
@@ -95,31 +76,14 @@ export function mailSignatureToDraft(signature: MailSignature): MailSignatureDra
   return { name: signature.name, body: signature.body };
 }
 
-function encodedSize(signatures: MailSignature[]): number {
-  return new TextEncoder().encode(JSON.stringify(signatures)).length;
-}
-
 /** Inline errors for the signature editor; `editingId` is null while adding a new signature. */
 export function validateMailSignatureDraft(
   draft: MailSignatureDraft,
   signatures: readonly MailSignature[],
   editingId: string | null,
 ): MailSignatureDraftErrors {
-  const errors: MailSignatureDraftErrors = {};
-  const name = draft.name.trim();
-  if (!name) {
-    errors.name = "Give the signature a name.";
-  } else if (name.length > MAIL_SIGNATURE_LIMITS.name) {
-    errors.name = `Use ${MAIL_SIGNATURE_LIMITS.name} characters or fewer.`;
-  } else if (
-    signatures.some(
-      (signature) =>
-        signature.id !== editingId &&
-        signature.name.toLowerCase() === name.toLowerCase(),
-    )
-  ) {
-    errors.name = "You already have a signature with this name.";
-  }
+  const name = entryNameError(draft.name, signatures, editingId, "signature", MAIL_SIGNATURE_LIMITS.name);
+  const errors: MailSignatureDraftErrors = name ? { name } : {};
   const body = draft.body.trim();
   if (!body) {
     errors.body = "Write the text this signature adds.";
@@ -228,7 +192,7 @@ export function composeSignatureKind(mode: string | null | undefined): MailSigna
     : "newMessage";
 }
 
-export function mailSignatureSource(signature: MailSignature): SignatureSource & { id: string } {
+function mailSignatureSource(signature: MailSignature): SignatureSource & { id: string } {
   return { id: signature.id, textSignature: signature.body };
 }
 
@@ -290,8 +254,8 @@ export type ComposeSignatureOption = {
   selected: boolean;
 };
 
-function previewText(text: string): string {
-  return text.replace(/\s+/g, " ").trim();
+export function mailSignaturePreview(signature: MailSignature): string {
+  return entryPreview(signature.body);
 }
 
 /** Rows for the compose signature picker: saved signatures, or the identity's own signature until one is saved. */
@@ -308,7 +272,7 @@ export function listComposeSignatureOptions<T extends SignatureSource & { id?: s
       key: signature.id,
       choice: signature.id,
       name: signature.name,
-      preview: previewText(signature.body),
+      preview: mailSignaturePreview(signature),
       selected: active?.id === signature.id,
     }));
   }
@@ -321,7 +285,7 @@ export function listComposeSignatureOptions<T extends SignatureSource & { id?: s
           key: "account",
           choice: undefined,
           name: "Account signature",
-          preview: previewText(accountSignature),
+          preview: entryPreview(accountSignature),
           selected: Boolean(getPlainTextSignature(active)),
         },
       ]

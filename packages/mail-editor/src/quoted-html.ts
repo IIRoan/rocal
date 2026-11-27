@@ -50,7 +50,7 @@ function readTypography(editorDom: HTMLElement): FrameTypography {
 }
 
 /** The quote frame's document: no scripts, no remote loads, and the editor's own type so it reads as part of the message. */
-export function buildQuoteFrameDocument(html: string, type: FrameTypography): string {
+function buildQuoteFrameDocument(html: string, type: FrameTypography): string {
   const csp = "default-src 'none'; img-src data:; style-src 'unsafe-inline'";
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><meta name="referrer" content="no-referrer"><meta name="color-scheme" content="${type.colorScheme}"><style>html,body{margin:0;padding:0;background:transparent}body{color:${type.color};font-family:${type.fontFamily};font-size:${type.fontSize};line-height:${type.lineHeight};overflow:hidden;overflow-wrap:break-word;outline:none}*{box-sizing:border-box}img{max-width:100%;height:auto}table{border-collapse:collapse;table-layout:auto;max-width:100%}a{color:${type.linkColor}}blockquote{margin:0 0 0 4px;padding-left:12px;border-left:2px solid ${type.borderColor}}p{margin:0 0 .75em}p:last-child{margin-bottom:0}</style></head><body>${sanitizeUntrustedEmailHtml(html)}</body></html>`;
 }

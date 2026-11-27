@@ -73,7 +73,7 @@ function richFields(fields: ComposeTextFields, htmlBody: string): ComposeFields 
 }
 
 /** A draft's HTML, or its text as paragraphs; drafts from older native builds kept formatting as markdown-lite text. */
-export function draftHtml(bodies: { text?: string | null; html?: string | null }): string {
+function draftHtml(bodies: { text?: string | null; html?: string | null }): string {
   if (bodies.html?.trim()) return bodies.html;
   const text = bodies.text ?? "";
   return hasComposeFormatting(text) ? composeTextToHtml(text) : plainTextToComposeHtml(text);

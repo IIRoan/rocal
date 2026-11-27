@@ -1,3 +1,5 @@
+import { formatPickerDate } from "@workspace/calendar-core";
+
 /** The shared time picker shows a Date; only its hours and minutes carry the "HH:mm" wall-clock time. */
 export function wallClockToPickerTime(time: string): Date {
   const [hours, minutes] = time.split(":").map(Number);
@@ -5,5 +7,5 @@ export function wallClockToPickerTime(time: string): Date {
 }
 
 export function pickerTimeToWallClock(date: Date): string {
-  return `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
+  return formatPickerDate(date, "HH:mm");
 }

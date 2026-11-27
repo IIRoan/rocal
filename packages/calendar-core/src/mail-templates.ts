@@ -1,5 +1,6 @@
 import { newClientEntityId } from "./content-encryption";
 import type { TextSelection } from "./mail-compose-format";
+import { encodedSize, entryNameError, entryPreview, normalizeEntries } from "./mail-settings-entries";
 import { z } from "./zod";
 
 export const MAIL_TEMPLATE_LIMITS = {
@@ -35,19 +36,13 @@ export const EMPTY_MAIL_TEMPLATE_DRAFT: MailTemplateDraft = {
   body: "",
 };
 
-/** Invalid entries are dropped one at a time, so one bad template never hides the rest. */
 export function normalizeMailTemplates(input: unknown): MailTemplate[] {
-  if (!Array.isArray(input)) return [];
-  const templates: MailTemplate[] = [];
-  const ids = new Set<string>();
-  for (const entry of input) {
-    const parsed = mailTemplateSchema.safeParse(entry);
-    if (!parsed.success || ids.has(parsed.data.id)) continue;
-    ids.add(parsed.data.id);
-    templates.push(parsed.data);
-    if (templates.length === MAIL_TEMPLATE_LIMITS.count) break;
-  }
-  return templates;
+  return normalizeEntries(
+    input,
+    mailTemplateSchema,
+    (template) => template.id,
+    MAIL_TEMPLATE_LIMITS.count,
+  );
 }
 
 export function mailTemplateToDraft(template: MailTemplate): MailTemplateDraft {
@@ -68,31 +63,14 @@ function draftToTemplate(id: string, draft: MailTemplateDraft): MailTemplate {
   };
 }
 
-function encodedSize(templates: MailTemplate[]): number {
-  return new TextEncoder().encode(JSON.stringify(templates)).length;
-}
-
 /** Inline errors for the template editor; `editingId` is null while adding a new template. */
 export function validateMailTemplateDraft(
   draft: MailTemplateDraft,
   templates: readonly MailTemplate[],
   editingId: string | null,
 ): MailTemplateDraftErrors {
-  const errors: MailTemplateDraftErrors = {};
-  const name = draft.name.trim();
-  if (!name) {
-    errors.name = "Give the template a name.";
-  } else if (name.length > MAIL_TEMPLATE_LIMITS.name) {
-    errors.name = `Use ${MAIL_TEMPLATE_LIMITS.name} characters or fewer.`;
-  } else if (
-    templates.some(
-      (template) =>
-        template.id !== editingId &&
-        template.name.toLowerCase() === name.toLowerCase(),
-    )
-  ) {
-    errors.name = "You already have a template with this name.";
-  }
+  const name = entryNameError(draft.name, templates, editingId, "template", MAIL_TEMPLATE_LIMITS.name);
+  const errors: MailTemplateDraftErrors = name ? { name } : {};
   if (draft.subject.trim().length > MAIL_TEMPLATE_LIMITS.subject) {
     errors.subject = `Use ${MAIL_TEMPLATE_LIMITS.subject} characters or fewer.`;
   }
@@ -160,4 +138,9 @@ export function resolveMailTemplateSubject(
 ): string {
   const subject = template.subject?.trim();
   return currentSubject.trim() || !subject ? currentSubject : subject;
+}
+
+/** A template's list row text: its subject, or its body on one line. */
+export function mailTemplatePreview(template: MailTemplate): string {
+  return template.subject || entryPreview(template.body);
 }

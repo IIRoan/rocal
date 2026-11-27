@@ -1,4 +1,4 @@
-import { useRef, type ComponentProps, type Dispatch } from "react";
+import { useRef, type ComponentProps } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -15,14 +15,12 @@ import { LAYOUT_METRICS } from "@workspace/native-core/lib/app-layout";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { useMailSkin, type MailSkin } from "@workspace/native-core/components/mail/mail-ui";
 import type { PendingComposeAttachment } from "../../lib/mail/compose-attachments";
-import type { ComposeFormAction } from "../../lib/mail/compose-form";
 import { ComposeAttachmentList } from "./ComposeAttachmentList";
 import { ComposeRecipientFields } from "./ComposeRecipientFields";
 
-type RecipientProps = Omit<ComponentProps<typeof ComposeRecipientFields>, "onSubmitEmpty" | "dispatch">;
+type RecipientProps = Omit<ComponentProps<typeof ComposeRecipientFields>, "onSubmitEmpty">;
 
 type ComposeFieldsProps = RecipientProps & {
-  dispatch: Dispatch<ComposeFormAction>;
   subject: string;
   /** A reply keeps its thread's subject. */
   threadReply: boolean;

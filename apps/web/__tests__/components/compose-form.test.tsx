@@ -44,8 +44,8 @@ jest.mock("@/lib/mail/strip-image-metadata", () => ({
   prepareOutgoingImageFiles: (files: File[]) => mockPrepareOutgoingImageFiles(files),
 }));
 
-jest.mock("../../components/mail/quoted-html", () => ({
-  ...jest.requireActual<object>("../../components/mail/quoted-html"),
+jest.mock("@workspace/mail-editor", () => ({
+  ...jest.requireActual<object>("@workspace/mail-editor"),
   serializeEditorContent: () => "",
 }));
 

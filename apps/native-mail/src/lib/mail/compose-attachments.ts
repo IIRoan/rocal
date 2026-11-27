@@ -1,5 +1,8 @@
 import type { JmapAttachmentInput } from "@workspace/calendar-core";
 
+/** Image types the editor, the sanitizer and every reader accept inline. */
+export const INLINE_IMAGE_TYPE = /^image\/(?:png|gif|jpe?g|webp|bmp|avif)$/i;
+
 export type PendingComposeAttachment = {
   id: string;
   name: string;

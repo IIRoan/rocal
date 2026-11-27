@@ -3,8 +3,6 @@ import {
   buildNewComposeHtml,
   insertPlainTextSignature,
   resolveComposeSignature,
-  type MailSignatureKind,
-  type SignatureSource,
 } from "@workspace/calendar-core";
 import type { JmapEmailMessage, JmapIdentity } from "@/lib/mail/types";
 import type { QuotedInlineAttachment } from "@/lib/mail/compose-editor-utils";
@@ -46,15 +44,6 @@ export function buildComposeSnapshot(draft: ComposeDraft): ComposeSnapshot {
   };
 }
 
-/** The signature a seeded compose starts with, from the sealed defaults or the identity's own. */
-export function resolveSeedSignature(
-  identities: JmapIdentity[],
-  identityId: string | null,
-  kind: MailSignatureKind,
-): SignatureSource | null {
-  return resolveComposeSignature(readMailComposeSettings(), identities, identityId, kind);
-}
-
 export function mapQuotedAttachments(
   message: JmapEmailMessage,
 ): QuotedInlineAttachment[] {
@@ -75,7 +64,8 @@ export function buildNewComposeBodies(identity: JmapIdentity | null): {
   plainTextMode: boolean;
 } {
   const settings = readMailComposeSettings();
-  const signature = resolveSeedSignature(
+  const signature = resolveComposeSignature(
+    settings,
     identity ? [identity] : [],
     identity?.id ?? null,
     "newMessage",

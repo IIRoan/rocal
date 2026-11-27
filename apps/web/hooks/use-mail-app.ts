@@ -51,7 +51,9 @@ import {
   buildReplyContext,
   type QuotedDateOptions,
   mergeMailboxRefresh,
-  missingMailboxMessageIds,
+  hasComposeHtmlBody,
+  resolveOutgoingComposeBodies,
+  htmlHasUnhydratedInlinePlaceholders,
 } from "@workspace/calendar-core";
 import { useSettings } from "@/hooks/use-settings";
 import { useUserTimeFormat } from "@/hooks/use-user-time-format";
@@ -118,19 +120,12 @@ import { decryptMessageForCompose } from "@/lib/mail/decrypt-message-for-compose
 import { useConversationDecryptedPreviews } from "@/hooks/use-conversation-decrypted-previews";
 import { replaceSavedDraftInMailboxList } from "@/lib/mail/compose-draft-cache";
 import { getDraftsMailboxId } from "@/lib/mail/draft-utils";
-import {
-  hasComposeHtmlBody,
-  resolveOutgoingComposeBodies,
-} from "@/lib/mail/signature-utils";
 import { mergeRefreshedIntoCurrentMessages } from "@/lib/mail/mail-list-merge";
 import {
   readMailListSettings,
   MARK_AS_READ_DELAY_MS,
 } from "@/lib/mail/mail-list-settings";
-import {
-  rewriteComposeInlineImages,
-  htmlHasUnhydratedInlinePlaceholders,
-} from "@/lib/mail/compose-editor-utils";
+import { rewriteComposeInlineImages } from "@/lib/mail/compose-editor-utils";
 import {
   readBlobAsDataUrl,
   registerComposeInlineImage,
@@ -272,21 +267,22 @@ function bumpAutoReadNonce(
   return next;
 }
 
-/** Rechecks a mailbox page held in memory by its flags and downloads only the messages it does not hold. */
+/** Rechecks a mailbox page held in memory by its flags and downloads only the messages it does not hold; with none held it loads the first page. */
 async function refreshHeldMailboxPage(
   client: StalwartJmapClient,
   session: JmapSession,
   mailboxId: string,
-  held: MailMailboxMessagesCache,
+  held: MailMailboxMessagesCache | undefined,
   limit: number,
 ): Promise<MailMailboxMessagesCache> {
+  if (!held) return client.getMailboxMessages(session, mailboxId, { limit, position: 0 });
   const { flags, total } = await client.getMailboxMessageFlags(session, mailboxId, {
     limit: Math.max(limit, held.messages.length),
   });
   const heldById = new Map(held.messages.map((message) => [message.id, message]));
   const fetched = await client.getMessagesByIds(
     session,
-    missingMailboxMessageIds(flags, heldById),
+    flags.filter((entry) => !heldById.has(entry.id)).map((entry) => entry.id),
     { includeBodies: false },
   );
   return { messages: mergeMailboxRefresh(flags, heldById, fetched), total };
@@ -943,10 +939,7 @@ export function useMailApp() {
       mailQueryKeys.mailboxMessages(sentMailbox.id),
     );
     if (held) setListThreadRelatedMessages(held.messages);
-    const load = held
-      ? refreshHeldMailboxPage(client, session, sentMailbox.id, held, SENT_THREAD_PREFETCH_LIMIT)
-      : client.getMailboxMessages(session, sentMailbox.id, { limit: SENT_THREAD_PREFETCH_LIMIT });
-    void load
+    void refreshHeldMailboxPage(client, session, sentMailbox.id, held, SENT_THREAD_PREFETCH_LIMIT)
       .then(({ messages, total }) => {
         if (activeMailboxRef.current?.session !== session) return;
         seedMailMessageCache(queryClient, sentMailbox.id, messages, total);
@@ -1323,16 +1316,8 @@ export function useMailApp() {
       MAILBOX_MESSAGES_PAGE_SIZE,
     );
     const refresh = async () => {
-      if (!held) {
-        const { messages, total } = await client.getMailboxMessages(session, mailboxId, {
-          limit: pageSize,
-          position: 0,
-        });
-        show(messages, total);
-        return;
-      }
       // A mailbox opened before shows at once from memory; only its flags are checked and only new messages downloaded.
-      show(held.messages, held.total);
+      if (held) show(held.messages, held.total);
       const refreshed = await refreshHeldMailboxPage(client, session, mailboxId, held, pageSize);
       show(refreshed.messages, refreshed.total);
     };
@@ -3055,30 +3040,20 @@ export function useMailApp() {
         .map((m) => m.id),
     );
     if (unreadIds.size === 0) return;
-    const restoreUnread = (cur: ActiveMailboxState | null) =>
-      cur?.selectedMailboxId === mailboxId
-        ? {
-            ...cur,
-            messages: cur.messages.map((m) => {
-              if (!unreadIds.has(m.id)) return m;
-              const keywords = { ...(m.keywords ?? {}) };
-              delete keywords["$seen"];
-              return { ...m, keywords };
-            }),
-          }
-        : cur;
-    setActiveMailbox((cur) =>
+    const setUnreadSeen = (seen: boolean) => (cur: ActiveMailboxState | null) =>
       cur?.selectedMailboxId === mailboxId
         ? {
             ...cur,
             messages: cur.messages.map((m) =>
               unreadIds.has(m.id)
-                ? { ...m, keywords: { ...(m.keywords ?? {}), $seen: true } }
+                ? withMessageKeywords(m, ({ $seen: _seen, ...keywords }) =>
+                    seen ? { ...keywords, $seen: true } : keywords,
+                  )
                 : m,
             ),
           }
-        : cur,
-    );
+        : cur;
+    setActiveMailbox(setUnreadSeen(true));
     try {
       await keywordReconciliation.trackWrite(
         [...unreadIds].map((messageId) => ({
@@ -3094,7 +3069,7 @@ export function useMailApp() {
       );
     } catch (error) {
       log.error("Failed to mark folder as read", error);
-      setActiveMailbox(restoreUnread);
+      setActiveMailbox(setUnreadSeen(false));
       toast.error(getErrorMessage(error, "Could not mark the folder as read."));
     }
   };

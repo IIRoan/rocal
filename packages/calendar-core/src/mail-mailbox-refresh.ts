@@ -4,14 +4,6 @@ export type MailMessageFlags = {
   mailboxIds?: Record<string, boolean> | null;
 };
 
-/** Ids in the refreshed window that no held message covers, so only those are downloaded. */
-export function missingMailboxMessageIds(
-  flags: readonly MailMessageFlags[],
-  held: ReadonlyMap<string, unknown>,
-): string[] {
-  return flags.filter((entry) => !held.has(entry.id)).map((entry) => entry.id);
-}
-
 /** The refreshed window in server order: held messages take the fresh read, flag and folder state, new ones come from `fetched`. */
 export function mergeMailboxRefresh<T extends MailMessageFlags>(
   flags: readonly MailMessageFlags[],

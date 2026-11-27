@@ -10,6 +10,7 @@ import {
   saveMailSignature,
   setMailSignatureDefault,
   validateMailSignatureDraft,
+  mailSignaturePreview,
   type MailSignature,
   type MailSignatureDraft,
   type MailSignatureKind,
@@ -47,10 +48,6 @@ const DEFAULT_KINDS: { kind: MailSignatureKind; label: string }[] = [
 function useSignatureIdentities(): JmapIdentity[] {
   const provisioned = useMailAccount().data?.provisioned ?? false;
   return useMailRuntime(provisioned).data?.pickerIdentities ?? NO_IDENTITIES;
-}
-
-function signaturePreview(signature: MailSignature): string {
-  return signature.body.replace(/\s+/g, " ").trim();
 }
 
 function signatureName(signatures: readonly MailSignature[], id: string | null): string {
@@ -107,7 +104,7 @@ export function MailSignaturesSettingsContent() {
                   key={signature.id}
                   icon="edit-3"
                   label={signature.name}
-                  detail={signaturePreview(signature)}
+                  detail={mailSignaturePreview(signature)}
                   chevron
                   onPress={() => navigate(`${EDIT_SIGNATURE_PREFIX}${signature.id}`)}
                   accessibilityLabel={`Edit ${signature.name}`}

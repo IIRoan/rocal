@@ -21,10 +21,10 @@ import { Textarea } from "@workspace/ui/components/ui/textarea";
 import { useMailComposeSettings } from "@/lib/mail/compose-settings";
 import type { JmapIdentity } from "@/lib/mail/types";
 import {
-  PaletteButton,
   PaletteEmptyState,
   PaletteField,
-  PaletteFormActions,
+  PaletteFieldError,
+  PaletteFormFooter,
   PaletteNavRow,
   PaletteSection,
   PaletteSelect,
@@ -236,7 +236,7 @@ function MailSignatureForm({
           className={PALETTE_INPUT_CLASS}
           {...fieldProps("name")}
         />
-        <FieldError id={`${id}-name-error`} message={errors.name} />
+        <PaletteFieldError id={`${id}-name-error`} message={errors.name} />
       </PaletteField>
       <PaletteField label="Text" htmlFor={`${id}-body`}>
         <Textarea
@@ -248,34 +248,9 @@ function MailSignatureForm({
           className="bg-muted text-base text-foreground md:text-[15px]"
           {...fieldProps("body")}
         />
-        <FieldError id={`${id}-body-error`} message={errors.body} />
+        <PaletteFieldError id={`${id}-body-error`} message={errors.body} />
       </PaletteField>
-      {errors.form ? (
-        <p role="alert" className="px-2 text-[13px] leading-[130%] text-destructive">
-          {errors.form}
-        </p>
-      ) : null}
-      <PaletteFormActions>
-        {onDelete ? (
-          <PaletteButton variant="destructive" className="mr-auto" onClick={onDelete}>
-            Delete
-          </PaletteButton>
-        ) : null}
-        <PaletteButton variant="ghost" onClick={onCancel}>
-          Cancel
-        </PaletteButton>
-        <PaletteButton type="submit" variant="primary">
-          Save
-        </PaletteButton>
-      </PaletteFormActions>
+      <PaletteFormFooter formError={errors.form} onCancel={onCancel} onDelete={onDelete} />
     </form>
   );
-}
-
-function FieldError({ id, message }: { id: string; message?: string }) {
-  return message ? (
-    <p id={id} className="text-[13px] leading-[130%] text-destructive">
-      {message}
-    </p>
-  ) : null;
 }

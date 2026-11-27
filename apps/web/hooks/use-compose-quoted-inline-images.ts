@@ -4,11 +4,8 @@ import { useEffect, useEffectEvent, type Dispatch, type SetStateAction } from "r
 import { createLogger } from "@workspace/logger";
 import type { StalwartJmapClient } from "@/lib/mail/jmap-client";
 import type { JmapSession } from "@/lib/mail/types";
-import { dropInlineImagePlaceholders } from "@workspace/calendar-core";
-import {
-  replaceInlineImagePlaceholders,
-  type QuotedInlineAttachment,
-} from "@/lib/mail/compose-editor-utils";
+import { dropInlineImagePlaceholders, replaceInlineImagePlaceholders } from "@workspace/calendar-core";
+import type { QuotedInlineAttachment } from "@/lib/mail/compose-editor-utils";
 import {
   beginQuotedInlineImageHydration,
   completeQuotedInlineImageHydration,

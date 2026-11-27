@@ -17,6 +17,7 @@ import {
   hasComposeUserContent,
   parseMailtoLink,
   composeHtmlToPlainText,
+  htmlToPlainText,
   plainTextToComposeHtml,
   type ComposeTextFields,
   type MailServerLimits,
@@ -24,7 +25,6 @@ import {
   type QuotedDateOptions,
 } from "@workspace/calendar-core";
 import type { JmapEmailMessage, JmapIdentity } from "@/lib/mail/types";
-import { htmlToPlainText } from "@/lib/mail/signature-utils";
 import { readMailComposeSettings } from "@/lib/mail/compose-settings";
 import { hasInsertedComposeImage, resetComposeInlineImages } from "@/lib/mail/compose-inline-images";
 import { resolveMailLink, takeMailLinkFragment, type MailLink } from "@/lib/mail/mail-link-handoff";

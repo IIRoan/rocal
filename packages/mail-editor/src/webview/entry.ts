@@ -23,12 +23,13 @@ type EditorPageWindow = Window & {
   [MAIL_EDITOR_COMMAND_FUNCTION]?: (command: MailEditorCommand) => void;
 };
 
-const page = window as EditorPageWindow;
+// Read on use, not at import, so the module stays safe to load where `window` is absent.
+const page = () => window as EditorPageWindow;
 const CHANGE_DEBOUNCE_MS = 150;
 const IMAGE_UPDATE = "solaceImageUpdate";
 
 function post(event: MailEditorEvent) {
-  page.ReactNativeWebView?.postMessage(JSON.stringify(event));
+  page().ReactNativeWebView?.postMessage(JSON.stringify(event));
 }
 
 function start(config: EditorPageConfig) {
@@ -67,20 +68,20 @@ function start(config: EditorPageConfig) {
     },
   });
 
-  function flushChange() {
-    if (!changeTimer) return;
-    clearTimeout(changeTimer);
+  function postChange() {
+    if (changeTimer) clearTimeout(changeTimer);
     changeTimer = null;
     post({ type: "change", html: serializeEditorContent(editor) });
+  }
+
+  function flushChange() {
+    if (changeTimer) postChange();
   }
 
   // Serializing a body with embedded images is heavy, so a burst of keystrokes posts once.
   function scheduleChange() {
     if (changeTimer) clearTimeout(changeTimer);
-    changeTimer = setTimeout(() => {
-      changeTimer = null;
-      post({ type: "change", html: serializeEditorContent(editor) });
-    }, CHANGE_DEBOUNCE_MS);
+    changeTimer = setTimeout(postChange, CHANGE_DEBOUNCE_MS);
   }
 
   function postState() {
@@ -154,7 +155,7 @@ function start(config: EditorPageConfig) {
     if (tr.docChanged) editor.view.dispatch(tr.setMeta("addToHistory", false).setMeta(IMAGE_UPDATE, true));
   }
 
-  page[MAIL_EDITOR_COMMAND_FUNCTION] = (command) => {
+  page()[MAIL_EDITOR_COMMAND_FUNCTION] = (command) => {
     switch (command.type) {
       case "setContent":
         editor.commands.setContent(command.html, { emitUpdate: false });
@@ -183,9 +184,7 @@ function start(config: EditorPageConfig) {
         const next = applyComposeSignatureHtml(html, command);
         if (next === html) return;
         editor.commands.setContent(next, { emitUpdate: false });
-        if (changeTimer) clearTimeout(changeTimer);
-        changeTimer = null;
-        post({ type: "change", html: serializeEditorContent(editor) });
+        postChange();
         return;
       }
       case "setEditable":
@@ -207,5 +206,5 @@ function start(config: EditorPageConfig) {
   post({ type: "ready" });
 }
 
-const config = page.__solaceMailEditorConfig;
+const config = page().__solaceMailEditorConfig;
 if (config) start(config);

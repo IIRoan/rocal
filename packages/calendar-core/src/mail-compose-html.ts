@@ -185,7 +185,7 @@ export function htmlHasUnhydratedInlinePlaceholders(html: string): boolean {
   return html.includes("data-cid") && html.includes(INLINE_IMAGE_PLACEHOLDER);
 }
 
-export type ComposeInlineImagePart = {
+type ComposeInlineImagePart = {
   cid: string;
   filename: string;
   contentType: string;

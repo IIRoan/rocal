@@ -531,8 +531,8 @@ export function parseDecryptedMailContent(
   };
 }
 
-export const MAX_MIME_SIGNATURE_CHARACTERS = 16 * 1024;
-export const MAX_MIME_KEY_CHARACTERS = 64 * 1024;
+const MAX_MIME_SIGNATURE_CHARACTERS = 16 * 1024;
+const MAX_MIME_KEY_CHARACTERS = 64 * 1024;
 const PGP_SIGNATURE_BEGIN = "-----BEGIN PGP SIGNATURE-----";
 const PGP_SIGNATURE_END = "-----END PGP SIGNATURE-----";
 

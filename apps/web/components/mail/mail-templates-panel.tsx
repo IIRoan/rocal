@@ -10,6 +10,7 @@ import {
   mailTemplateToDraft,
   saveMailTemplate,
   validateMailTemplateDraft,
+  mailTemplatePreview,
   type MailTemplate,
   type MailTemplateDraft,
   type MailTemplateDraftErrors,
@@ -17,10 +18,10 @@ import {
 import { Textarea } from "@workspace/ui/components/ui/textarea";
 import { useMailComposeSettings } from "@/lib/mail/compose-settings";
 import {
-  PaletteButton,
   PaletteEmptyState,
   PaletteField,
-  PaletteFormActions,
+  PaletteFieldError,
+  PaletteFormFooter,
   PaletteNavRow,
   PaletteSection,
   PaletteView,
@@ -90,7 +91,7 @@ export function MailTemplatesPanel({ goBack }: { goBack: () => void }) {
               key={template.id}
               icon={FileText}
               label={template.name}
-              description={templatePreview(template)}
+              description={mailTemplatePreview(template)}
               onClick={() =>
                 setEditing({ id: template.id, draft: mailTemplateToDraft(template) })
               }
@@ -100,10 +101,6 @@ export function MailTemplatesPanel({ goBack }: { goBack: () => void }) {
       )}
     </PaletteView>
   );
-}
-
-function templatePreview(template: MailTemplate): string {
-  return template.subject || template.body.replace(/\s+/g, " ").trim();
 }
 
 function MailTemplateForm({
@@ -162,7 +159,7 @@ function MailTemplateForm({
           className={PALETTE_INPUT_CLASS}
           {...fieldProps("name")}
         />
-        <FieldError id={`${id}-name-error`} message={errors.name} />
+        <PaletteFieldError id={`${id}-name-error`} message={errors.name} />
       </PaletteField>
       <PaletteField
         label="Subject"
@@ -178,7 +175,7 @@ function MailTemplateForm({
           className={PALETTE_INPUT_CLASS}
           {...fieldProps("subject")}
         />
-        <FieldError id={`${id}-subject-error`} message={errors.subject} />
+        <PaletteFieldError id={`${id}-subject-error`} message={errors.subject} />
       </PaletteField>
       <PaletteField label="Text" htmlFor={`${id}-body`}>
         <Textarea
@@ -189,34 +186,9 @@ function MailTemplateForm({
           className="bg-muted text-base text-foreground md:text-[15px]"
           {...fieldProps("body")}
         />
-        <FieldError id={`${id}-body-error`} message={errors.body} />
+        <PaletteFieldError id={`${id}-body-error`} message={errors.body} />
       </PaletteField>
-      {errors.form ? (
-        <p role="alert" className="px-2 text-[13px] leading-[130%] text-destructive">
-          {errors.form}
-        </p>
-      ) : null}
-      <PaletteFormActions>
-        {onDelete ? (
-          <PaletteButton variant="destructive" className="mr-auto" onClick={onDelete}>
-            Delete
-          </PaletteButton>
-        ) : null}
-        <PaletteButton variant="ghost" onClick={onCancel}>
-          Cancel
-        </PaletteButton>
-        <PaletteButton type="submit" variant="primary">
-          Save
-        </PaletteButton>
-      </PaletteFormActions>
+      <PaletteFormFooter formError={errors.form} onCancel={onCancel} onDelete={onDelete} />
     </form>
   );
-}
-
-function FieldError({ id, message }: { id: string; message?: string }) {
-  return message ? (
-    <p id={id} className="text-[13px] leading-[130%] text-destructive">
-      {message}
-    </p>
-  ) : null;
 }

@@ -1,3 +1,5 @@
+import { escapeComposeHtml } from "./mail-compose-html";
+
 export type TextSelection = {
   start: number;
   end: number;
@@ -5,14 +7,6 @@ export type TextSelection = {
 
 export function hasComposeFormatting(text: string): boolean {
   return /(\*\*|__|_(?!\s)|^- )/m.test(text);
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 function applyInlineMarkdown(escaped: string): string {
@@ -38,11 +32,11 @@ export function composeTextToHtml(text: string): string {
     if (isList && lines.some((line) => line.startsWith("- "))) {
       const items = lines
         .filter((line) => line.startsWith("- "))
-        .map((line) => `<li>${applyInlineMarkdown(escapeHtml(line.slice(2)))}</li>`)
+        .map((line) => `<li>${applyInlineMarkdown(escapeComposeHtml(line.slice(2)))}</li>`)
         .join("");
       return `<ul>${items}</ul>`;
     }
-    return `<p>${applyInlineMarkdown(escapeHtml(block)).replace(/\n/g, "<br>")}</p>`;
+    return `<p>${applyInlineMarkdown(escapeComposeHtml(block)).replace(/\n/g, "<br>")}</p>`;
   });
 
   return htmlBlocks.join("");

@@ -3,6 +3,7 @@ import {
   buildForwardQuoteHtml,
   buildReplyContext,
   buildReplyQuoteHtml,
+  escapeComposeHtml,
   FORWARDED_MESSAGE_HEADER,
   formatQuotedMailDate,
   formatReplyQuoteHeader,
@@ -11,6 +12,7 @@ import {
   plainTextToComposeHtml,
   prepareQuotedComposeHtml,
   resolveMessageReplyFrom,
+  resolveComposeSignature,
   resolveMessageReplyRecipients,
   type MailComposeSettings,
   type MailtoDraft,
@@ -20,14 +22,12 @@ import {
 import { limitMailQuoteContent } from "@workspace/calendar-core/mail-mime-limits";
 import type { JmapEmailMessage, JmapIdentity } from "@/lib/mail/types";
 import { extractMessageBodies } from "@/lib/mail/message-security";
-import { escapeHtml } from "@/lib/mail/compose-editor-utils";
 import { readMailComposeSettings } from "@/lib/mail/compose-settings";
 import type { MailComposeState } from "./mail-compose-state";
 import {
   addressesToCsv,
   buildNewComposeBodies,
   mapQuotedAttachments,
-  resolveSeedSignature,
 } from "./mail-compose-utils";
 
 type SeedResult = {
@@ -83,7 +83,8 @@ export function buildReplySeed(
     identities.find((entry) => entry.id === replyIdentityId) ??
     identities[0] ??
     null;
-  const signatureIdentity = resolveSeedSignature(
+  const signatureIdentity = resolveComposeSignature(
+    settings,
     identities,
     currentIdentity?.id ?? null,
     "replyForward",
@@ -156,7 +157,8 @@ export function buildForwardSeed(
     identities.find((entry) => entry.id === forwardIdentityId) ??
     identities[0] ??
     null;
-  const signatureIdentity = resolveSeedSignature(
+  const signatureIdentity = resolveComposeSignature(
+    settings,
     identities,
     currentIdentity?.id ?? null,
     "replyForward",
@@ -258,7 +260,7 @@ export function buildMailtoSeed(
       composeHtmlBody:
         plainTextMode || !draft.body
           ? seeded.htmlBody
-          : `<p>${escapeHtml(draft.body).replace(/\n/g, "<br>")}</p>${seeded.htmlBody}`,
+          : `<p>${escapeComposeHtml(draft.body).replace(/\n/g, "<br>")}</p>${seeded.htmlBody}`,
       plainTextMode,
       composeAttachments: [],
       composeReplyContext: null,

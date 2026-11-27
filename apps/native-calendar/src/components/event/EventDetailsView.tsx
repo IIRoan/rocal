@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Linking, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import {
   EVENT_CONTENT_UNAVAILABLE_MESSAGE,
@@ -17,16 +17,13 @@ import {
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
 import { BottomSheetScrollView } from "@workspace/native-core/components/BottomSheet";
 import { BlobatarAvatar } from "@workspace/native-core/components/BlobatarAvatar";
+import { openExternalLink } from "@workspace/native-core/lib/open-external-link";
 import { resolveCalendarSwatchColor } from "../../lib/calendar-color-utils";
 import { EncryptionStatusIcon } from "../calendar/EncryptionStatusIcon";
 import { EventEditorRow } from "./EventEditorPrimitives";
 import { FormErrorList } from "./FormErrorList";
 import { formatEventDate, formatEventTime } from "./event-detail-utils";
 import type { EventSheetStyles } from "./event-sheet-styles";
-
-function openLink(url: string) {
-  Linking.openURL(url).catch(() => undefined);
-}
 
 function renderRuns(runs: EventTextRun[], linkStyle: EventSheetStyles["viewLink"]): ReactNode[] {
   const parts: ReactNode[] = [];
@@ -43,7 +40,7 @@ function renderRuns(runs: EventTextRun[], linkStyle: EventSheetStyles["viewLink"
       <Text
         key={offset}
         style={linkStyle}
-        onPress={() => openLink(run.url)}
+        onPress={() => openExternalLink(run.url)}
         accessibilityRole="link"
         accessibilityHint={`Opens ${getEventLinkLabel(run.url)}`}
       >
@@ -181,7 +178,7 @@ export function EventDetailsView({
           <EventEditorRow icon="video" label="Video call">
             <View style={styles.viewInlineRow}>
               <Pressable
-                onPress={() => openLink(callLink)}
+                onPress={() => openExternalLink(callLink)}
                 hitSlop={4}
                 style={({ pressed }) => [
                   styles.joinButton,
@@ -284,7 +281,7 @@ export function EventDetailsView({
               {mapQuery ? (
                 <Pressable
                   onPress={() =>
-                    openLink(
+                    openExternalLink(
                       `https://maps.apple.com/?q=${encodeURIComponent(mapQuery)}`,
                     )
                   }

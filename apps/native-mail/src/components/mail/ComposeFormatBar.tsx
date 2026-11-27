@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -7,9 +7,8 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import { Feather } from "@expo/vector-icons";
-import { afterPaint } from "@workspace/calendar-core";
 import type { MailEditorFormat, MailEditorFormatState } from "@workspace/mail-editor/protocol";
 import type { ThemeTokens } from "@workspace/design-tokens";
 import { useTheme } from "@workspace/native-core/providers/ThemeProvider";
@@ -18,6 +17,7 @@ import {
   COMPOSE_FORMAT_BAR_GAP,
   COMPOSE_FORMAT_BAR_HEIGHT,
 } from "../../lib/mail/compose-display";
+import { useAfterPaintProgress } from "../../hooks/use-after-paint-progress";
 
 type FeatherName = keyof typeof Feather.glyphMap;
 type Glyph = { glyph: string; glyphStyle?: "bold" | "italic" | "underline" | "strike" | "large" };
@@ -142,16 +142,7 @@ export function ComposeFormatBar({
 
 /** The panel rises in after it has painted; the second row follows it in and leaves first. */
 function usePanelMotion(expanded: boolean) {
-  const progress = useSharedValue(0);
-  useEffect(() => {
-    if (!expanded) {
-      progress.set(withTiming(0, { duration: CLOSE_MS }));
-      return;
-    }
-    return afterPaint(() => {
-      progress.set(withTiming(1, { duration: OPEN_MS, easing: Easing.out(Easing.cubic) }));
-    });
-  }, [expanded, progress]);
+  const progress = useAfterPaintProgress(expanded, OPEN_MS, CLOSE_MS);
   return {
     panelStyle: useAnimatedStyle(() => ({
       opacity: progress.get(),

@@ -7,10 +7,6 @@ export type MessageListSpamActions = {
 };
 
 export type MessageListDisplayOptions = {
-  isMobile: boolean;
-  /** Desktop list squeezed next to the open reader. */
-  narrow: boolean;
-  density: "compact" | "comfortable";
   showLabelChips: boolean;
   threadExpandEnabled: boolean;
 };

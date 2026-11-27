@@ -38,8 +38,7 @@ import {
   buildEmailMarkReadMethodCall,
   buildUnreadMailboxQueryMethodCall,
   withDraftsSeen,
-  destroyMailboxMessagesInBatches,
-  markMailboxMessagesReadInBatches,
+  drainMailboxInBatches,
   type MailMailboxRestore,
   parseJmapBlobUploadResponse,
   AUTH_RESULTS_JMAP_PROPERTY,
@@ -1368,7 +1367,7 @@ export class StalwartJmapClient {
 
   /** Permanently deletes every message in a mailbox (Trash / Spam empty). */
   async emptyMailbox(session: JmapSession, mailboxId: string): Promise<number> {
-    return destroyMailboxMessagesInBatches({
+    return drainMailboxInBatches({
       listIds: async (limit) =>
         (
           await this.getMailboxMessageIds(session, mailboxId, {
@@ -1376,7 +1375,7 @@ export class StalwartJmapClient {
             position: 0,
           })
         ).ids,
-      destroy: (ids) => this.bulkDestroyMessages(session, ids),
+      apply: (ids) => this.bulkDestroyMessages(session, ids),
     });
   }
 
@@ -1387,8 +1386,8 @@ export class StalwartJmapClient {
   ): Promise<number> {
     const accountId = this.requirePrimaryAccountId(session);
     const using = ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"];
-    return markMailboxMessagesReadInBatches({
-      listUnreadIds: async (limit) => {
+    return drainMailboxInBatches({
+      listIds: async (limit) => {
         const envelope = await this.call(session, using, [
           buildUnreadMailboxQueryMethodCall(accountId, mailboxId, limit),
         ]);
@@ -1397,7 +1396,7 @@ export class StalwartJmapClient {
             .ids ?? []
         );
       },
-      markRead: async (ids) => {
+      apply: async (ids) => {
         const envelope = await this.call(session, using, [
           buildEmailMarkReadMethodCall(accountId, ids),
         ]);
@@ -1412,13 +1411,10 @@ export class StalwartJmapClient {
   ): Promise<void> {
     if (messageIds.length === 0) return;
     const accountId = this.requirePrimaryAccountId(session);
-    const update = Object.fromEntries(
-      messageIds.map((id) => [id, { "keywords/$seen": true }]),
-    );
     await this.call(
       session,
       ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-      [["Email/set", { accountId, update }, "c1"]],
+      [buildEmailMarkReadMethodCall(accountId, messageIds)],
     );
   }
 

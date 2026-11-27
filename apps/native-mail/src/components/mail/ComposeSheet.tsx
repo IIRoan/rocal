@@ -277,7 +277,7 @@ function ComposeSession({
             signed={composeSettings.signOutgoingMail}
           />
         </BottomSheetHeader>
-        <View style={styles.composeArea}>
+        <View style={styles.flex}>
         <View
           style={[
             styles.composeShell,
@@ -442,8 +442,6 @@ function useComposeSignatureActions({
   const { identities, selectedIdentityId } = identity;
   const options = { separator: settings.signatureSeparatorEnabled };
   const candidates = composeSignatureCandidates(settings, identities);
-  const replaceIn = (next: SignatureSource | null) => (current: string) =>
-    replaceComposePlainTextSignature(current, candidates, next, options) ?? current;
 
   const placement = {
     ...options,
@@ -458,11 +456,9 @@ function useComposeSignatureActions({
     }
     dispatch({
       type: "editBody",
-      update: insert
-        ? (current) =>
-            replaceComposePlainTextSignature(current, candidates, next, options) ??
-            insertPlainTextSignature(current, next, placement)
-        : replaceIn(next),
+      update: (current) =>
+        replaceComposePlainTextSignature(current, candidates, next, options) ??
+        (insert ? insertPlainTextSignature(current, next, placement) : current),
     });
   };
 
@@ -551,10 +547,7 @@ function useComposeTemplatePicker(
   const [visible, setVisible] = useState(false);
   const onSelect = (template: MailTemplate) => {
     setVisible(false);
-    const nextSubject = resolveMailTemplateSubject(subject, template);
-    if (nextSubject !== subject) {
-      dispatch({ type: "edit", field: "subject", value: nextSubject });
-    }
+    dispatch({ type: "edit", field: "subject", value: resolveMailTemplateSubject(subject, template) });
     bodyEditorRef.current?.insertTemplate(template.body);
   };
   return {
@@ -574,10 +567,6 @@ const EMPTY_COMPOSE_FIELDS: ComposeTextFields = {
 function createStyles(theme: ThemeTokens, skin: MailSkin) {
   const view = {
     flex: {
-      flex: 1,
-      minHeight: 0,
-    },
-    composeArea: {
       flex: 1,
       minHeight: 0,
     },

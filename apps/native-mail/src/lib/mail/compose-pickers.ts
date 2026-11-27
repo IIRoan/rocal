@@ -4,15 +4,13 @@ import { getErrorMessage, getOutgoingAttachmentSizeError } from "@workspace/cale
 import { bytesToBase64, decodeBase64ToBytes } from "./binary-utils";
 import {
   createPendingComposeAttachment,
+  INLINE_IMAGE_TYPE,
   type PendingComposeAttachment,
 } from "./compose-attachments";
 import {
   stripPickedImageMetadata,
   type StrippedImageFile,
 } from "./strip-image-metadata";
-
-/** Image types the editor, the sanitizer and every reader accept inline. */
-const INLINE_IMAGE_TYPE = /^image\/(?:png|gif|jpe?g|webp|bmp|avif)$/i;
 
 type PickedFile = { uri: string; name: string; type: string | undefined; size: number };
 

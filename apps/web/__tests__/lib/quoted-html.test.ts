@@ -2,7 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   buildQuotedHtmlBlock,
   QUOTED_HTML_MARKER,
-} from "@/components/mail/quoted-html";
+} from "@workspace/calendar-core";
 
 describe("quoted-html", () => {
   it("wraps sanitized inner html in a marked block", () => {

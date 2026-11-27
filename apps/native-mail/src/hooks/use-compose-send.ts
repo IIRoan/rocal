@@ -9,6 +9,7 @@ import {
   getEmbeddedImagesSizeError,
   getErrorMessage,
   getOutgoingAttachmentsTotalSizeError,
+  newClientEntityId,
   resolveOutgoingComposeBodies,
   runTasksWithConcurrencyLimit,
   selfCopyWithEmbeddedImages,
@@ -26,7 +27,6 @@ import { useHeldSendToast } from "./use-held-send-toast";
 import { useToast } from "@workspace/native-core/providers/ToastProvider";
 import { useRecentContacts } from "@workspace/native-core/hooks/use-recent-contacts";
 import { extractRecentContactEntries } from "@workspace/native-core/lib/record-recent-contacts";
-import { toJmapAttachmentInput } from "../lib/mail/compose-attachments";
 import type { ComposeFormState } from "../lib/mail/compose-form";
 import { validateComposeInput } from "../lib/mail/mail-helpers";
 import type { MailRuntime } from "../lib/mail/mail-runtime";
@@ -57,12 +57,6 @@ type ComposeSendInput = {
   /** Waits for quoted images and drops any that never loaded. */
   finalizeQuotedImages?: (html: string) => Promise<string>;
 };
-
-/** A content id for an image inserted while composing. */
-function createInlineCid(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  return `${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}@solace`;
-}
 
 function countInlineImages(html: string): number {
   return html.match(/<img\b/gi)?.length ?? 0;
@@ -141,15 +135,8 @@ export function useComposeSend({
       // Solace's reader drops cid parts of decrypted mail, so encrypted mail keeps its images inline as data URLs.
       const inline =
         outgoingHtml && !willEncrypt
-          ? extractComposeInlineImages(outgoingHtml, createInlineCid)
+          ? extractComposeInlineImages(outgoingHtml, () => `${newClientEntityId()}@solace`)
           : { html: outgoingHtml, images: [] };
-      const inlineParts: OutgoingMimeAttachment[] = inline.images.map((image) => ({
-        filename: image.filename,
-        contentType: image.contentType,
-        content: image.content,
-        cid: image.cid,
-        disposition: "inline",
-      }));
       const embeddedImagesError = willEncrypt ? getEmbeddedImagesSizeError(outgoingHtml) : null;
       if (embeddedImagesError) throw new Error(embeddedImagesError);
       const fileParts: OutgoingMimeAttachment[] = attachments.map((pending) => ({
@@ -157,12 +144,13 @@ export function useComposeSend({
         contentType: pending.type,
         content: pending.bytes,
       }));
+      const mimeParts: OutgoingMimeAttachment[] = [
+        ...inline.images.map((image) => ({ ...image, disposition: "inline" as const })),
+        ...fileParts,
+      ];
       const selfCopy = selfCopyWithEmbeddedImages({ text: plaintext, html: inline.html, attachments: fileParts }, outgoingHtml);
       const sizeError = getOutgoingAttachmentsTotalSizeError(
-        [
-          ...attachments.map((pending) => pending.size),
-          ...inline.images.map((image) => image.content.byteLength),
-        ],
+        mimeParts.map((part) => part.content.byteLength),
         runtime.mailServerPolicy.limits.maxOutgoingAttachmentBytes,
       );
       if (sizeError) throw new Error(sizeError);
@@ -173,7 +161,7 @@ export function useComposeSend({
         recipients: allRecipients,
         plaintext,
         html: inline.html,
-        mimeAttachments: [...inlineParts, ...fileParts],
+        mimeAttachments: mimeParts,
         // The Sent copy keeps its images embedded, since the reader drops cid parts of decrypted mail.
         sentCopyContent: selfCopy.html === inline.html ? undefined : selfCopy,
         sign: settings.signOutgoingMail,
@@ -197,34 +185,19 @@ export function useComposeSend({
           ? []
           : await uploadPlaintextMailAttachments(outgoing, () =>
               runTasksWithConcurrencyLimit<JmapAttachmentInput>(
-                [
-                  ...inline.images.map((image) => async () => {
-                    const uploaded = await uploadPlaintextMailAttachments(outgoing, () =>
-                      runtime.client.uploadBlob(runtime.session, image.content, image.contentType, isCurrent),
-                    );
-                    return {
-                      blobId: uploaded.blobId,
-                      name: image.filename,
-                      type: image.contentType,
-                      size: image.content.byteLength,
-                      disposition: "inline" as const,
-                      cid: image.cid,
-                    };
-                  }),
-                  ...attachments.map((pending) => async () => {
-                    const uploaded = await uploadPlaintextMailAttachments(
-                      outgoing,
-                      () =>
-                        runtime.client.uploadBlob(
-                          runtime.session,
-                          pending.bytes,
-                          pending.type,
-                          isCurrent,
-                        ),
-                    );
-                    return toJmapAttachmentInput(pending, uploaded.blobId);
-                  }),
-                ],
+                mimeParts.map((part) => async () => {
+                  const uploaded = await uploadPlaintextMailAttachments(outgoing, () =>
+                    runtime.client.uploadBlob(runtime.session, part.content, part.contentType, isCurrent),
+                  );
+                  return {
+                    blobId: uploaded.blobId,
+                    name: part.filename,
+                    type: part.contentType,
+                    size: part.content.byteLength,
+                    disposition: part.disposition,
+                    cid: part.cid,
+                  };
+                }),
                 runtime.mailServerPolicy.maxConcurrentUploads,
               ),
             );

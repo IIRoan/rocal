@@ -22,6 +22,7 @@ function fakeAnimate(): Animation {
     play() {},
     cancel() {},
     addEventListener: (_type: string, listener: () => void) => listeners.push(listener),
+    removeEventListener: (_type: string, listener: () => void) => listeners.splice(listeners.indexOf(listener), 1),
   } as unknown as Animation;
 }
 

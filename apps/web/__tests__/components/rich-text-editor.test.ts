@@ -3,7 +3,7 @@
 import { expect, it } from "@jest/globals";
 import { Editor } from "@tiptap/core";
 import { richTextEditorExtensions } from "../../components/mail/rich-text-editor-extensions";
-import { serializeEditorContent } from "../../components/mail/quoted-html";
+import { serializeEditorContent } from "@workspace/mail-editor";
 
 const HOSTILE_QUOTE = '<div data-quoted-html><p>Quoted line</p><img src="x" onerror="window.alert(1)"></div>';
 

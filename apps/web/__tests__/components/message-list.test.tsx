@@ -321,7 +321,6 @@ describe("MessageList", () => {
           timeFormat="24h"
           onSelect={onSelect}
           onDelete={onDelete}
-          narrow
         />,
       );
     });
@@ -366,7 +365,6 @@ describe("MessageList", () => {
           onSelect={jest.fn()}
           onDelete={onDelete}
           onBulkDelete={onBulkDelete}
-          narrow
         />,
       );
     });
@@ -400,7 +398,6 @@ describe("MessageList", () => {
           timeFormat="24h"
           timezone="Europe/Amsterdam"
           onSelect={jest.fn()}
-          narrow
         />,
       );
     });

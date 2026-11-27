@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { mergeMailboxRefresh, missingMailboxMessageIds } from "../mail-mailbox-refresh";
+import { mergeMailboxRefresh } from "../mail-mailbox-refresh";
 
 type Message = { id: string; subject: string; keywords?: Record<string, boolean>; mailboxIds?: Record<string, boolean> };
 
@@ -13,10 +13,6 @@ describe("mailbox refresh", () => {
     { id: "new", keywords: {}, mailboxIds: { inbox: true } },
     { id: "a", keywords: { $seen: true }, mailboxIds: { inbox: true } },
   ];
-
-  it("downloads only messages it does not already hold", () => {
-    expect(missingMailboxMessageIds(flags, held)).toEqual(["new"]);
-  });
 
   it("keeps held messages with fresh flags, adds new ones in server order and drops what left the mailbox", () => {
     const merged = mergeMailboxRefresh(flags, held, [{ id: "new", subject: "Fresh", keywords: {} }]);

@@ -1,27 +1,10 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   buildMessageListItems,
-  getRowHeight,
   getThreadAvatarSenders,
-  ROW_HEIGHT_NARROW,
   type MessageListThreadRow,
 } from "../../components/mail/message-list/message-list-utils";
-import type { JmapEmailMessage, LabelDef } from "../../lib/mail/types";
-
-const labels = [{ id: "l1", name: "Work", color: "#3b82f6" }] as LabelDef[];
-// Only id, keywords and preview matter for the row height.
-const labelled = { id: "m1", keywords: { "label:l1": true }, preview: "See you Friday" } as unknown as JmapEmailMessage;
-const plain = { id: "m2", keywords: {}, preview: "Lunch?" } as unknown as JmapEmailMessage;
-const noPreview = { id: "m3", keywords: {} } as unknown as JmapEmailMessage;
-
-describe("getRowHeight", () => {
-  it("gives every stacked row one height, with or without a preview or labels", () => {
-    expect(getRowHeight(plain, labels, true, "compact")).toBe(ROW_HEIGHT_NARROW);
-    expect(getRowHeight(labelled, labels, true, "comfortable")).toBe(ROW_HEIGHT_NARROW);
-    expect(getRowHeight(noPreview, labels, true, "compact")).toBe(ROW_HEIGHT_NARROW);
-    expect(getRowHeight(labelled, labels, false, "comfortable", true, true)).toBe(ROW_HEIGHT_NARROW);
-  });
-});
+import type { JmapEmailMessage } from "../../lib/mail/types";
 
 describe("list items", () => {
   const message = (id: string, email: string, receivedAt: string) =>

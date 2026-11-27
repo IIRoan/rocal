@@ -1,4 +1,4 @@
-import type { MailTemplate } from "@workspace/calendar-core";
+import { mailTemplatePreview, type MailTemplate } from "@workspace/calendar-core";
 import {
   BottomSheet,
   BottomSheetHeader,
@@ -37,7 +37,7 @@ export function ComposeTemplatesSheet({
                 key={template.id}
                 icon="file-text"
                 label={template.name}
-                detail={template.subject || template.body.replace(/\s+/g, " ").trim()}
+                detail={mailTemplatePreview(template)}
                 onPress={() => onSelect(template)}
                 accessibilityLabel={`Insert ${template.name}`}
               />

@@ -4,7 +4,7 @@ export type EventTextRun =
   | { kind: "text"; text: string }
   | { kind: "link"; url: string; label: string | null };
 
-export type EventDescriptionLine = { key: number; runs: EventTextRun[] };
+type EventDescriptionLine = { key: number; runs: EventTextRun[] };
 
 interface TeamsLink {
   index: number;
@@ -60,27 +60,19 @@ function trimTrailingPunctuation(url: string): string {
   return url.slice(0, end);
 }
 
-function bareUrlRuns(line: string): EventTextRun[] {
-  const runs: EventTextRun[] = [];
-  let lastIndex = 0;
-  for (const match of line.matchAll(BARE_URL)) {
+function bareUrlLinks(line: string): TeamsLink[] {
+  return Array.from(line.matchAll(BARE_URL), (match) => {
     const url = trimTrailingPunctuation(match[0]);
-    const start = match.index;
-    if (start > lastIndex) runs.push({ kind: "text", text: line.slice(lastIndex, start) });
-    runs.push({ kind: "link", url, label: null });
-    lastIndex = start + url.length;
-  }
-  if (lastIndex < line.length) runs.push({ kind: "text", text: line.slice(lastIndex) });
-  return runs;
+    return { index: match.index, end: match.index + url.length, label: "", url };
+  });
 }
 
 /** One line as text and http(s) link runs: Teams-style `Label<url>` links when present, bare URLs otherwise. */
 export function splitEventTextLine(line: string): EventTextRun[] {
   const teamsLinks = findTeamsLinks(line);
-  if (teamsLinks.length === 0) return bareUrlRuns(line);
   const runs: EventTextRun[] = [];
   let lastIndex = 0;
-  for (const link of teamsLinks) {
+  for (const link of teamsLinks.length ? teamsLinks : bareUrlLinks(line)) {
     if (link.index > lastIndex) runs.push({ kind: "text", text: line.slice(lastIndex, link.index) });
     runs.push({ kind: "link", url: link.url, label: link.label.trim() || null });
     lastIndex = link.end;

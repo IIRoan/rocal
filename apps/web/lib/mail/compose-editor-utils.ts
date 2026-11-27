@@ -1,15 +1,7 @@
+import type { Editor } from "@tiptap/react";
+import type { InlineImageUpload } from "@/components/mail/rich-text-editor";
 import { getComposeInlineImages } from "./compose-inline-images";
-import {
-  escapeComposeHtml,
-  extractComposeInlineImages,
-  plainTextToComposeHtml,
-} from "@workspace/calendar-core";
-
-export {
-  htmlHasUnhydratedInlinePlaceholders,
-  INLINE_IMAGE_PLACEHOLDER,
-  replaceInlineImagePlaceholders,
-} from "@workspace/calendar-core";
+import { extractComposeInlineImages } from "@workspace/calendar-core";
 
 export type QuotedInlineAttachment = {
   blobId?: string | null;
@@ -20,11 +12,7 @@ export type QuotedInlineAttachment = {
   cid?: string | null;
 };
 
-export const escapeHtml = escapeComposeHtml;
-
-export const plainTextToComposerBody = plainTextToComposeHtml;
-
-export type ComposeInlineAttachment = {
+type ComposeInlineAttachment = {
   blobId: string | null;
   name: string;
   type: string;
@@ -88,4 +76,29 @@ export function rewriteComposeInlineImages(html: string): {
       })),
     ],
   };
+}
+
+/** Uploads each image and inserts it once uploaded, at `position()` when that gives one, else at the cursor. */
+export function insertUploadedImages(
+  editor: Editor,
+  files: File[],
+  upload: (file: File) => Promise<InlineImageUpload | null>,
+  position?: () => number | undefined,
+) {
+  for (const file of files) {
+    // upload (handleComposeImageUpload) reports failures itself and returns null.
+    void upload(file)
+      .then((result) => {
+        if (!result) return;
+        const at = position?.();
+        requestAnimationFrame(() => {
+          if (editor.isDestroyed) return;
+          const image = { type: "image", attrs: { src: result.src, alt: file.name, cid: result.cid } };
+          const chain = editor.chain().focus();
+          if (typeof at === "number") chain.insertContentAt(at, image).run();
+          else chain.insertContent(image).run();
+        });
+      })
+      .catch(() => undefined);
+  }
 }

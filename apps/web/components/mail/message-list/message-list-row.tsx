@@ -1,18 +1,13 @@
 "use client";
 
-import type { ComponentProps } from "react";
-import { ChevronDown, ChevronRight, RotateCcw, Star } from "lucide-react";
+import { ChevronDown, RotateCcw, Star } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import {
   ContextDropdown,
-  FilledVariant,
   Icon,
-  IconButton,
   Icons,
   Size,
-  Type,
   Typography,
-  TypographySize,
   TypographyWeight,
 } from "@workspace/ui/solace";
 import type { JmapEmailMessage } from "@/lib/mail/types";
@@ -38,11 +33,11 @@ import { MessageListRowOverflowMenu } from "./message-list-row-overflow-menu";
 function MessageLabelChips({
   messageLabels,
   max = 2,
-  className = "mt-0.5 min-w-0 overflow-hidden pr-4",
+  className,
 }: {
   messageLabels: { id: string; name: string; color?: string }[];
   max?: number;
-  className?: string;
+  className: string;
 }) {
   if (messageLabels.length === 0) return null;
   const visible = messageLabels.slice(0, max);
@@ -80,117 +75,46 @@ function MessageLabelChips({
 }
 
 function rowShellClassName({
-  stacked,
-  density,
   isChecked,
   isSelected,
   isRead,
 }: {
-  stacked: boolean;
-  density: "compact" | "comfortable";
   isChecked: boolean;
   isSelected: boolean;
   isRead: boolean;
 }) {
-  const padding = stacked
-    ? "pl-3.5 pr-4 py-2.5"
-    : density === "comfortable"
-      ? "px-[18px] py-3"
-      : "px-5 py-3";
   const tone = isChecked || isSelected
     ? "bg-[var(--bg-cell-active)]"
     : isRead
       ? "hover:bg-[var(--bg-cell-hover)]"
       : "bg-[var(--bg-cell-unread)] hover:border-b-[var(--border-primary)]";
   return cn(
-    "group/row relative w-full overflow-hidden text-left cursor-pointer border-b border-[var(--border-tertiary)] box-border transition-colors duration-150",
-    padding,
+    "group/row relative w-full overflow-hidden text-left cursor-pointer border-b border-[var(--border-tertiary)] box-border transition-colors duration-150 pl-3.5 pr-4 py-2.5",
     tone,
   );
 }
 
-function MessageListRowSelectAvatar({
-  email,
-  name,
-  isChecked,
-  onToggleSelect,
-}: {
-  email: string;
-  name?: string;
-  isChecked: boolean;
-  onToggleSelect: (event: React.MouseEvent) => void;
-}) {
-  return (
-    <div className="mr-3 flex shrink-0 items-center gap-3">
-      <IconButton
-        aria-label="Select message"
-        aria-pressed={isChecked}
-        className="relative z-2"
-        icon={isChecked ? Icon.CheckboxFilled : Icon.CheckboxEmpty}
-        onClick={onToggleSelect}
-        size={Size.SMALL}
-        type={Type.TERTIARY}
-        variant={FilledVariant.UNFILLED}
-      />
-      <SenderAvatar email={email} name={name} className="size-8" />
-    </div>
-  );
-}
-
 function MessageListRowSubject({
-  className,
   isRead,
   subject,
   previewSnippet,
-  thread,
-  onToggleThreadExpand,
 }: {
-  className?: string;
   isRead: boolean;
   subject: string;
   previewSnippet: string;
-  thread: {
-    id: string;
-    expanded: boolean;
-    loading: boolean;
-  } | null;
-  onToggleThreadExpand: (threadId: string) => void;
 }) {
   const weight = isRead ? TypographyWeight.REGULAR : TypographyWeight.MEDIUM;
   return (
-    <div className={cn("ml-1 flex min-w-0 flex-1 items-center", className)}>
-      {thread ? (
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            onToggleThreadExpand(thread.id);
-          }}
-          // A 24px target (WCAG 2.5.8) whose negative margins keep the chevron's 16px slot; the text clip sits on the sibling so it can't cut it.
-          className="relative z-2 -my-1 -ml-1 shrink-0 rounded p-1.5 text-[var(--icon-tertiary)] hover:text-[var(--icon-primary)]"
-          aria-label="Show thread messages"
-          aria-expanded={thread.expanded}
-        >
-          {thread.loading ? (
-            <RotateCcw className="size-3 animate-spin" strokeWidth={2} />
-          ) : thread.expanded ? (
-            <ChevronDown className="size-3" strokeWidth={2.25} />
-          ) : (
-            <ChevronRight className="size-3" strokeWidth={2.25} />
-          )}
-        </button>
-      ) : null}
-      <div className="flex min-w-0 flex-1 items-center overflow-hidden">
-        <Typography color={isRead ? "secondary" : "primary"} minWidth="auto" weight={weight}>
-          {subject || "(No subject)"}
+    <div className="flex min-w-0 flex-1 items-center overflow-hidden">
+      <Typography color={isRead ? "secondary" : "primary"} minWidth="auto" weight={weight}>
+        {subject || "(No subject)"}
+      </Typography>
+      {previewSnippet ? (
+        <Typography color={isRead ? "tertiary" : "secondary"}>
+          <span>&nbsp;–&nbsp;</span>
+          {previewSnippet}
         </Typography>
-        {previewSnippet ? (
-          <Typography color={isRead ? "tertiary" : "secondary"}>
-            <span>&nbsp;–&nbsp;</span>
-            {previewSnippet}
-          </Typography>
-        ) : null}
-      </div>
+      ) : null}
     </div>
   );
 }
@@ -279,7 +203,6 @@ function buildMessageListRowView({
     labels,
     moveTargets,
     spamActions,
-    display,
     timeFormat,
     timezone,
     mailboxActions,
@@ -304,7 +227,6 @@ function buildMessageListRowView({
       .join(", "),
     senderTone: (isRead ? "secondary" : "primary") as "secondary" | "primary",
     senderWeight: isRead ? TypographyWeight.REGULAR : TypographyWeight.BOLD,
-    unreadOpacity: isRead ? 0 : 1,
     thread: threaded
       ? {
           id: row.id,
@@ -318,48 +240,6 @@ function buildMessageListRowView({
       message.id,
     ),
   };
-}
-
-function MessageListRowTrailing({
-  hasAttachments,
-  messageLabels,
-  dateLabel,
-  hover,
-}: {
-  hasAttachments: boolean;
-  messageLabels: { id: string; name: string; color?: string }[];
-  dateLabel: string;
-  hover: ComponentProps<typeof MessageListRowHoverActions>;
-}) {
-  return (
-    <div className="ml-auto flex shrink-0 items-center gap-4">
-      <div className="flex items-center gap-1">
-        {hasAttachments ? (
-          <Icons color="tertiary" icon={Icon.PaperClip} size={Size.SMALL} />
-        ) : null}
-        <MessageLabelChips messageLabels={messageLabels} />
-      </div>
-      <Typography
-        className="group-hover/row:hidden"
-        color="tertiary"
-        mono
-        size={TypographySize.SMALL}
-      >
-        {dateLabel}
-      </Typography>
-      <div className="hidden group-hover/row:flex">
-        <MessageListRowHoverActions {...hover} />
-      </div>
-    </div>
-  );
-}
-
-function UnreadDot({ opacity }: { opacity: number }) {
-  return (
-    <span className="ml-1 flex h-2 w-2.5 shrink-0 items-center">
-      <span className="size-2 rounded-full bg-accent" style={{ opacity }} />
-    </span>
-  );
 }
 
 type MessageListRowView = ReturnType<typeof buildMessageListRowView>;
@@ -511,12 +391,9 @@ function MessageListRowStacked({ view }: { view: MessageListRowView }) {
         </div>
         <div className="flex h-5 min-w-0 items-center gap-1.5">
           <MessageListRowSubject
-            className="ml-0"
             isRead={view.isRead}
             subject={message.subject ?? ""}
             previewSnippet={view.previewSnippet}
-            thread={null}
-            onToggleThreadExpand={view.onToggleThreadExpand}
           />
           <MessageLabelChips messageLabels={view.messageLabels} className="max-w-[60%] shrink-0 overflow-hidden" />
         </div>
@@ -525,55 +402,9 @@ function MessageListRowStacked({ view }: { view: MessageListRowView }) {
   );
 }
 
-function MessageListRowInline({ view }: { view: MessageListRowView }) {
-  const { message, row } = view;
-  return (
-    <div className="flex h-full items-center">
-      <MessageListRowSelectAvatar
-        email={message.from?.[0]?.email ?? ""}
-        name={message.from?.[0]?.name ?? undefined}
-        isChecked={view.isChecked}
-        onToggleSelect={(event) => view.onToggleSelect(event, row.messageIds)}
-      />
-      <div className="flex min-w-[140px] w-[16vw] max-w-[220px] shrink-0 items-center overflow-hidden">
-        <Typography color={view.senderTone} weight={view.senderWeight}>
-          {view.senderLabel}
-        </Typography>
-      </div>
-      <UnreadDot opacity={view.unreadOpacity} />
-      <MessageListRowSubject
-        isRead={view.isRead}
-        subject={message.subject ?? ""}
-        previewSnippet={view.previewSnippet}
-        thread={view.thread}
-        onToggleThreadExpand={view.onToggleThreadExpand}
-      />
-      <MessageListRowTrailing
-        hasAttachments={view.hasAttachments}
-        messageLabels={view.messageLabels}
-        dateLabel={view.dateLabel}
-        hover={{
-          isRead: view.isRead,
-          isFlagged: view.isFlagged,
-          isBulk: row.messageIds.length > 1,
-          messageId: message.id,
-          messageIds: row.messageIds,
-          onMarkAsUnread: view.mailboxActions.onMarkAsUnread,
-          onMarkAsRead: view.mailboxActions.onMarkAsRead,
-          onBulkMarkAsUnread: view.mailboxActions.onBulkMarkAsUnread,
-          onBulkMarkAsRead: view.mailboxActions.onBulkMarkAsRead,
-          onDelete: view.mailboxActions.onDelete,
-          onBulkDelete: view.mailboxActions.onBulkDelete,
-          onToggleFlagged: view.mailboxActions.onToggleFlagged,
-        }}
-      />
-    </div>
-  );
-}
-
 export function MessageListRow(props: MessageListRowProps) {
   const view = buildMessageListRowView(props);
-  const { message, row, display } = view;
+  const { message, row } = view;
 
   return (
     <>
@@ -583,8 +414,6 @@ export function MessageListRow(props: MessageListRowProps) {
         <div
           style={{ height: props.height }}
           className={rowShellClassName({
-            stacked: display.isMobile || display.narrow,
-            density: display.density,
             isChecked: view.isChecked,
             isSelected: view.isSelected,
             isRead: view.isRead,
@@ -598,11 +427,7 @@ export function MessageListRow(props: MessageListRowProps) {
             onClick={() => view.onSelect(message.id)}
             className="absolute inset-0 z-1 cursor-pointer focus-visible:-outline-offset-2"
           />
-          {display.isMobile || display.narrow ? (
-            <MessageListRowStacked view={view} />
-          ) : (
-            <MessageListRowInline view={view} />
-          )}
+          <MessageListRowStacked view={view} />
         </div>
         }
       >

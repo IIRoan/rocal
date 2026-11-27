@@ -72,6 +72,7 @@ jest.mock("@workspace/logger", () => ({
 jest.mock("sonner", () => ({
   toast: Object.assign(jest.fn(), {
     error: jest.fn(),
+    dismiss: jest.fn(),
   }),
 }));
 

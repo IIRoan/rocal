@@ -5,12 +5,11 @@ import {
   getPlainTextSignature,
   hasComposeHtmlBody,
   htmlToPlainText,
-  insertEmbeddedSignatureHtml,
   resolveOutgoingComposeBodies,
   sanitizeSignatureHtml,
-  swapEmbeddedSignatureInHtml,
   buildEmbeddedSignatureHtml,
-} from "@/lib/mail/signature-utils";
+} from "@workspace/calendar-core";
+import { insertEmbeddedSignatureHtml, swapEmbeddedSignatureInHtml } from "@workspace/mail-editor";
 
 describe("signature-utils", () => {
   it("prefers text signatures over html signatures for plain text", () => {
