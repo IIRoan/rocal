@@ -95,6 +95,7 @@ class SelectiveReleaseTests(unittest.TestCase):
             (["apps/backend/Dockerfile"], {"api"}),
             (["apps/notifications/src/event_reminder.html"], {"notifications"}),
             (["apps/backend/src/integrations/stalwart/mailer.rs"], {"api", "notifications"}),
+            (["apps/backend/security.txt"], {"api", "notifications"}),
             (["Cargo.lock"], {"api", "notifications"}),
             (["apps/stalwart/stalwart/plan/00-stores.ndjson"], {"stalwart"}),
             ([".zeabur/solace-mail/data.yaml", "apps/stalwart/README.md", "apps/native-mail/app/mail/index.tsx"], set()),

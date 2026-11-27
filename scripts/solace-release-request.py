@@ -33,7 +33,7 @@ def affected(paths):
             result.update(("api", "notifications"))
         elif path == "apps/backend/src/main.rs" or path == "apps/backend/Dockerfile":
             result.add("api")
-        elif path in ("apps/backend/Cargo.toml", "apps/backend/build.rs") or path.startswith("apps/backend/src/"):
+        elif path in ("apps/backend/Cargo.toml", "apps/backend/build.rs", "apps/backend/security.txt") or path.startswith("apps/backend/src/"):
             result.update(("api", "notifications"))
         elif path.startswith("apps/notifications/") and (
             path.removeprefix("apps/notifications/") in {"Dockerfile", "Cargo.toml", "build.rs"}
