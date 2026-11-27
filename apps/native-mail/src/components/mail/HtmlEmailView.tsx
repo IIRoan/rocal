@@ -159,6 +159,7 @@ export function HtmlEmailView({
   return (
     <View style={[{ height: webViewHeight }, style]}>
       <WebView
+        testID="mail-html-body"
         // data: is listed only so it reaches onShouldStartLoadWithRequest and is refused there; mailto/tel so the library never hands them to Linking.
         originWhitelist={["about:blank", "data:", "http://*", "https://*", "mailto:*", "tel:*"]}
         source={{ html: document }}

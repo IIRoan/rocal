@@ -42,11 +42,9 @@ appId: ${APP_ID}
           file: ../common/type.yaml
           env:
             TEXT: Maestro calendar
-            VERIFY_TEXT: "true"
-            VERIFY_ID: calendar-name
-- assertVisible:
-    id: calendar-name
-    text: Maestro calendar
+      - assertVisible:
+          id: calendar-name
+          text: Maestro calendar
 - hideKeyboard
 - waitForAnimationToEnd
 - assertVisible:
