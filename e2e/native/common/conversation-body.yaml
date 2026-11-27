@@ -3,9 +3,9 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     label: Wait for the expanded message body
     visible:
-      text: ${BODY_TEXT}
-      below:
-        text: '${typeof SIGNATURE_LABEL !== "undefined" ? SIGNATURE_LABEL : "Signature verified"}'
+      id: mail-html-body
+      containsDescendants:
+        - text: ${BODY_TEXT}
     timeout: ${OPEN_TIMEOUT_MS}
 - assertVisible: '${typeof SIGNATURE_LABEL !== "undefined" ? SIGNATURE_LABEL : "Signature verified"}'
 - assertNotVisible: This message has no content.
@@ -24,8 +24,8 @@ appId: ${APP_ID}
       true: ${typeof EXCLUDED_TEXT !== "undefined"}
     commands:
       - assertNotVisible:
-          text: ${EXCLUDED_TEXT}
-          below:
-            text: '${typeof SIGNATURE_LABEL !== "undefined" ? SIGNATURE_LABEL : "Signature verified"}'
+          id: mail-html-body
+          containsDescendants:
+            - text: ${EXCLUDED_TEXT}
 - waitForAnimationToEnd:
     timeout: 3000

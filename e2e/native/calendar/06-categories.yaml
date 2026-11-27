@@ -41,9 +41,9 @@ appId: ${APP_ID}
           file: ../common/type.yaml
           env:
             TEXT: Maestro category
-            VERIFY_TEXT: "true"
-            VERIFY_ID: category-name
-- assertVisible: Maestro category
+      - assertVisible:
+          id: category-name
+          text: Maestro category
 - hideKeyboard
 - waitForAnimationToEnd
 - tapOn:
