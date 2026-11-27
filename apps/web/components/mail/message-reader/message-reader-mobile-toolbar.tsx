@@ -1,22 +1,11 @@
 "use client";
 
-import {
-  EllipsisVertical,
-  Inbox,
-  OctagonAlert,
-  Trash2,
-  X,
-} from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@workspace/ui/components/ui/tooltip";
-import { Button } from "@workspace/ui/components/ui/button";
+import { Icon, Type } from "@workspace/ui/solace";
 import type {
   MessageReaderController,
   MessageReaderViewModel,
 } from "../use-message-reader-controller";
+import { ReaderActionIcon } from "./message-reader-action-button";
 
 export function MessageReaderMobileToolbar({
   controller,
@@ -30,93 +19,50 @@ export function MessageReaderMobileToolbar({
   const { message, isInTrash, canReportSpam, canNotSpam } = view;
 
   return (
-    <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border/40 px-3">
+    <div className="flex h-14 shrink-0 items-center gap-2 border-b border-[var(--border-tertiary)] px-3">
       {onClose && (
-        <Button
-          variant="ghost"
-          size="icon-sm"
+        <ReaderActionIcon
+          icon={Icon.Close}
+          tone={Type.TERTIARY}
           aria-label="Close message"
           onClick={onClose}
-        >
-          <X />
-        </Button>
+        />
       )}
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium leading-none">
-          {message.subject || "(No subject)"}
-        </div>
+      <div className="min-w-0 flex-1 truncate text-sm font-medium leading-none">
+        {message.subject || "(No subject)"}
       </div>
-      <div className="flex shrink-0 items-center gap-0.5">
+      <div className="flex shrink-0 items-center gap-1.5">
         {canReportSpam && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Report spam"
-                disabled={isBusy}
-                onClick={onReportSpam}
-              >
-                <OctagonAlert className="text-muted-foreground" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              Report spam
-            </TooltipContent>
-          </Tooltip>
+          <ReaderActionIcon
+            icon={Icon.Spam}
+            tooltip="Report spam"
+            disabled={isBusy}
+            onClick={onReportSpam}
+          />
         )}
         {canNotSpam && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Not spam"
-                disabled={isBusy}
-                onClick={onNotSpam}
-              >
-                <Inbox />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              Not spam
-            </TooltipContent>
-          </Tooltip>
+          <ReaderActionIcon
+            icon={Icon.Inbox}
+            tooltip="Not spam"
+            disabled={isBusy}
+            onClick={onNotSpam}
+          />
         )}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={isInTrash ? "Delete permanently" : "Move to trash"}
-              disabled={isBusy}
-              onClick={onDelete}
-            >
-              <Trash2 className="text-destructive" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            {isInTrash ? "Delete permanently" : "Move to trash"}
-          </TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="More actions"
-              disabled={isBusy}
-              onClick={() =>
-                dispatchChrome({ type: "patch", patch: { moreActionsOpen: true } })
-              }
-            >
-              <EllipsisVertical />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            More actions
-          </TooltipContent>
-        </Tooltip>
+        <ReaderActionIcon
+          icon={Icon.Trash}
+          iconColor="destructive"
+          tooltip={isInTrash ? "Delete permanently" : "Move to trash"}
+          disabled={isBusy}
+          onClick={onDelete}
+        />
+        <ReaderActionIcon
+          icon={Icon.OverflowH}
+          tooltip="More actions"
+          disabled={isBusy}
+          onClick={() =>
+            dispatchChrome({ type: "patch", patch: { moreActionsOpen: true } })
+          }
+        />
       </div>
     </div>
   );

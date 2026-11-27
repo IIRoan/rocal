@@ -47,7 +47,7 @@ export function MailAppMainLayout({
   } = controller;
 
   return (
-    <SolaceTheme className="h-svh max-h-svh overflow-hidden">
+    <SolaceTheme className={cn("h-svh max-h-svh overflow-hidden", !isMobile && "mail-desktop")}>
     <SidebarProvider className="h-svh max-h-svh min-h-0 overflow-hidden">
       <MailSidebar
         user={user ?? { name: "User", email: "" }}
@@ -75,7 +75,6 @@ export function MailAppMainLayout({
         scheduledCount={scheduledSendCount}
         onOpenScheduled={handleOpenScheduledPalette}
       />
-      {/* On desktop the list and the reader are their own surfaces, so the inset only holds them on the sidebar's backdrop. */}
       <SidebarInset
         className={
           isMobile
@@ -104,7 +103,10 @@ export function MailAppMainLayout({
               />
             )}
 
-            <div className={cn("@container relative flex min-h-0 flex-1 overflow-hidden", !isMobile && "gap-2")}>
+            <div className={cn(
+              "@container relative flex min-h-0 flex-1 overflow-hidden",
+              !isMobile && "mail-panes rounded-xl border border-[var(--border-secondary)] bg-[var(--bg-l2-solid)]",
+            )}>
               <MailAppListColumn controller={controller} />
               <MailAppDetailPane controller={controller} />
             </div>

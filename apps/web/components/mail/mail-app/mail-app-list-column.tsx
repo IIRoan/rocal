@@ -241,7 +241,7 @@ export function MailAppListColumn({
             ? "hidden"
             : "flex h-full min-h-0 flex-1 flex-col overflow-hidden"
           : cn(
-              "flex h-full min-h-0 shrink-0 flex-col overflow-hidden rounded-xl border border-[var(--border-secondary)] bg-[var(--bg-l2-solid)]",
+              "flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-e border-[var(--border-secondary)]",
               MAIL_LIST_NARROW_WIDTH_CLASS,
             )
       }
