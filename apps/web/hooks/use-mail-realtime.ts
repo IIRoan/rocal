@@ -35,12 +35,14 @@ export function useMailRealtime(input: {
     let closed = false;
 
     const runSync = async () => {
+      if (closed) return;
       const result = await mailDemoApiService.syncAccount(accountId);
-      await onSyncRef.current(result);
+      if (!closed) await onSyncRef.current(result);
     };
     let eventSource: EventSource | null = null;
 
     const scheduleDebouncedSync = () => {
+      if (closed) return;
       if (debounceTimerRef.current !== null) {
         window.clearTimeout(debounceTimerRef.current);
       }
@@ -79,6 +81,7 @@ export function useMailRealtime(input: {
     };
 
     const handleMailChanged = (event: Event) => {
+      if (closed) return;
       let payload;
 
       try {

@@ -27,6 +27,7 @@ jest.mock("../../lib/mail/api-service", () => ({
 
 import { useMailRealtime } from "../../hooks/use-mail-realtime";
 import { mailDemoApiService } from "../../lib/mail/api-service";
+import type { MailSyncResponse } from "../../lib/mail/types";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -57,7 +58,7 @@ class MockEventSource {
     this.listeners.get(type)?.delete(listener);
   }
 
-  close() {}
+  close = jest.fn();
 
   emit(type: string, data?: string) {
     const event =
@@ -135,7 +136,7 @@ describe("useMailRealtime", () => {
         destroyed: [],
         records: [],
       },
-    } as any);
+    });
   });
 
   afterEach(() => {
@@ -284,5 +285,66 @@ describe("useMailRealtime", () => {
 
     expect(mockApi.syncAccount).toHaveBeenCalledTimes(1);
     expect(onSync).toHaveBeenLastCalledWith(pushedSync);
+  });
+
+  it.each(["connected", "unsupported", "failed"])(
+    "discards a late sync after switching accounts (%s EventSource)",
+    async (connection) => {
+      if (connection === "unsupported") {
+        Object.defineProperty(window, "EventSource", { value: undefined });
+      } else if (connection === "failed") {
+        Object.defineProperty(window, "EventSource", {
+          value: function () {
+            throw new Error("Connection unavailable");
+          },
+        });
+      }
+      const staleResult = await mockApi.syncAccount("acct-1");
+      let finish: ((value: MailSyncResponse) => void) | undefined;
+      mockApi.syncAccount.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      );
+      const oldOnSync = jest.fn<(result: unknown) => void>();
+      const nextOnSync = jest.fn<(result: unknown) => void>();
+      await act(async () =>
+        root.render(<HookHarness accountId="acct-1" onSync={oldOnSync} />),
+      );
+      await act(async () =>
+        root.render(<HookHarness accountId="acct-2" onSync={nextOnSync} />),
+      );
+      nextOnSync.mockClear();
+
+      await act(async () => finish?.(staleResult));
+
+      expect(oldOnSync).not.toHaveBeenCalled();
+      expect(nextOnSync).not.toHaveBeenCalled();
+      if (connection === "connected")
+        expect(MockEventSource.instances[0]?.close).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("discards an in-flight sync when realtime is disabled", async () => {
+    const staleResult = await mockApi.syncAccount("acct-1");
+    let finish: ((value: MailSyncResponse) => void) | undefined;
+    mockApi.syncAccount.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const onSync = jest.fn<(result: unknown) => void>();
+    await act(async () =>
+      root.render(<HookHarness accountId="acct-1" onSync={onSync} />),
+    );
+    await act(async () =>
+      root.render(
+        <HookHarness accountId="acct-1" enabled={false} onSync={onSync} />,
+      ),
+    );
+    await act(async () => finish?.(staleResult));
+    expect(onSync).not.toHaveBeenCalled();
   });
 });

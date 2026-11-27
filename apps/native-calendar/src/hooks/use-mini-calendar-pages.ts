@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo } from "react";
 import {
   useQueries,
   useQueryClient,
@@ -12,7 +12,6 @@ import {
   getPaddedCalendarMonthRange,
   groupEventsByCalendarDay,
   type Calendar,
-  type DecoratedCalendarEvent,
 } from "@workspace/calendar-core";
 import { calendarApiService } from "@workspace/native-core/lib/api";
 import { QUERY_KEYS } from "@workspace/native-core/lib/query-keys";
@@ -20,7 +19,7 @@ import {
   getMiniCalendarPagerWindow,
   MINI_CALENDAR_WINDOW_RADIUS,
 } from "../components/sidebar-mini-calendar-pager";
-import { retainMonthEvents } from "../components/sidebar-mini-calendar-utils";
+import { decorateMiniCalendarEvents } from "../components/sidebar-mini-calendar-utils";
 
 const MINI_CALENDAR_STALE_TIME = 1000 * 60 * 2;
 
@@ -46,9 +45,6 @@ export function useMiniCalendarPages({
   calendars,
 }: UseMiniCalendarPagesOptions) {
   const queryClient = useQueryClient();
-  const retainedEventsByMonthRef = useRef(
-    new Map<string, DecoratedCalendarEvent[]>(),
-  );
 
   const { start, end } = getMiniCalendarPagerWindow(
     committedIndex,
@@ -107,12 +103,7 @@ export function useMiniCalendarPages({
         monthDate: page.monthDate,
         weeks: page.weeks,
         eventsByDay: groupEventsByCalendarDay(
-          retainMonthEvents(
-            retainedEventsByMonthRef.current,
-            page.key,
-            monthData[index],
-            calendars,
-          ),
+          decorateMiniCalendarEvents(monthData[index], calendars),
           {
             firstDay: startOfMonth(page.monthDate),
             lastDay: endOfMonth(page.monthDate),

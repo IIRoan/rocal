@@ -2,6 +2,18 @@
 
 Patterns that fire diagnostics but are safe to suppress.
 
+## Issue #25: remaining error diagnostics in React Doctor 0.9.22
+
+These findings remain visible in the scan; no scanner rules are disabled for them.
+
+- `effect-needs-cleanup`, `apps/native-calendar/src/components/calendar/useCurrentDateTime.ts`: the returned cleanup clears both the initial timeout and the interval that its callback starts.
+- `effect-needs-cleanup`, `apps/web/components/mail/message-list/message-list-virtualized.tsx`: the scroll/resize effect clears `loadMoreTimerRef` through its captured ref, removes its listener, and disconnects its observer.
+- `effect-needs-cleanup`, `apps/web/hooks/use-mail-realtime.ts`: all paths after constructing an EventSource return cleanup that removes both listeners and closes it; paths without a source only have the initial sync. Late sync results are guarded by `closed`, with account-switch and disabled-state regressions in `use-mail-realtime.test.tsx`.
+- `effect-needs-cleanup`, `packages/ui/src/hooks/use-cycling-message.ts`: cleanup clears the initial delay and interval and calls `stopTransition`, which clears the nested transition timeout. Its existing lifecycle tests exercise cleanup.
+- `effect-needs-cleanup`, `packages/ui/src/hooks/use-event-visibility.ts`: the returned layout-effect cleanup disconnects the observer stored in `observerRef`, including Strict Mode restarts.
+- `no-hydration-branch-on-browser-global`, `apps/web/app/login/_content.tsx`: the passkey support snapshot can differ, but the only markup branch using it is also guarded by `requiresPasskeyStepUp`, initially false on both server and client. That flag changes after authentication checks in effects or event handlers.
+- `no-unguarded-browser-global-in-render-or-hook-init`, `packages/ui/src/components/calendar/events-popup.tsx` (two occurrences): viewport reads sit inside `if (popupRef.current)`. That component-owned DOM ref is null during server rendering and the initial hydration render, so neither reads `window`.
+
 ## react-doctor/no-giant-component — native AuthProvider
 
 - **File**: `packages/native-core/src/providers/AuthProvider.tsx` (`AuthProvider`)

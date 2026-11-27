@@ -1,4 +1,7 @@
-import type { Calendar, DecoratedCalendarEvent } from "@workspace/calendar-core";
+import type {
+  Calendar,
+  DecoratedCalendarEvent,
+} from "@workspace/calendar-core";
 import { calendarApiService } from "@workspace/native-core/lib/api";
 
 type MiniCalendarEventsResponse = Awaited<
@@ -49,9 +52,15 @@ export function getMiniCalendarSwipeTarget(
 
   let target: number;
   if (velocityX <= -commitVelocity) {
-    target = Math.max(Math.round(predicted), Math.floor(currentIndex + 0.001) + 1);
+    target = Math.max(
+      Math.round(predicted),
+      Math.floor(currentIndex + 0.001) + 1,
+    );
   } else if (velocityX >= commitVelocity) {
-    target = Math.min(Math.round(predicted), Math.ceil(currentIndex - 0.001) - 1);
+    target = Math.min(
+      Math.round(predicted),
+      Math.ceil(currentIndex - 0.001) - 1,
+    );
   } else {
     target = Math.round(currentIndex);
   }
@@ -76,7 +85,10 @@ export function decorateMiniCalendarEvents(
 
   // The calendars query is refreshed on recolor; the list embedded in a cached events response is not.
   const calendarColorById = new Map(
-    [...data.calendars, ...calendars].map((calendar) => [calendar.id, calendar.color]),
+    [...data.calendars, ...calendars].map((calendar) => [
+      calendar.id,
+      calendar.color,
+    ]),
   );
 
   return data.events.map((event) => ({
@@ -87,19 +99,4 @@ export function decorateMiniCalendarEvents(
     categoryId: event.categoryId ?? undefined,
     reminder: event.reminder ?? undefined,
   }));
-}
-
-export function retainMonthEvents(
-  cache: Map<string, DecoratedCalendarEvent[]>,
-  monthKey: string,
-  data: MiniCalendarEventsResponse | undefined,
-  calendars?: readonly Calendar[],
-): DecoratedCalendarEvent[] {
-  if (data) {
-    const decorated = decorateMiniCalendarEvents(data, calendars);
-    cache.set(monthKey, decorated);
-    return decorated;
-  }
-
-  return cache.get(monthKey) ?? [];
 }
