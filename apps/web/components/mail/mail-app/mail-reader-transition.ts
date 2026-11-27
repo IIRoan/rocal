@@ -11,6 +11,9 @@ export const MAIL_READER_CONTENT_FADE_OPTIONS: KeyframeAnimationOptions = {
   easing: "cubic-bezier(0.37, 0, 0.63, 1)",
 };
 
+/** Opening from the empty reader slides the conversation across like a drawer, and closing slides it off at the same pace. */
+export const MAIL_READER_DRAWER_MS = 240;
+
 /** Fades nested inside the conversation while it slides in would stack on a moving layer, which stutters in Firefox, so they are skipped then. */
 function isMailReaderContentMoving(element: Element) {
   const content = element.closest("[data-mail-reader-content]");

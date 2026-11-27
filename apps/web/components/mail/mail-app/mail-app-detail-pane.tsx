@@ -8,6 +8,7 @@ import { Typography, TypographySize, TypographyWeight } from "@workspace/ui/sola
 import { ComposeForm } from "../compose-dialog";
 import { MessageReader } from "../message-reader";
 import type { MailAppContentController } from "../use-mail-app-content-controller";
+import { MailReaderLayer, MailReaderPending, useMailReaderDrawer } from "./mail-reader-layer";
 
 const log = createLogger("mail-app-detail-pane");
 
@@ -24,7 +25,7 @@ export function MailAppDetailPane({
     selectedIsDraft,
     selectedMessageId,
     selectedConversationMessages,
-    isConversationLoading,
+    isSelectedConversationReady,
     isMessageBodyLoading,
     selectedMessageIsDecrypting,
     conversationDecryptedPreviews,
@@ -77,6 +78,9 @@ export function MailAppDetailPane({
     handleFullComposeSend,
     handleComposeImageUpload,
   } = controller;
+  // Each conversation gets its own surface, so the last stays on screen until the next has loaded.
+  const openKey = selectedMessage && !selectedIsDraft ? (selectedMessage.threadId ?? selectedMessage.id) : null;
+  const drawer = useMailReaderDrawer(openKey, isSelectedConversationReady);
 
   if (!activeMailbox) {
     return null;
@@ -84,148 +88,159 @@ export function MailAppDetailPane({
 
   const panes = (
     <>
-      {selectedMessage && !selectedIsDraft ? (
-        <div
-          className="absolute inset-0 flex flex-col transition-[transform,opacity] duration-200 ease-in-out motion-reduce:transition-opacity"
-          style={{
-            opacity: isFullCompose ? 0 : 1,
-            transform: isFullCompose ? "translateX(-16px)" : "translateX(0)",
-            pointerEvents: isFullCompose ? "none" : "auto",
-          }}
-        >
-          <MessageReader
-            message={selectedMessage}
-            selectedMessageId={selectedMessage?.id ?? null}
-            conversationMessages={selectedConversationMessages}
-            conversationPreviews={conversationDecryptedPreviews}
-            conversationAttachments={conversationAttachments}
-            loading={{
-              conversation: isConversationLoading,
-              messageBody: isMessageBodyLoading,
-              decrypting: selectedMessageIsDecrypting,
-            }}
-            onSelectConversationMessage={(id) =>
-              setSelectedConversationMessageId(id)
-            }
-            plaintext={selectedMessagePlaintext}
-            decryptedHtml={selectedMessageDecryptedHtml}
-            attachments={selectedMessageDecryptedAttachments ?? undefined}
-            signatureVerificationState={
-              selectedMessageSignatureVerificationState
-            }
-            senderKeyTrustState={selectedMessageSenderKeyTrustState}
-            decryptError={selectedMessageDecryptError}
-            readState={selectedMessageReadState}
-            accountEncryptedAtRest={activeMailbox.accountEncryptedAtRest}
-            isBusy={isBusy}
-            mailboxes={activeMailbox.mailboxes}
-            currentMailboxId={activeMailbox.selectedMailboxId}
-            onReply={handleReply}
-            onReplyAll={handleReplyAll}
-            onForward={handleForward}
-            onDelete={() =>
-              void handleDeleteMessage().catch((error) =>
-                log.error("Failed to delete message", error),
-              )
-            }
-            onMove={(targetId) =>
-              void handleMoveMessage(targetId).catch((error) =>
-                log.error("Failed to move message", error),
-              )
-            }
-            onMarkAsUnread={() =>
-              void handleMarkAsUnread().catch((error) =>
-                log.error("Failed to mark message as unread", error),
-              )
-            }
-            onToggleFlagged={() =>
-              void handleToggleFlagged(selectedMessage.id).catch((error) =>
-                log.error("Failed to toggle flagged", error),
-              )
-            }
-            onSetLabel={(labelId, assigned) =>
-              selectedMessage
-                ? void handleSetMessageLabel(
-                    selectedMessage.id,
-                    labelId,
-                    assigned,
-                  ).catch((error) =>
-                    log.error("Failed to set message label", error),
+      <div
+        className="absolute inset-0 transition-[transform,opacity] duration-200 ease-in-out motion-reduce:transition-opacity"
+        style={{
+          opacity: isFullCompose ? 0 : 1,
+          transform: isFullCompose ? "translateX(-16px)" : "translateX(0)",
+          pointerEvents: isFullCompose ? "none" : "auto",
+        }}
+      >
+        {/* On mobile the reader only shows once a message is picked, so it never needs the empty state. */}
+        {drawer.showEmpty && !isMobile ? <MailReaderEmptyState /> : null}
+        {drawer.layers.map(({ key, revealed, slideIn, leaving }) => (
+          <MailReaderLayer
+            key={key}
+            revealed={revealed}
+            slideIn={slideIn}
+            leaving={leaving}
+            onEntered={() => drawer.finishEnter(key)}
+            onLeft={drawer.finishLeave}
+          >
+            {key === openKey && selectedMessage ? (
+              <MessageReader
+                message={selectedMessage}
+                selectedMessageId={selectedMessage?.id ?? null}
+                conversationMessages={selectedConversationMessages}
+                conversationPreviews={conversationDecryptedPreviews}
+                conversationAttachments={conversationAttachments}
+                loading={{
+                  messageBody: isMessageBodyLoading,
+                  decrypting: selectedMessageIsDecrypting,
+                }}
+                onSelectConversationMessage={(id) =>
+                  setSelectedConversationMessageId(id)
+                }
+                plaintext={selectedMessagePlaintext}
+                decryptedHtml={selectedMessageDecryptedHtml}
+                attachments={selectedMessageDecryptedAttachments ?? undefined}
+                signatureVerificationState={
+                  selectedMessageSignatureVerificationState
+                }
+                senderKeyTrustState={selectedMessageSenderKeyTrustState}
+                decryptError={selectedMessageDecryptError}
+                readState={selectedMessageReadState}
+                accountEncryptedAtRest={activeMailbox.accountEncryptedAtRest}
+                isBusy={isBusy}
+                mailboxes={activeMailbox.mailboxes}
+                currentMailboxId={activeMailbox.selectedMailboxId}
+                onReply={handleReply}
+                onReplyAll={handleReplyAll}
+                onForward={handleForward}
+                onDelete={() =>
+                  void handleDeleteMessage().catch((error) =>
+                    log.error("Failed to delete message", error),
                   )
-                : undefined
-            }
-            onSimpleLoginAction={(message, mode) =>
-              void handleSimpleLoginAction(message, mode).catch((error) =>
-                log.error("Failed to run SimpleLogin action", error),
-              )
-            }
-            onUnsubscribe={(message) =>
-              void handleUnsubscribe(message).catch((error) =>
-                log.error("Failed to unsubscribe", error),
-              )
-            }
-            onCreateLabel={(name, color) => handleCreateLabel(name, color)}
-            onUpdateLabel={(id, updates) =>
-              void handleUpdateLabel(id, updates).catch((error) =>
-                log.error("Failed to update label", error),
-              )
-            }
-            onDeleteLabel={(id) =>
-              void handleDeleteLabel(id).catch((error) =>
-                log.error("Failed to delete label", error),
-              )
-            }
-            labels={labels}
-            timeFormat={timeFormat}
-            timezone={timezone}
-            onClose={handleCloseMessage}
-            onNavigatePrev={handleNavigatePrev}
-            onNavigateNext={handleNavigateNext}
-            navigation={{ hasPrev, hasNext }}
-            onArchive={handleArchive}
-            onSendReply={handleQuickReply}
-            onLoadAttachmentPreview={loadAttachmentHoverPreview}
-            onPreviewAttachment={handlePreviewAttachment}
-            onDownloadAttachment={handleDownloadAttachment}
-            onUntrash={() =>
-              void handleUntrash().catch((error) =>
-                log.error("Failed to move out of trash", error),
-              )
-            }
-            onReportSpam={() =>
-              void handleReportSpam().catch((error) =>
-                log.error("Failed to report spam", error),
-              )
-            }
-            onNotSpam={() =>
-              void handleNotSpam().catch((error) =>
-                log.error("Failed to move out of spam", error),
-              )
-            }
-            onConversationMessageDelete={(id) =>
-              void handleDeleteMessage(id).catch((error) =>
-                log.error("Failed to delete message", error),
-              )
-            }
-            onConversationMessageMarkUnread={(id) =>
-              void handleMarkAsUnread(id).catch((error) =>
-                log.error("Failed to mark message as unread", error),
-              )
-            }
-            onConversationMessageMove={(id, mailboxId) =>
-              void handleMoveMessage(mailboxId, id).catch((error) =>
-                log.error("Failed to move message", error),
-              )
-            }
-            accountEmail={activeMailbox?.email ?? accountEmail}
-            accountName={accountDisplayName}
-            identities={activeMailbox.pickerIdentities}
-            mailServerLimits={composeMailPolicy.limits}
-          />
-        </div>
-      ) : !isFullCompose ? (
-        <MailReaderEmptyState />
-      ) : null}
+                }
+                onMove={(targetId) =>
+                  void handleMoveMessage(targetId).catch((error) =>
+                    log.error("Failed to move message", error),
+                  )
+                }
+                onMarkAsUnread={() =>
+                  void handleMarkAsUnread().catch((error) =>
+                    log.error("Failed to mark message as unread", error),
+                  )
+                }
+                onToggleFlagged={() =>
+                  void handleToggleFlagged(selectedMessage.id).catch((error) =>
+                    log.error("Failed to toggle flagged", error),
+                  )
+                }
+                onSetLabel={(labelId, assigned) =>
+                  selectedMessage
+                    ? void handleSetMessageLabel(
+                        selectedMessage.id,
+                        labelId,
+                        assigned,
+                      ).catch((error) =>
+                        log.error("Failed to set message label", error),
+                      )
+                    : undefined
+                }
+                onSimpleLoginAction={(message, mode) =>
+                  void handleSimpleLoginAction(message, mode).catch((error) =>
+                    log.error("Failed to run SimpleLogin action", error),
+                  )
+                }
+                onUnsubscribe={(message) =>
+                  void handleUnsubscribe(message).catch((error) =>
+                    log.error("Failed to unsubscribe", error),
+                  )
+                }
+                onCreateLabel={(name, color) => handleCreateLabel(name, color)}
+                onUpdateLabel={(id, updates) =>
+                  void handleUpdateLabel(id, updates).catch((error) =>
+                    log.error("Failed to update label", error),
+                  )
+                }
+                onDeleteLabel={(id) =>
+                  void handleDeleteLabel(id).catch((error) =>
+                    log.error("Failed to delete label", error),
+                  )
+                }
+                labels={labels}
+                timeFormat={timeFormat}
+                timezone={timezone}
+                onClose={handleCloseMessage}
+                onNavigatePrev={handleNavigatePrev}
+                onNavigateNext={handleNavigateNext}
+                navigation={{ hasPrev, hasNext }}
+                onArchive={handleArchive}
+                onSendReply={handleQuickReply}
+                onLoadAttachmentPreview={loadAttachmentHoverPreview}
+                onPreviewAttachment={handlePreviewAttachment}
+                onDownloadAttachment={handleDownloadAttachment}
+                onUntrash={() =>
+                  void handleUntrash().catch((error) =>
+                    log.error("Failed to move out of trash", error),
+                  )
+                }
+                onReportSpam={() =>
+                  void handleReportSpam().catch((error) =>
+                    log.error("Failed to report spam", error),
+                  )
+                }
+                onNotSpam={() =>
+                  void handleNotSpam().catch((error) =>
+                    log.error("Failed to move out of spam", error),
+                  )
+                }
+                onConversationMessageDelete={(id) =>
+                  void handleDeleteMessage(id).catch((error) =>
+                    log.error("Failed to delete message", error),
+                  )
+                }
+                onConversationMessageMarkUnread={(id) =>
+                  void handleMarkAsUnread(id).catch((error) =>
+                    log.error("Failed to mark message as unread", error),
+                  )
+                }
+                onConversationMessageMove={(id, mailboxId) =>
+                  void handleMoveMessage(mailboxId, id).catch((error) =>
+                    log.error("Failed to move message", error),
+                  )
+                }
+                accountEmail={activeMailbox?.email ?? accountEmail}
+                accountName={accountDisplayName}
+                identities={activeMailbox.pickerIdentities}
+                mailServerLimits={composeMailPolicy.limits}
+              />
+            ) : undefined}
+          </MailReaderLayer>
+        ))}
+        {drawer.pending ? <MailReaderPending /> : null}
+      </div>
 
       <div
         className="absolute inset-0 flex flex-col transition-[transform,opacity] duration-200 ease-in-out motion-reduce:transition-opacity"

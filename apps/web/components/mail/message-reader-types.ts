@@ -15,7 +15,6 @@ import type {
 } from "@/lib/mail/types";
 
 export interface MessageReaderLoadingState {
-  conversation?: boolean;
   messageBody?: boolean;
   decrypting?: boolean;
 }

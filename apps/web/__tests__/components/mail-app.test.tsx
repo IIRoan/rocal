@@ -1930,6 +1930,43 @@ describe("MailApp", () => {
     expect(container.textContent).toContain("Select a conversation");
   });
 
+  it("keeps a conversation hidden until its earlier messages load, then reveals it", async () => {
+    const message = {
+      id: "thread-latest",
+      threadId: "thread-1",
+      subject: "Trip plans",
+      from: [{ email: "bob@solace.onl" }],
+      to: [{ email: "alice@solace.onl" }],
+      receivedAt: "2026-11-10T10:00:00Z",
+      textBody: [{ partId: "text" }],
+      bodyValues: { text: { value: "Latest reply" } },
+    };
+    let resolveThread: (messages: unknown[]) => void = () => {};
+    mockJmapClient.getMailboxMessages.mockResolvedValue({ messages: [message], total: 1 });
+    mockJmapClient.getMessagesByIds.mockResolvedValue([message]);
+    mockJmapClient.getThreadMessages.mockImplementation(
+      () => new Promise((resolve) => { resolveThread = resolve; }),
+    );
+    await renderApp();
+    await waitForExpectation(() => expect(container.textContent).toContain("Trip plans"));
+
+    await act(async () => {
+      Array.from(container.querySelectorAll("button"))
+        .find((button) => button.textContent === "Trip plans")
+        ?.click();
+    });
+    const layer = () => container.querySelector("[data-mail-reader-content]");
+    await waitForExpectation(() => expect(layer()).not.toBeNull());
+    expect(layer()?.hasAttribute("inert")).toBe(true);
+    expect(container.textContent).toContain("Loading conversation");
+
+    await act(async () => {
+      resolveThread([message]);
+    });
+    await waitForExpectation(() => expect(layer()?.hasAttribute("inert")).toBe(false));
+    expect(container.textContent).not.toContain("Loading conversation");
+  });
+
   it("does not auto-open the newest message on mobile", async () => {
     mockUseIsMobile.mockReturnValue(true);
 

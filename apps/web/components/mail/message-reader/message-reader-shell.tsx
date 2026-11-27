@@ -1,11 +1,8 @@
 "use client";
 
-import { useEffectEvent, useLayoutEffect, useRef } from "react";
 import { Copy } from "lucide-react";
 import { toast } from "@workspace/ui/lib/toast";
 import { Button } from "@workspace/ui/components/ui/button";
-import { usePrefersReducedMotion } from "@workspace/ui/hooks";
-import { MOTION_EASING, slideFadeIn } from "@workspace/ui/lib/motion";
 import {
   Dialog,
   DialogContent,
@@ -35,10 +32,6 @@ export function MessageReaderShell({
     orderedConversationMessages[0]?.id ??
     message?.id ??
     "";
-  const contentRef = useRef<HTMLDivElement>(null);
-  const shownAtRef = useRef<number | null>(null);
-  const prefersReducedMotion = usePrefersReducedMotion();
-  const threadAt = Date.parse(orderedConversationMessages.at(-1)?.receivedAt ?? message?.receivedAt ?? "") || 0;
 
   const handleCopySource = async () => {
     try {
@@ -49,24 +42,9 @@ export function MessageReaderShell({
     }
   };
 
-  // A newer conversation drops in from above and an older one rises from below, like moving through a stack of mail; the toolbar stays put.
-  const slideInConversation = useEffectEvent((content: HTMLElement) => {
-    const previousAt = shownAtRef.current;
-    shownAtRef.current = threadAt;
-    const fromAbove = previousAt !== null && threadAt > previousAt;
-    return slideFadeIn(content, { y: fromAbove ? -14 : 14 }, { duration: 280, easing: MOTION_EASING.reveal });
-  });
-  useLayoutEffect(() => {
-    const content = contentRef.current;
-    if (!content || prefersReducedMotion) return;
-    const enter = slideInConversation(content);
-    return () => enter?.cancel();
-  }, [conversationThreadKey, prefersReducedMotion]);
-
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[var(--bg-l2-solid)]">
       <MessageReaderToolbar controller={controller} view={view} />
-      <div ref={contentRef} data-mail-reader-content="" className="flex min-h-0 flex-1 flex-col">
       <MessageReaderTitle controller={controller} view={view} />
       <MessageReaderThreadStack
         key={conversationThreadKey}
@@ -82,7 +60,6 @@ export function MessageReaderShell({
           <MessageReaderReplyBar controller={controller} view={view} />
         </article>
       </MessageReaderThreadStack>
-      </div>
       <Dialog
         open={showRawHtmlDialog}
         onOpenChange={(open) =>

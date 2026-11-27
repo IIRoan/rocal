@@ -101,6 +101,7 @@ import {
   seedMailMessageCache,
 } from "@/lib/mail/mail-message-query";
 import {
+  mergeMailMessage,
   mergeMailMessagePreservingKeywords,
   messageHasLoadedBody,
 } from "@/lib/mail/mail-message-body";
@@ -299,6 +300,31 @@ function conversationOrMessage(
   return conversation.length > 0 || !message ? conversation : [message];
 }
 
+/** Thread caches also hold messages from other folders, so keyword and body changes are applied to every cached thread. */
+function patchThreadCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  update: (messages: JmapEmailMessage[]) => JmapEmailMessage[],
+) {
+  queryClient.setQueriesData<JmapEmailMessage[]>(
+    { queryKey: mailQueryKeys.threads() },
+    (current) => (current ? update(current) : current),
+  );
+}
+
+/** A thread's messages, keeping bodies opened earlier since the thread fetch carries only metadata. */
+async function fetchThreadMessages(
+  queryClient: ReturnType<typeof useQueryClient>,
+  mailbox: { client: StalwartJmapClient; session: JmapSession },
+  threadId: string,
+) {
+  const fetched = await mailbox.client.getThreadMessages(mailbox.session, threadId);
+  return fetched.map((message) => {
+    const known = findCachedMailMessage(queryClient, message.id);
+    return known ? mergeMailMessage(known, message) : message;
+  });
+}
+
+const EMPTY_THREAD_MESSAGES: JmapEmailMessage[] = [];
 const SENT_THREAD_PREFETCH_LIMIT = 50;
 
 const PROTECTED_ROLES = new Set([
@@ -335,16 +361,14 @@ export function useMailApp() {
   );
   const [selectedConversationMessageId, setSelectedConversationMessageId] =
     useState<string | null>(null);
-  const [relatedConversationMessages, setRelatedConversationMessages] =
-    useState<JmapEmailMessage[]>([]);
   const [listThreadRelatedMessages, setListThreadRelatedMessages] = useState<
     JmapEmailMessage[]
   >([]);
   const threadPrefetchedMailboxRef = useRef<string | null>(null);
   const [optimisticConversationMessages, setOptimisticConversationMessages] =
     useState<JmapEmailMessage[]>([]);
-  const [isConversationLoading, setIsConversationLoading] = useState(false);
   const [isMessageBodyLoading, setIsMessageBodyLoading] = useState(false);
+  const [bodySettledFor, setBodySettledFor] = useState<string | null>(null);
   const [selectedMessagePlaintext, setSelectedMessagePlaintext] = useState<
     string | null
   >(null);
@@ -522,6 +546,19 @@ export function useMailApp() {
       findCachedMailMessage(queryClient, selectedMessageId) ??
       null)
     : null;
+  const selectedThreadId = selectedMailboxMessage?.threadId ?? null;
+  // The open thread shares the list's cache, so a conversation seen before opens at once while it refreshes.
+  const conversationThreadQuery = useQuery({
+    queryKey: mailQueryKeys.threadMessages(selectedThreadId ?? ""),
+    queryFn: () =>
+      activeMailbox && selectedThreadId
+        ? fetchThreadMessages(queryClient, activeMailbox, selectedThreadId)
+        : EMPTY_THREAD_MESSAGES,
+    enabled: Boolean(activeMailbox && selectedThreadId),
+    staleTime: 0,
+    retry: false,
+  });
+  const relatedConversationMessages = conversationThreadQuery.data ?? EMPTY_THREAD_MESSAGES;
   const serverConversationMessages = mergeConversationSourceMessages(
     activeMailbox?.messages ?? [],
     relatedConversationMessages,
@@ -673,42 +710,10 @@ export function useMailApp() {
     );
   };
 
-  const loadConversationThread = async (threadId: string) => {
-    const mb = activeMailboxRef.current;
-    if (!mb) {
-      setRelatedConversationMessages([]);
-      setIsConversationLoading(false);
-      return;
-    }
-
-    setIsConversationLoading(true);
-    const fetchThread = async () => {
-      const messages = await mb.client.getThreadMessages(mb.session, threadId);
-      // Prefer local keywords so optimistic $seen isn't wiped by the thread fetch.
-      const localById = new Map(
-        (activeMailboxRef.current?.messages ?? []).map((message) => [
-          message.id,
-          message,
-        ]),
-      );
-      setRelatedConversationMessages(
-        messages.map((message) => {
-          const local = localById.get(message.id);
-          return local
-            ? mergeMailMessagePreservingKeywords(local, message)
-            : message;
-        }),
-      );
-    };
-    await fetchThread().catch((error: unknown) => {
-      log.warn("Failed to load thread messages", error);
-      setRelatedConversationMessages([]);
-    }).finally(() => setIsConversationLoading(false));
-  };
-
-  const clearConversationThread = () => {
-    setRelatedConversationMessages([]);
-    setIsConversationLoading(false);
+  const loadConversationThread = (threadId: string) => {
+    queryClient
+      .invalidateQueries({ queryKey: mailQueryKeys.threadMessages(threadId) })
+      .catch((error: unknown) => log.warn("Failed to load thread messages", error));
   };
 
   useEffect(() => {
@@ -717,8 +722,6 @@ export function useMailApp() {
       if (cancelled) return;
       setSelectedConversationMessageId(null);
       setOptimisticConversationMessages([]);
-      setRelatedConversationMessages([]);
-      setIsConversationLoading(false);
     });
     return () => {
       cancelled = true;
@@ -743,29 +746,6 @@ export function useMailApp() {
       };
     }
   }, [selectedConversationMessageId, selectedConversationMessages]);
-
-  const syncConversationThread = useEffectEvent((messageId: string | null) => {
-    if (!messageId || !activeMailboxRef.current) {
-      clearConversationThread();
-      return;
-    }
-
-    // Read activeMailbox via ref so keyword/flag updates don't refetch the thread (threadId is stable per message).
-    const selectedMsg =
-      activeMailboxRef.current.messages.find((m) => m.id === messageId) ??
-      findCachedMailMessage(queryClient, messageId);
-    const threadId = selectedMsg?.threadId;
-
-    if (threadId) {
-      void loadConversationThread(threadId);
-    } else {
-      clearConversationThread();
-    }
-  });
-
-  useEffect(() => {
-    syncConversationThread(selectedMessageId);
-  }, [selectedMessageId]);
 
   const applyLoadedMessage = useEffectEvent((message: JmapEmailMessage) => {
     const mergeBody = (
@@ -803,7 +783,7 @@ export function useMailApp() {
         ),
       };
     });
-    setRelatedConversationMessages((current) =>
+    patchThreadCaches(queryClient, (current) =>
       current.map((entry) =>
         entry.id === message.id ? mergeBody(entry, message) : entry,
       ),
@@ -874,6 +854,7 @@ export function useMailApp() {
       .finally(() => {
         if (!cancelled) {
           setIsMessageBodyLoading(false);
+          setBodySettledFor(bodyTargetMessageId);
         }
       })
       .catch((error) => {
@@ -1153,6 +1134,7 @@ export function useMailApp() {
   const {
     previews: conversationDecryptedPreviews,
     attachments: conversationAttachments,
+    loading: conversationPreviewsLoading,
   } = useConversationDecryptedPreviews({
     messages: selectedConversationMessages,
     client: activeMailbox?.client,
@@ -1258,7 +1240,7 @@ export function useMailApp() {
             }
           : cur,
       );
-      setRelatedConversationMessages((cur) =>
+      patchThreadCaches(queryClient, (cur) =>
         patchMessagesKeywords(cur, messageId, markRead),
       );
       setListThreadRelatedMessages((cur) =>
@@ -2037,7 +2019,7 @@ export function useMailApp() {
       announceSent();
       // Reload only the thread; realtime sync updates the inbox so the sent draft never flashes there.
       if (effectiveThreadId) {
-        void loadConversationThread(effectiveThreadId);
+        loadConversationThread(effectiveThreadId);
       }
     };
     await send().catch((error: unknown) => {
@@ -2481,7 +2463,7 @@ export function useMailApp() {
         }),
       );
       if (effectiveThreadId) {
-        void loadConversationThread(effectiveThreadId);
+        loadConversationThread(effectiveThreadId);
       }
       quickReplyScopeRef.current = null;
       toast(encrypted ? "Encrypted reply sent." : "Reply sent.");
@@ -3152,7 +3134,7 @@ export function useMailApp() {
           }
         : cur,
     );
-    setRelatedConversationMessages((current) =>
+    patchThreadCaches(queryClient, (current) =>
       current.map((m) => (m.id === targetId ? markUnread(m) : m)),
     );
     try {
@@ -3399,7 +3381,7 @@ export function useMailApp() {
           }
         : cur,
     );
-    setRelatedConversationMessages((cur) =>
+    patchThreadCaches(queryClient, (cur) =>
       patchMessagesKeywords(cur, msg.id, update),
     );
     setListThreadRelatedMessages((cur) =>
@@ -3586,10 +3568,25 @@ export function useMailApp() {
   const loadThreadMessages = async (threadId: string) => {
     const mailbox = activeMailboxRef.current;
     if (!mailbox) return [];
-    const messages = await mailbox.client.getThreadMessages(mailbox.session, threadId);
+    const messages = await fetchThreadMessages(queryClient, mailbox, threadId);
     queryClient.setQueryData(mailQueryKeys.threadMessages(threadId), messages);
     return messages;
   };
+
+  const selectedEncryption = selectedMessage ? classifyMessageEncryption(selectedMessage) : null;
+  const selectedReadSettled =
+    selectedMessage !== null &&
+    selectedMessageRead !== null &&
+    selectedMessageRead.messageId === selectedMessage.id &&
+    selectedMessageRead.state !== "pending";
+  const selectedDecryptSettled =
+    (selectedEncryption !== "inline_pgp" && selectedEncryption !== "pgp_mime") || selectedReadSettled;
+  // The reader opens only once the thread's earlier messages, the body and its decryption are in, so it never shows half loaded.
+  const isSelectedConversationReady =
+    selectedMessage !== null &&
+    !conversationThreadQuery.isLoading &&
+    !conversationPreviewsLoading &&
+    (selectedMessageBodyLoaded ? selectedDecryptSettled : bodySettledFor === selectedMessage.id);
 
   let selectedMessageReadState: MailReadState = "pending";
   if (
@@ -3623,7 +3620,7 @@ export function useMailApp() {
     selectedConversationMessages,
     conversationDecryptedPreviews,
     conversationAttachments,
-    isConversationLoading,
+    isSelectedConversationReady,
     isMessageBodyLoading,
     loadConversationThread,
     setSelectedConversationMessageId: handleSelectConversationMessageId,
