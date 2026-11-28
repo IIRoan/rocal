@@ -16,35 +16,12 @@ appId: ${APP_ID}
     enabled: true
 - tapOn: Create calendar
 - assertVisible: Calendar name is required
-- retry:
-    maxRetries: 1
-    commands:
-      - runFlow:
-          file: ../common/refocus-input.yaml
-          env:
-            INPUT_ID: calendar-name
-            BLUR_TARGET: Name
-      - runFlow:
-          when:
-            platform: Android
-          commands:
-            - extendedWaitUntil:
-                visible:
-                  id: calendar-name
-                  focused: true
-                timeout: 15000
-      - runFlow:
-          file: ../common/clear-unsaved-name.yaml
-          env:
-            INPUT_ID: calendar-name
-            EMPTY_LABEL: Calendar name
-      - runFlow:
-          file: ../common/type.yaml
-          env:
-            TEXT: Maestro calendar
-      - assertVisible:
-          id: calendar-name
-          text: Maestro calendar
+- runFlow:
+    file: ../common/enter-unsaved-name.yaml
+    env:
+      INPUT_ID: calendar-name
+      EMPTY_LABEL: Calendar name
+      TEXT: Maestro calendar
 - hideKeyboard
 - waitForAnimationToEnd
 - assertVisible:

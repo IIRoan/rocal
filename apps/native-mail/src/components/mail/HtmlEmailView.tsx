@@ -42,11 +42,19 @@ const FIT_AND_REPORT_SCRIPT = `
   var lastH = 0;
   function run() {
     var dw = window.innerWidth;
+    // A newly mounted WebView can run this before Android gives it a width.
+    if (dw <= 0) return;
+    var style = document.body.style;
+    style.width = '';
+    style.transform = '';
+    document.documentElement.style.overflow = '';
     var bw = Math.max(document.body.scrollWidth, document.documentElement.scrollWidth);
     var scale = 1;
     if (bw > dw + 4) {
       scale = dw / bw;
-      document.body.style.cssText += ';transform:scale(' + scale + ');transform-origin:0 0;width:' + bw + 'px;';
+      style.width = bw + 'px';
+      style.transformOrigin = '0 0';
+      style.transform = 'scale(' + scale + ')';
       document.documentElement.style.overflow = 'hidden';
     }
     var rawH = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
@@ -58,6 +66,7 @@ const FIT_AND_REPORT_SCRIPT = `
   }
   function bind() {
     run();
+    window.addEventListener('resize', run);
     var imgs = document.images;
     for (var i = 0; i < imgs.length; i++) {
       if (!imgs[i].complete) imgs[i].addEventListener('load', run);
