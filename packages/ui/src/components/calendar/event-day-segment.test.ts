@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 
-import type { CalendarEvent } from "./types";
+import { createEvent } from "../../../test/calendar-event";
 import {
   eventOverlapsRange,
   getEventSegmentForCalendarDay,
@@ -9,18 +9,6 @@ import {
 } from "./utils";
 
 const timezone = "Europe/Amsterdam";
-
-function createEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
-  return {
-    id: "event-1",
-    title: "Event",
-    start: "2026-06-20T10:00:00.000Z",
-    end: "2026-06-20T11:00:00.000Z",
-    allDay: false,
-    color: "blue",
-    ...overrides,
-  };
-}
 
 describe("single-day event membership", () => {
   const saturday = new Date(2026, 5, 20);

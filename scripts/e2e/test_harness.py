@@ -595,7 +595,8 @@ class HarnessTests(unittest.TestCase):
                               "evaluatedCommand": {"tapOnElement": {"selector": "private-sender-sentinel"}}}},
                 {"metadata": {"status": "COMPLETED", "timestamp": 1400, "duration": 200,
                               "evaluatedCommand": {"assertConditionCommand": {
-                                  "condition": {"visible": {"idRegex": "mail-message-text", "textRegex": "private-body-sentinel"}},
+                                  "label": "Wait for the expanded message body",
+                                  "condition": {"visible": {"textRegex": "private-body-sentinel", "below": {"textRegex": "Signature verified"}}},
                                   "timeout": "5000"}}}},
                 {"metadata": {"status": "COMPLETED", "timestamp": 1700, "duration": 100,
                               "evaluatedCommand": {"assertConditionCommand": {

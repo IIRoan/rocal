@@ -22,11 +22,11 @@ appId: ${APP_ID}
     visible: ".*Maestro round trip.*"
     timeout: 120000
 - tapOn: ".*Maestro round trip.*"
-- extendedWaitUntil:
-    visible:
-      id: mail-message-text
-      # The reply must sit above the quote header, not inside it.
-      text: "Maestro online recovery reply.*wrote:.*"
-    timeout: 60000
-- assertVisible: Signed with your local key
+- runFlow:
+    file: conversation-body.yaml
+    env:
+      BODY_TEXT: Maestro online recovery reply
+      SIGNATURE_LABEL: Signed with your local key
+      CHECK_QUOTE: "true"
+      OPEN_TIMEOUT_MS: 60000
 - takeScreenshot: ${SCREENSHOT_DIR}/mail-recovered-without-restart

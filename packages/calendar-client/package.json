@@ -24,6 +24,7 @@
   },
   "exports": {
     ".": "./src/index.ts",
+    "./jmap-mail-client": "./src/jmap-mail-client.ts",
     "./account-query-options": "./src/account-query-options.ts",
     "./event-trash-query-options": "./src/event-trash-query-options.ts",
     "./use-riftbound": "./src/use-riftbound.ts",

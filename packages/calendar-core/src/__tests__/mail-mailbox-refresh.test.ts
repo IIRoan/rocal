@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { mergeMailboxRefresh } from "../mail-mailbox-refresh";
+import { mergeMailboxRefresh, type MailMessageFlags } from "../mail-mailbox-refresh";
 
 type Message = { id: string; subject: string; keywords?: Record<string, boolean>; mailboxIds?: Record<string, boolean> };
 
@@ -9,7 +9,7 @@ describe("mailbox refresh", () => {
     ["a", { id: "a", subject: "Held A", keywords: {}, mailboxIds: { inbox: true } }],
     ["gone", { id: "gone", subject: "Deleted elsewhere", keywords: {} }],
   ]);
-  const flags = [
+  const flags: MailMessageFlags[] = [
     { id: "new", keywords: {}, mailboxIds: { inbox: true } },
     { id: "a", keywords: { $seen: true }, mailboxIds: { inbox: true } },
   ];

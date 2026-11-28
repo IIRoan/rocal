@@ -1,11 +1,15 @@
 appId: ${APP_ID}
 ---
 - waitForAnimationToEnd
-- scrollUntilVisible:
-    element:
-      id: settings-page-${PAGE}
-    direction: DOWN
-    visibilityPercentage: 100
+- runFlow:
+    when:
+      notVisible:
+        id: settings-page-${PAGE}
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: settings-page-${PAGE}
+          direction: DOWN
 - tapOn:
     id: settings-page-${PAGE}
     retryTapIfNoChange: false

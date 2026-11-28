@@ -20,33 +20,14 @@ appId: ${APP_ID}
     maxRetries: 1
     commands:
       - runFlow:
-          file: ../common/refocus-input.yaml
-          env:
-            INPUT_ID: calendar-name
-            BLUR_TARGET: Name
-      - runFlow:
-          when:
-            platform: Android
-          commands:
-            - extendedWaitUntil:
-                visible:
-                  id: calendar-name
-                  focused: true
-                timeout: 15000
-      - runFlow:
-          file: ../common/clear-unsaved-name.yaml
+          file: ../common/enter-unsaved-name.yaml
           env:
             INPUT_ID: calendar-name
             EMPTY_LABEL: Calendar name
-      - runFlow:
-          file: ../common/type.yaml
-          env:
             TEXT: Maestro calendar
-            VERIFY_TEXT: "true"
-            VERIFY_ID: calendar-name
-- assertVisible:
-    id: calendar-name
-    text: Maestro calendar
+      - assertVisible:
+          id: calendar-name
+          text: Maestro calendar
 - hideKeyboard
 - waitForAnimationToEnd
 - assertVisible:

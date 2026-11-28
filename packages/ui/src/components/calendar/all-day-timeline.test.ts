@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { pickerDateToAllDayUtcRange } from "@workspace/calendar-core";
 
-import type { CalendarEvent } from "./types";
+import { createEvent } from "../../../test/calendar-event";
 import {
   eventOverlapsRange,
   getEventSegmentForCalendarDay,
@@ -13,18 +13,6 @@ const timezone = "Europe/Amsterdam";
 const friday = new Date(2026, 5, 19);
 const saturday = new Date(2026, 5, 20);
 const sunday = new Date(2026, 5, 21);
-
-function createEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
-  return {
-    id: "event-1",
-    title: "Event",
-    start: "2026-06-20T10:00:00.000Z",
-    end: "2026-06-20T11:00:00.000Z",
-    allDay: false,
-    color: "blue",
-    ...overrides,
-  };
-}
 
 describe("Friday all-day event does not leak to Saturday", () => {
   const utcMidnightFriday = createEvent({

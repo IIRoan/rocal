@@ -9,10 +9,13 @@ import { toast } from "sonner";
 import {
   buildDraggedEventUpdate,
   persistDraggedCalendarEvent,
+  type MoveRecurringCalendarEvent,
 } from "./event-calendar-mutations";
 import type { CalendarEvent } from "./types";
 
-const baseEvent = {
+type UpdateEvent = Parameters<typeof persistDraggedCalendarEvent>[0]["updateEvent"];
+
+const baseEvent: CalendarEvent = {
   id: "event-1",
   title: "Standup",
   calendarId: "cal-1",
@@ -22,7 +25,7 @@ const baseEvent = {
   end: new Date("2026-06-01T10:00:00.000Z"),
   createdAt: new Date("2026-05-01T00:00:00.000Z"),
   updatedAt: new Date("2026-05-01T00:00:00.000Z"),
-} as CalendarEvent;
+};
 
 const movedTimes = {
   start: new Date("2026-06-02T11:00:00.000Z"),
@@ -55,8 +58,8 @@ describe("persistDraggedCalendarEvent", () => {
   });
 
   it("updates single events directly", async () => {
-    const updateEvent = jest.fn(async () => undefined);
-    const moveRecurringEvent = jest.fn(async () => true);
+    const updateEvent = jest.fn<UpdateEvent>().mockResolvedValue(undefined);
+    const moveRecurringEvent = jest.fn<MoveRecurringCalendarEvent>().mockResolvedValue(true);
 
     await persistDraggedCalendarEvent({
       timezone: "UTC",
@@ -78,14 +81,14 @@ describe("persistDraggedCalendarEvent", () => {
   });
 
   it("routes recurring occurrences through the scope prompt with the pre-drag event", async () => {
-    const updateEvent = jest.fn(async () => undefined);
-    const moveRecurringEvent = jest.fn(async () => true);
-    const occurrence = {
+    const updateEvent = jest.fn<UpdateEvent>().mockResolvedValue(undefined);
+    const moveRecurringEvent = jest.fn<MoveRecurringCalendarEvent>().mockResolvedValue(true);
+    const occurrence: CalendarEvent = {
       ...baseEvent,
       id: "series-1_2026-06-01T09:00:00.000Z",
       parentEventId: "series-1",
       isRecurringInstance: true,
-    } as CalendarEvent;
+    };
 
     await persistDraggedCalendarEvent({
       timezone: "UTC",
@@ -107,13 +110,13 @@ describe("persistDraggedCalendarEvent", () => {
   });
 
   it("discards the drop silently when the scope prompt is cancelled", async () => {
-    const updateEvent = jest.fn(async () => undefined);
-    const moveRecurringEvent = jest.fn(async () => false);
+    const updateEvent = jest.fn<UpdateEvent>().mockResolvedValue(undefined);
+    const moveRecurringEvent = jest.fn<MoveRecurringCalendarEvent>().mockResolvedValue(false);
     const series = {
       ...baseEvent,
       id: "series-1",
       recurrence: "FREQ=DAILY",
-    } as CalendarEvent;
+    };
 
     await persistDraggedCalendarEvent({
       timezone: "UTC",
@@ -130,14 +133,14 @@ describe("persistDraggedCalendarEvent", () => {
   });
 
   it("says resized and asks for the recurring scope when an occurrence is resized", async () => {
-    const updateEvent = jest.fn(async () => undefined);
-    const moveRecurringEvent = jest.fn(async () => true);
-    const occurrence = {
+    const updateEvent = jest.fn<UpdateEvent>().mockResolvedValue(undefined);
+    const moveRecurringEvent = jest.fn<MoveRecurringCalendarEvent>().mockResolvedValue(true);
+    const occurrence: CalendarEvent = {
       ...baseEvent,
       id: "series-1_2026-06-01T09:00:00.000Z",
       parentEventId: "series-1",
       isRecurringInstance: true,
-    } as CalendarEvent;
+    };
     const longer = { ...occurrence, end: new Date("2026-06-01T11:00:00.000Z") };
 
     await persistDraggedCalendarEvent({

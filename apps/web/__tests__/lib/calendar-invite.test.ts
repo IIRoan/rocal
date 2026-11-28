@@ -82,6 +82,19 @@ describe("mail calendar invite parsing", () => {
     });
   });
 
+  it("prefers body values over plaintext and decodes only the selected attachment bytes", () => {
+    const ics = (uid: string) =>
+      ["BEGIN:VCALENDAR", "BEGIN:VEVENT", `UID:${uid}`, "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+    const message = { id: "mail", bodyValues: { invite: { value: ics("body") } } };
+    const plaintext = ics("plaintext");
+    const bytes = new TextEncoder().encode(ics("outside") + ics("attachment"));
+    const attachments = [{ content: bytes.subarray(ics("outside").length) }];
+
+    expect(extractMailCalendarInvite({ message, plaintext, attachments })?.uid).toBe("body");
+    expect(extractMailCalendarInvite({ plaintext, attachments })?.uid).toBe("plaintext");
+    expect(extractMailCalendarInvite({ attachments })?.uid).toBe("attachment");
+  });
+
   it("reads invitation dates from VEVENT instead of VTIMEZONE rules", () => {
     const icsContent = [
       "BEGIN:VCALENDAR",

@@ -248,6 +248,13 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
     });
   }
 
+  it("rejects a read flag the mail server refused to update", async () => {
+    const fetcher = jest.fn<Promise<Response>, [string, RequestInit?]>().mockResolvedValue(
+      jsonOk({ methodResponses: [["Email/set", { notUpdated: { m1: { type: "forbidden" } } }, "c1"]] }),
+    );
+    await expect(createClient(fetcher).markAsRead(session, "m1")).rejects.toThrow("forbidden");
+  });
+
   it("cancels a held submission, then moves its sealed copy to Drafts, and lists scheduled sends", async () => {
     const fetcher = jest
       .fn(async (_url: string, _init?: RequestInit) => jsonOk({ methodResponses: [] }))
@@ -420,6 +427,13 @@ describe("StalwartJmapClient mailbox and send implementations", () => {
     });
   });
 
+  it("rejects a folder rename refused by the server", async () => {
+    const fetcher = jest.fn<Promise<Response>, [string, RequestInit?]>().mockResolvedValue(
+      jsonOk({ methodResponses: [["Mailbox/set", { notUpdated: { folder: { type: "forbidden" } } }, "c1"]] }),
+    );
+    await expect(createClient(fetcher).renameMailbox(session, "folder", "Work")).rejects.toThrow("forbidden");
+  });
+
   it("uploads a blob, then sends HTML plus that attachment over JMAP", async () => {
     const pending = createPendingComposeAttachment({
       name: "notes.txt",
@@ -579,6 +593,18 @@ describe("StalwartJmapClient undo, delete, and field search", () => {
     });
   }
 
+  it("reports a refused update when marking a whole mailbox as read", async () => {
+    const fetcher = jest.fn<Promise<Response>, [string, RequestInit?]>()
+      .mockResolvedValueOnce(jsonOk({ methodResponses: [["Email/query", { ids: ["m1"] }, "q1"]] }))
+      .mockResolvedValueOnce(jsonOk({ methodResponses: [["Email/set", {
+        notUpdated: { m1: { type: "forbidden" } },
+      }, "c1"]] }));
+
+    await expect(createClient(fetcher).markMailboxAsRead(session, "inbox")).rejects.toThrow("forbidden");
+    const query = parseJmapRequest(fetcher.mock.calls[0][1]).methodCalls[0];
+    expect(query[1].filter).toEqual({ inMailbox: "inbox", notKeyword: "$seen" });
+  });
+
   it("restores every original mailbox when undoing a move", async () => {
     const fetcher = jest.fn(async (_url: string, _init?: RequestInit) =>
       jsonOk({
@@ -717,6 +743,11 @@ describe("StalwartJmapClient undo, delete, and field search", () => {
       position: 40,
       limit: 40,
       calculateTotal: true,
+    });
+    expect(getCall[1]).toMatchObject({
+      fetchTextBodyValues: true,
+      fetchHTMLBodyValues: true,
+      fetchAllBodyValues: true,
     });
     expect(getCall[1]["#ids"]).toEqual({
       resultOf: "q1",

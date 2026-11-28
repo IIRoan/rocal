@@ -1,18 +1,24 @@
-import { INTERNAL_BUILD_PROFILES } from "../../../../scripts/native-release-config";
+import { INTERNAL_BUILD_PROFILES } from "../native-release-config";
 
 export const PROFILES = INTERNAL_BUILD_PROFILES;
 export type Profile = (typeof PROFILES)[number];
 
-/** App-scoped so the calendar and mail apps (or anything else in a shared bucket) never prune each other's artifacts. */
-export const RELEASE_PREFIX = "solace/releases/mail/";
+export type ReleaseApp = "calendar" | "mail";
 
-export const releaseKeys = (profile: Profile) => ({
-  ipa: `${RELEASE_PREFIX}${profile}.ipa`,
-  apk: `${RELEASE_PREFIX}${profile}.apk`,
-  plist: `${RELEASE_PREFIX}${profile}.plist`,
-  page: `${RELEASE_PREFIX}${profile}.html`,
-  qr: `${RELEASE_PREFIX}${profile}-qr.png`,
-});
+export function releasePrefix(app: ReleaseApp): string {
+  return `solace/releases/${app}/`;
+}
+
+export function releaseKeys(app: ReleaseApp, profile: Profile) {
+  const base = `${releasePrefix(app)}${profile}`;
+  return {
+    ipa: `${base}.ipa`,
+    apk: `${base}.apk`,
+    plist: `${base}.plist`,
+    page: `${base}.html`,
+    qr: `${base}-qr.png`,
+  };
+}
 
 export function isProfile(value: string | undefined): value is Profile {
   return value !== undefined && (PROFILES as readonly string[]).includes(value);

@@ -22,10 +22,16 @@ export function SheetViewport({ children }: { children: ReactNode }) {
   const isAndroid = Platform.OS === "android";
   useEffect(() => {
     if (!isAndroid) return;
-    const subscription = Keyboard.addListener("keyboardDidShow", (event) => {
+    const shown = Keyboard.addListener("keyboardDidShow", (event) => {
       keyboardTop.set(event.endCoordinates.screenY);
     });
-    return () => subscription.remove();
+    const hidden = Keyboard.addListener("keyboardDidHide", () => {
+      keyboardTop.set(Number.POSITIVE_INFINITY);
+    });
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
   }, [isAndroid, keyboardTop]);
   const {
     animatedLayoutState,
@@ -69,14 +75,14 @@ export function SheetViewport({ children }: { children: ReactNode }) {
             layout.containerHeight -
             keyboardTop.get(),
         )
-      : keyboard.heightWithinContainer;
+      : keyboard.status === KEYBOARD_SHOWN ? keyboard.heightWithinContainer : 0;
     return {
       height: getBottomSheetViewportHeight(
         layout.containerHeight,
         restingPosition.get(),
         animatedSheetHeight.get(),
         layout.handleHeight,
-        keyboard.status === KEYBOARD_SHOWN ? keyboardOverlap : 0,
+        keyboardOverlap,
       ),
     };
   });

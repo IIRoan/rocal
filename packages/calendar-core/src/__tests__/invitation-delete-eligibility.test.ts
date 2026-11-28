@@ -18,7 +18,6 @@ function attendeeInviteEvent(
     end: new Date("2026-05-27T11:00:00.000Z"),
     allDay: false,
     timezone: "UTC",
-    isPrivate: false,
     isCancelled: false,
     isSynced: false,
     calendarId: "calendar-1",
@@ -27,6 +26,7 @@ function attendeeInviteEvent(
     participants: [
       {
         id: "participant-1",
+        eventId: "event-1",
         userId,
         email: "user@example.com",
         role: "attendee",
@@ -46,6 +46,7 @@ describe("canCurrentUserDeleteEvent", () => {
       participants: [
         {
           id: "participant-1",
+          eventId: "event-1",
           userId,
           email: "user@example.com",
           role: "organizer",
@@ -101,6 +102,7 @@ describe("canCurrentUserModifyEvent", () => {
           participants: [
             {
               id: "participant-1",
+              eventId: "event-1",
               userId,
               email: "user@example.com",
               role: "organizer",

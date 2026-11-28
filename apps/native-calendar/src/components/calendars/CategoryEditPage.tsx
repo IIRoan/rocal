@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Alert } from "react-native";
 import {
+  CATEGORY_NAME_MAX_LENGTH,
   categoryUsageDetail,
+  validateCategoryName,
   getErrorMessage,
   type EventCategory,
   type EventColor,
@@ -24,7 +26,6 @@ import {
   useDeleteCategory,
   useUpdateCategory,
 } from "../../hooks/use-categories";
-import { CATEGORY_NAME_MAX_LENGTH, validateCategoryName } from "../../lib/categories-model";
 import { ColorPicker } from "../event/ColorPicker";
 
 export function CategoryEditPage({ id }: { id: string }) {
@@ -72,15 +73,15 @@ function CategoryEditForm({
   const updateCategory = useUpdateCategory(category.id);
   const deleteCategory = useDeleteCategory(category.id);
   const usageCount = useCategoryUsageCounts().data?.[category.id] ?? category.usageCount;
-  const [name, setName] = useState(initialName);
+  const name = useRef(initialName);
   const [color, setColor] = useState<EventColor>(initialColor);
   const [nameError, setNameError] = useState<string>();
 
   const handleSave = () => {
-    const error = validateCategoryName(name, categories, category.id);
+    const error = validateCategoryName(name.current, categories, category.id);
     setNameError(error);
     if (error) return;
-    const trimmed = name.trim();
+    const trimmed = name.current.trim();
     if (trimmed === category.name && color === category.color) {
       back();
       return;
@@ -124,7 +125,7 @@ function CategoryEditForm({
             // Uncontrolled: on Android a re-render pushing a stale `value` wiped text the keyboard had just entered.
             defaultValue={initialName}
             onChangeText={(value) => {
-              setName(value);
+              name.current = value;
               setNameError(undefined);
             }}
             placeholder="Category name"

@@ -244,6 +244,7 @@
       "dependencies": {
         "@workspace/api-contracts": "workspace:*",
         "@workspace/calendar-ics": "workspace:*",
+        "@workspace/runtime": "workspace:*",
         "date-fns": "^4.4.0",
         "date-fns-tz": "^3.2.0",
         "dompurify": "^3.4.17",

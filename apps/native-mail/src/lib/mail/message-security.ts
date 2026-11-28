@@ -1,175 +1,23 @@
-/** Message body extraction and encryption classification, ported from the web app's crypto-free subset. */
 import {
   containsArmoredPgpMessage,
-  isCompleteArmoredPgpMessage,
-  stripHtmlTags,
+  classifyMessageEncryption as classifyBodyEncryption,
+  isPgpAttachment as isHiddenAttachment,
 } from "@workspace/calendar-core";
 import type {
   JmapAttachment,
-  JmapBodyStructure,
-  JmapBodyValue,
   JmapEmailMessage,
   MessageEncryptionState,
 } from "./types";
 
-function getBodyValue(
-  bodyValues: Record<string, JmapBodyValue> | undefined,
-  partId: string | undefined,
-): string | null {
-  if (!bodyValues || !partId) {
-    return null;
-  }
+export { isHiddenAttachment };
 
-  const value = bodyValues[partId]?.value;
-  return typeof value === "string" ? value : null;
-}
-
-function htmlToText(value: string): string {
-  return stripHtmlTags(value).replace(/\s+/g, " ").trim();
-}
-
-export function extractMessageBodies(message: JmapEmailMessage): {
-  text: string | null;
-  html: string | null;
-} {
-  const textPartId = message.textBody?.[0]?.partId;
-  const htmlPartId = message.htmlBody?.[0]?.partId;
-  const text = getBodyValue(message.bodyValues, textPartId);
-  const html = getBodyValue(message.bodyValues, htmlPartId);
-
-  if (text || html) {
-    if (containsArmoredPgpMessage(text)) {
-      return { text, html: null };
-    }
-    return {
-      text,
-      html,
-    };
-  }
-
-  const firstValue = Object.values(message.bodyValues ?? {}).find(
-    (entry) => typeof entry.value === "string" && entry.value.length > 0,
-  )?.value;
-
-  if (!firstValue) {
-    return { text: null, html: null };
-  }
-
-  if (firstValue.includes("<") && firstValue.includes(">")) {
-    return {
-      text: htmlToText(firstValue),
-      html: firstValue,
-    };
-  }
-
-  return {
-    text: firstValue,
-    html: null,
-  };
-}
-
-function collectBodyStructureBlobIds(
-  bodyStructure: JmapBodyStructure | undefined,
-): string[] {
-  if (!bodyStructure) {
-    return [];
-  }
-
-  const blobIds: string[] = [];
-  const visit = (part: JmapBodyStructure | undefined) => {
-    if (!part) {
-      return;
-    }
-    if (part.blobId) {
-      blobIds.push(part.blobId);
-    }
-    for (const subPart of part.subParts ?? []) {
-      visit(subPart);
-    }
-  };
-
-  visit(bodyStructure);
-  return blobIds;
-}
-
-export function extractEncryptedBodyBlobId(
-  message: Pick<JmapEmailMessage, "bodyStructure" | "bodyValues" | "textBody">,
-): string | null {
-  const { text } = extractMessageBodies(message as JmapEmailMessage);
-  if (text?.trim()) {
-    return null;
-  }
-
-  const blobIds = collectBodyStructureBlobIds(message.bodyStructure);
-  return blobIds[0] ?? null;
-}
-
-function collectTextPlainBlobIds(
-  bodyStructure: JmapBodyStructure | undefined,
-): string[] {
-  if (!bodyStructure) {
-    return [];
-  }
-
-  const blobIds: string[] = [];
-  const visit = (part: JmapBodyStructure | undefined) => {
-    if (!part) {
-      return;
-    }
-    if (part.type?.toLowerCase() === "text/plain" && part.blobId) {
-      blobIds.push(part.blobId);
-    }
-    for (const subPart of part.subParts ?? []) {
-      visit(subPart);
-    }
-  };
-
-  visit(bodyStructure);
-  return blobIds;
-}
-
-export function extractTextBodyBlobId(
-  bodyStructure: JmapBodyStructure | undefined,
-): string | null {
-  return collectTextPlainBlobIds(bodyStructure)[0] ?? null;
-}
-
-export async function resolveInlinePgpArmoredCiphertext(input: {
-  message: Pick<
-    JmapEmailMessage,
-    "bodyStructure" | "bodyValues" | "textBody" | "htmlBody"
-  >;
-  fetchBlob: (blobId: string) => Promise<string>;
-}): Promise<string> {
-  const { text } = extractMessageBodies(input.message as JmapEmailMessage);
-  if (text && isCompleteArmoredPgpMessage(text)) {
-    return text.trim();
-  }
-
-  const blobId =
-    extractTextBodyBlobId(input.message.bodyStructure) ??
-    extractEncryptedBodyBlobId(input.message);
-  if (blobId) {
-    const armored = (await input.fetchBlob(blobId)).trim();
-    if (armored) {
-      return armored;
-    }
-  }
-
-  if (text?.trim()) {
-    return text.trim();
-  }
-
-  throw new Error("No armored PGP body found in this message.");
-}
-
-/** BlobId of the PGP/MIME ciphertext part; RFC 3156 puts it at `subParts[1]` of multipart/encrypted. */
-export function extractPgpMimeCiphertextBlobId(
-  bodyStructure: JmapBodyStructure | undefined,
-): string | null {
-  if (bodyStructure?.type?.toLowerCase() !== "multipart/encrypted") return null;
-  return bodyStructure.subParts?.[1]?.blobId ?? null;
-}
+export {
+  extractEncryptedBodyBlobId,
+  extractMessageBodies,
+  extractPgpMimeCiphertextBlobId,
+  extractTextBodyBlobId,
+  resolveInlinePgpArmoredCiphertext,
+} from "@workspace/calendar-core";
 
 export function classifyMessageEncryption(
   message: Pick<
@@ -182,43 +30,9 @@ export function classifyMessageEncryption(
     | "preview"
   >,
 ): MessageEncryptionState {
-  const { text } = extractMessageBodies(message as JmapEmailMessage);
-
-  if (text?.includes("-----BEGIN PGP MESSAGE-----")) {
-    return "inline_pgp";
-  }
-
-  // Row copies carry no body text, but the server preview still opens with the armor header.
-  if (!message.bodyValues && containsArmoredPgpMessage(message.preview)) {
-    return "inline_pgp";
-  }
-
-  const topType = message.bodyStructure?.type?.toLowerCase() ?? "";
-  if (topType === "multipart/encrypted") {
-    return "pgp_mime";
-  }
-
-  // Only flag as encrypted if attachment has an explicit PGP MIME type
-  // — never match on application/octet-stream which is any binary file
-  const hasEncryptedAttachment = (message.attachments ?? []).some(
-    (attachment) => {
-      const type = attachment.type?.toLowerCase() ?? "";
-      const name = attachment.name?.toLowerCase() ?? "";
-      return (
-        type === "application/pgp-encrypted" ||
-        type === "application/pgp-keys" ||
-        (name.endsWith(".asc") && name !== "smime.p7s") ||
-        name.endsWith(".pgp") ||
-        name.endsWith(".gpg")
-      );
-    },
-  );
-
-  if (hasEncryptedAttachment) {
-    return "unknown_encrypted";
-  }
-
-  return "plain";
+  // Rows omit body values, so their preview can be the only evidence of inline PGP.
+  if (!message.bodyValues && containsArmoredPgpMessage(message.preview)) return "inline_pgp";
+  return classifyBodyEncryption(message);
 }
 
 export function isEncryptedState(state: MessageEncryptionState): boolean {
@@ -230,18 +44,6 @@ export function messageHasVisibleAttachments(message: {
   attachments?: { name?: string | null; type?: string | null }[];
 }): boolean {
   return (message.attachments ?? []).some((attachment) => !isHiddenAttachment(attachment));
-}
-
-export function isHiddenAttachment(attachment: { name?: string | null; type?: string | null }): boolean {
-  const type = attachment.type?.toLowerCase() ?? "";
-  const name = attachment.name?.toLowerCase() ?? "";
-  return (
-    type === "application/pgp-encrypted" ||
-    type === "application/pgp-keys" ||
-    (name.endsWith(".asc") && name !== "smime.p7s") ||
-    name.endsWith(".pgp") ||
-    name.endsWith(".gpg")
-  );
 }
 
 /** Attachments to show in the reader; PGP/MIME shows decrypted attachments only. */

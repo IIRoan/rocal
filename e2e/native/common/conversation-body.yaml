@@ -1,18 +1,31 @@
 appId: ${APP_ID}
 ---
 - extendedWaitUntil:
+    label: Wait for the expanded message body
     visible:
-      id: mail-message-text
-      text: ${BODY_TEXT}
+      id: mail-html-body
+      containsDescendants:
+        - text: ${BODY_TEXT}
     timeout: ${OPEN_TIMEOUT_MS}
 - assertVisible: '${typeof SIGNATURE_LABEL !== "undefined" ? SIGNATURE_LABEL : "Signature verified"}'
 - assertNotVisible: This message has no content.
 - runFlow:
     when:
+      true: ${typeof CHECK_QUOTE !== "undefined"}
+    commands:
+      - assertVisible:
+          text: ${BODY_TEXT}
+          below:
+            text: '${typeof SIGNATURE_LABEL !== "undefined" ? SIGNATURE_LABEL : "Signature verified"}'
+          above:
+            text: ".*wrote:.*"
+- runFlow:
+    when:
       true: ${typeof EXCLUDED_TEXT !== "undefined"}
     commands:
       - assertNotVisible:
-          id: mail-message-text
-          text: ${EXCLUDED_TEXT}
+          id: mail-html-body
+          containsDescendants:
+            - text: ${EXCLUDED_TEXT}
 - waitForAnimationToEnd:
     timeout: 3000

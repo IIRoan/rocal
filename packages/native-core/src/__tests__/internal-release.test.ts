@@ -9,7 +9,7 @@ import {
   isProfile,
   objectUrl,
   releaseKeys,
-} from "../../scripts/internal-release/install-artifacts";
+} from "../../../../scripts/internal-release/install-artifacts";
 
 describe("internal release manifest", () => {
   it("escapes & in plist IPA URLs so iOS can parse the manifest", () => {
@@ -32,16 +32,16 @@ describe("internal release manifest", () => {
 });
 
 describe("release keys", () => {
-  it("keeps every artifact under the Solace prefix so shared buckets are never pruned", () => {
-    expect(releaseKeys("development")).toEqual({
-      ipa: "solace/releases/calendar/development.ipa",
-      apk: "solace/releases/calendar/development.apk",
-      plist: "solace/releases/calendar/development.plist",
-      page: "solace/releases/calendar/development.html",
-      qr: "solace/releases/calendar/development-qr.png",
+  it.each(["calendar", "mail"] as const)("keeps every %s artifact under its own prefix", (app) => {
+    expect(releaseKeys(app, "development")).toEqual({
+      ipa: `solace/releases/${app}/development.ipa`,
+      apk: `solace/releases/${app}/development.apk`,
+      plist: `solace/releases/${app}/development.plist`,
+      page: `solace/releases/${app}/development.html`,
+      qr: `solace/releases/${app}/development-qr.png`,
     });
-    expect(releaseKeys("preview").apk).toBe("solace/releases/calendar/preview.apk");
-    expect(releaseKeys("testing").apk).toBe("solace/releases/calendar/testing.apk");
+    expect(releaseKeys(app, "preview").apk).toBe(`solace/releases/${app}/preview.apk`);
+    expect(releaseKeys(app, "testing").apk).toBe(`solace/releases/${app}/testing.apk`);
   });
 
   it("only accepts internal profiles", () => {

@@ -1,3 +1,5 @@
+import type { Schema } from "@workspace/api-contracts";
+
 /** plain renders on-device; the encrypted states need the secure client to decrypt. */
 export type MessageEncryptionState =
   | "plain"
@@ -6,12 +8,10 @@ export type MessageEncryptionState =
   | "internal_e2ee"
   | "unknown_encrypted";
 
-export type MailVaultKdfParams = {
-  saltB64: string;
-  memoryKiB: number;
-  iterations: number;
-  parallelism: number;
-};export type MailOAuthConfig = {
+export type MailVaultKdfParams = Schema<"MailVaultKdfParams">;
+export type MailBootstrapRequest = Schema<"MailBootstrapRequest"> & { wrapAlgorithm: string };
+
+export type MailOAuthConfig = {
   mailTokenEndpoint: string;
 };
 
