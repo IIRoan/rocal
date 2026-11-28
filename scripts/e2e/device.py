@@ -74,6 +74,8 @@ def android():
     (directory() / "private/device.json").write_text(json.dumps({"id": identifier, "platform": "android"}))
     for scale in ["window_animation_scale", "transition_animation_scale", "animator_duration_scale"]:
         run([*adb, "shell", "settings", "put", "global", scale, "1"])
+    # Maestro reads rendered mail through accessibility as the reader switches WebViews.
+    run([*adb, "shell", "echo '_ --force-renderer-accessibility=complete' > /data/local/tmp/webview-command-line"])
     run([*adb, "reverse", "tcp:4001", "tcp:4001"])
     run([*adb, "reverse", "tcp:59000", "tcp:59000"])
     for app in APPS:
