@@ -16,12 +16,18 @@ appId: ${APP_ID}
     enabled: true
 - tapOn: Create calendar
 - assertVisible: Calendar name is required
-- runFlow:
-    file: ../common/enter-unsaved-name.yaml
-    env:
-      INPUT_ID: calendar-name
-      EMPTY_LABEL: Calendar name
-      TEXT: Maestro calendar
+- retry:
+    maxRetries: 1
+    commands:
+      - runFlow:
+          file: ../common/enter-unsaved-name.yaml
+          env:
+            INPUT_ID: calendar-name
+            EMPTY_LABEL: Calendar name
+            TEXT: Maestro calendar
+      - assertVisible:
+          id: calendar-name
+          text: Maestro calendar
 - hideKeyboard
 - waitForAnimationToEnd
 - assertVisible:

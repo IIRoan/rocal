@@ -15,12 +15,18 @@ appId: ${APP_ID}
     visible: Category name
     timeout: 30000
 - waitForAnimationToEnd
-- runFlow:
-    file: ../common/enter-unsaved-name.yaml
-    env:
-      INPUT_ID: category-name
-      EMPTY_LABEL: Category name
-      TEXT: Maestro category
+- retry:
+    maxRetries: 1
+    commands:
+      - runFlow:
+          file: ../common/enter-unsaved-name.yaml
+          env:
+            INPUT_ID: category-name
+            EMPTY_LABEL: Category name
+            TEXT: Maestro category
+      - assertVisible:
+          id: category-name
+          text: Maestro category
 - hideKeyboard
 - waitForAnimationToEnd
 - tapOn:

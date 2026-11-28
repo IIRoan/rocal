@@ -1,43 +1,37 @@
 appId: ${APP_ID}
 ---
-- retry:
-    maxRetries: 1
+- runFlow:
+    file: refocus-input.yaml
+    env:
+      BLUR_TARGET: Name
+- runFlow:
+    file: clear-unsaved-name.yaml
+- runFlow:
+    when:
+      platform: iOS
+    file: type.yaml
+- runFlow:
+    when:
+      platform: Android
     commands:
-      - runFlow:
-          file: refocus-input.yaml
-          env:
-            BLUR_TARGET: Name
-      - runFlow:
-          file: clear-unsaved-name.yaml
-      - runFlow:
-          when:
-            platform: iOS
-          file: type.yaml
-      - runFlow:
-          when:
-            platform: Android
-          commands:
-            - assertVisible:
-                id: ${INPUT_ID}
-                focused: true
-            # Use the visible Gboard keys so the focused name receives real IME input.
-            - runFlow:
-                when:
-                  notVisible:
-                    id: '.*:id/key_pos_.*'
-                    text: ${TEXT.charAt(0)}
-                commands:
-                  - tapOn:
-                      id: '.*:id/key_pos_shift'
-            - evalScript: ${output.nameIndex = 0}
-            - repeat:
-                times: ${TEXT.length}
-                commands:
-                  - tapOn:
-                      id: '.*:id/key_pos_.*'
-                      text: '${TEXT.charAt(output.nameIndex) === " " ? "Space" : TEXT.charAt(output.nameIndex)}'
-                      retryTapIfNoChange: false
-                  - evalScript: ${output.nameIndex++}
       - assertVisible:
           id: ${INPUT_ID}
-          text: ${TEXT}
+          focused: true
+      # Use the visible Gboard keys so the focused name receives real IME input.
+      - runFlow:
+          when:
+            notVisible:
+              id: '.*:id/key_pos_.*'
+              text: ${TEXT.charAt(0)}
+          commands:
+            - tapOn:
+                id: '.*:id/key_pos_shift'
+      - evalScript: ${output.nameIndex = 0}
+      - repeat:
+          times: ${TEXT.length}
+          commands:
+            - tapOn:
+                id: '.*:id/key_pos_.*'
+                text: '${TEXT.charAt(output.nameIndex) === " " ? "Space" : TEXT.charAt(output.nameIndex)}'
+                retryTapIfNoChange: false
+            - evalScript: ${output.nameIndex++}
