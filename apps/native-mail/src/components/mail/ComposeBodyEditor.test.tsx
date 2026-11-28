@@ -353,6 +353,26 @@ describe("the editor page", () => {
     expect(posted.some((message) => message.type === "state" && (message.state as { bulletList: boolean }).bulletList)).toBe(true);
   });
 
+  it("keeps typing in order across draft flushes and delayed React acknowledgements", () => {
+    const { page, posted, run, flush } = openPage("");
+    mockInject.mockImplementation((script: string) => page.window.eval(script));
+    post({ type: "ready" });
+    let acknowledged = "";
+
+    for (const character of "Maestro body survives encrypted draft storage") {
+      run({ type: "insertHtml", html: character, afterSelection: false });
+      const current = flush();
+      post(posted.at(-1));
+      render({ html: acknowledged });
+      acknowledged = current;
+    }
+
+    expect(flush()).toBe("<p>Maestro body survives encrypted draft storage</p>");
+    expect(mockPages).toHaveLength(1);
+    expect(mockInject).not.toHaveBeenCalled();
+    mockInject.mockReset();
+  });
+
   it("inserts a link at the caret and drops a script link", () => {
     const { run, flush } = openPage("<p>Docs</p>");
     run({ type: "focus", position: "end" });

@@ -122,7 +122,9 @@ def collect_reader_timings(traces):
                     tap = timestamp
                 assertion = command["assertConditionCommand"]
                 budget = assertion.get("timeout")
-                if assertion["condition"]["visible"]["idRegex"] != "mail-message-text" or budget not in ("5000", "10000") or tap is None:
+                visible = assertion["condition"]["visible"]
+                body_wait = assertion.get("label") == "Wait for the expanded message body" or visible.get("idRegex") == "mail-message-text"
+                if not body_wait or budget not in ("5000", "10000") or tap is None:
                     continue
             except (AttributeError, KeyError, TypeError):
                 continue

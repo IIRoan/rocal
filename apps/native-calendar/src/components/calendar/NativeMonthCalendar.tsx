@@ -266,19 +266,19 @@ export function NativeMonthCalendar({
   const animatingToIndexRef = useRef<number | null>(null);
 
   useEffect(() => {
-    committedIndexShared.value = committedIndex;
+    committedIndexShared.set(committedIndex);
     if (animatingToIndexRef.current === committedIndex) {
       animatingToIndexRef.current = null;
       return;
     }
     cancelAnimation(pageIndex);
-    pageIndex.value = committedIndex;
+    pageIndex.set(committedIndex);
   }, [committedIndex, committedIndexShared, pageIndex]);
 
   const commitToIndex = useCallback(
     (index: number) => {
       animatingToIndexRef.current = index;
-      committedIndexShared.value = index;
+      committedIndexShared.set(index);
       onMonthChange(addMonths(selectedDate, index - committedIndex));
     },
     [committedIndex, committedIndexShared, onMonthChange, selectedDate],
@@ -286,9 +286,9 @@ export function NativeMonthCalendar({
 
   const stepMonth = useCallback(
     (delta: 1 | -1) => {
-      const target = committedIndexShared.value + delta;
+      const target = committedIndexShared.get() + delta;
       cancelAnimation(pageIndex);
-      pageIndex.value = withSpring(target, PAGE_SPRING);
+      pageIndex.set(withSpring(target, PAGE_SPRING));
       commitToIndex(target);
     },
     [commitToIndex, committedIndexShared, pageIndex],
@@ -337,7 +337,7 @@ export function NativeMonthCalendar({
   );
 
   useEffect(() => {
-    pageWidthShared.value = pageSize.width;
+    pageWidthShared.set(pageSize.width);
   }, [pageSize.width, pageWidthShared]);
 
   const handleGridLayout = useCallback((event: LayoutChangeEvent) => {
@@ -358,32 +358,34 @@ export function NativeMonthCalendar({
         .onBegin(() => {
           "worklet";
           cancelAnimation(pageIndex);
-          dragStartPageIndex.value = pageIndex.value;
+          dragStartPageIndex.set(pageIndex.get());
         })
         .onUpdate((event) => {
           "worklet";
-          const width = pageWidthShared.value;
+          const width = pageWidthShared.get();
           if (width <= 1) return;
-          const committed = committedIndexShared.value;
-          pageIndex.value = rubberBandPagerPosition(
-            dragStartPageIndex.value - event.translationX / width,
-            committed - MONTH_WINDOW_RADIUS,
-            committed + MONTH_WINDOW_RADIUS,
-            RUBBER_BAND_FACTOR,
+          const committed = committedIndexShared.get();
+          pageIndex.set(
+            rubberBandPagerPosition(
+              dragStartPageIndex.get() - event.translationX / width,
+              committed - MONTH_WINDOW_RADIUS,
+              committed + MONTH_WINDOW_RADIUS,
+              RUBBER_BAND_FACTOR,
+            ),
           );
         })
         .onEnd((event) => {
           "worklet";
-          const width = pageWidthShared.value;
-          const committed = committedIndexShared.value;
+          const width = pageWidthShared.get();
+          const committed = committedIndexShared.get();
           if (width <= 1) {
-            pageIndex.value = withSpring(committed, PAGE_SPRING);
+            pageIndex.set(withSpring(committed, PAGE_SPRING));
             return;
           }
 
           const target = getMiniCalendarSwipeTarget({
-            startIndex: dragStartPageIndex.value,
-            currentIndex: pageIndex.value,
+            startIndex: dragStartPageIndex.get(),
+            currentIndex: pageIndex.get(),
             translationX: event.translationX,
             velocityX: event.velocityX,
             pageWidth: width,
@@ -397,10 +399,12 @@ export function NativeMonthCalendar({
             scheduleOnRN(commitToIndex, target);
           }
 
-          pageIndex.value = withSpring(target, {
-            ...PAGE_SPRING,
-            velocity: -event.velocityX / width,
-          });
+          pageIndex.set(
+            withSpring(target, {
+              ...PAGE_SPRING,
+              velocity: -event.velocityX / width,
+            }),
+          );
         }),
     [
       commitToIndex,
@@ -414,14 +418,14 @@ export function NativeMonthCalendar({
   const windowOffsetPx =
     (committedIndex - MONTH_WINDOW_RADIUS) * pageSize.width;
   const pagesAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: -pageIndex.value * pageWidthShared.value }],
+    transform: [{ translateX: -pageIndex.get() * pageWidthShared.get() }],
   }));
 
   return (
     <View style={styles.container}>
       <View style={styles.weekdaysRow}>
-        {dayLabels.map((label, index) => (
-          <View key={`${label}-${index}`} style={styles.weekdayCell}>
+        {dayLabels.map((label) => (
+          <View key={label} style={styles.weekdayCell}>
             <Text style={styles.weekdayText}>{label}</Text>
           </View>
         ))}

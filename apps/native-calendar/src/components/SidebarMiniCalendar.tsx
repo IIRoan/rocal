@@ -147,9 +147,9 @@ const MiniCalendarMonthPage = React.memo(function MiniCalendarMonthPage({
                 </View>
 
                 <View style={styles.dotsRow}>
-                  {dayEvents.slice(0, MAX_DOTS).map((event, index) => (
+                  {dayEvents.slice(0, MAX_DOTS).map((event) => (
                     <View
-                      key={`${event.id}-${index}`}
+                      key={`${event.id}-${event.start.toISOString()}`}
                       style={[
                         styles.dot,
                         {
@@ -207,7 +207,9 @@ export function SidebarMiniCalendar({
   );
   const monthKey = formatCalendarMonthKey(calendarMonth);
   const monthKeyRef = useRef(monthKey);
-  monthKeyRef.current = monthKey;
+  useLayoutEffect(() => {
+    monthKeyRef.current = monthKey;
+  }, [monthKey]);
 
   const commitToIndex = useCallback((index: number) => {
     setCommittedIndex(index);
@@ -220,7 +222,7 @@ export function SidebarMiniCalendar({
         epochMonth,
       );
       cancelAnimation(pageIndex);
-      pageIndex.value = index;
+      pageIndex.set(index);
       setCommittedIndex(index);
     },
     [epochMonth, pageIndex],
@@ -242,14 +244,14 @@ export function SidebarMiniCalendar({
   });
 
   const dayLabels = useMemo(
-    () => getOrderedDayLabels(weekStartDay).map((label) => label.charAt(0)),
+    () => getOrderedDayLabels(weekStartDay),
     [weekStartDay],
   );
 
   useLayoutEffect(() => {
-    pageWidthShared.value = pageWidth;
+    pageWidthShared.set(pageWidth);
     // Keep the worklet-facing committed index in lockstep with the rendered window so rubber-band bounds match what is mounted.
-    committedIndexShared.value = committedIndex;
+    committedIndexShared.set(committedIndex);
   }, [committedIndex, committedIndexShared, pageWidth, pageWidthShared]);
 
   const handleGoToToday = useCallback(() => {
@@ -262,9 +264,9 @@ export function SidebarMiniCalendar({
 
   const stepMonth = useCallback(
     (delta: 1 | -1) => {
-      const target = committedIndexShared.value + delta;
+      const target = committedIndexShared.get() + delta;
       cancelAnimation(pageIndex);
-      pageIndex.value = withSpring(target, PAGE_SPRING);
+      pageIndex.set(withSpring(target, PAGE_SPRING));
       commitToIndex(target);
     },
     [commitToIndex, committedIndexShared, pageIndex],
@@ -294,33 +296,35 @@ export function SidebarMiniCalendar({
           "worklet";
           // Grab the strip wherever it is, even mid-settle, so the motion stays with the finger instead of snapping to a page edge.
           cancelAnimation(pageIndex);
-          dragStartPageIndex.value = pageIndex.value;
+          dragStartPageIndex.set(pageIndex.get());
         })
         .onUpdate((event) => {
           "worklet";
-          const width = pageWidthShared.value;
+          const width = pageWidthShared.get();
           if (width <= 1) return;
-          const committed = committedIndexShared.value;
-          const raw = dragStartPageIndex.value - event.translationX / width;
-          pageIndex.value = rubberBandPagerPosition(
-            raw,
-            committed - MINI_CALENDAR_WINDOW_RADIUS,
-            committed + MINI_CALENDAR_WINDOW_RADIUS,
-            RUBBER_BAND_FACTOR,
+          const committed = committedIndexShared.get();
+          const raw = dragStartPageIndex.get() - event.translationX / width;
+          pageIndex.set(
+            rubberBandPagerPosition(
+              raw,
+              committed - MINI_CALENDAR_WINDOW_RADIUS,
+              committed + MINI_CALENDAR_WINDOW_RADIUS,
+              RUBBER_BAND_FACTOR,
+            ),
           );
         })
         .onEnd((event) => {
           "worklet";
-          const width = pageWidthShared.value;
-          const committed = committedIndexShared.value;
+          const width = pageWidthShared.get();
+          const committed = committedIndexShared.get();
           if (width <= 1) {
-            pageIndex.value = withSpring(committed, PAGE_SPRING);
+            pageIndex.set(withSpring(committed, PAGE_SPRING));
             return;
           }
 
           const target = getMiniCalendarSwipeTarget({
-            startIndex: dragStartPageIndex.value,
-            currentIndex: pageIndex.value,
+            startIndex: dragStartPageIndex.get(),
+            currentIndex: pageIndex.get(),
             translationX: event.translationX,
             velocityX: event.velocityX,
             pageWidth: width,
@@ -335,10 +339,12 @@ export function SidebarMiniCalendar({
             scheduleOnRN(commitToIndex, target);
           }
 
-          pageIndex.value = withSpring(target, {
-            ...PAGE_SPRING,
-            velocity: -event.velocityX / width,
-          });
+          pageIndex.set(
+            withSpring(target, {
+              ...PAGE_SPRING,
+              velocity: -event.velocityX / width,
+            }),
+          );
         }),
     [commitToIndex, committedIndexShared, dragStartPageIndex, pageIndex, pageWidthShared],
   );
@@ -347,7 +353,7 @@ export function SidebarMiniCalendar({
   const windowOffsetPx = windowStartIndex * pageWidth;
 
   const pagesAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: -pageIndex.value * pageWidthShared.value }],
+    transform: [{ translateX: -pageIndex.get() * pageWidthShared.get() }],
   }));
 
   return (
@@ -408,9 +414,9 @@ export function SidebarMiniCalendar({
       <GestureDetector gesture={monthSwipeGesture}>
         <View collapsable={false}>
           <View style={styles.weekdaysRow}>
-            {dayLabels.map((label, index) => (
-              <View key={`${label}-${index}`} style={styles.weekdayCell}>
-                <Text style={styles.weekdayText}>{label}</Text>
+            {dayLabels.map((label) => (
+              <View key={label} style={styles.weekdayCell}>
+                <Text style={styles.weekdayText}>{label.charAt(0)}</Text>
               </View>
             ))}
           </View>

@@ -1,7 +1,7 @@
 import type { EventsResponse } from "@workspace/calendar-core";
 import {
   getMiniCalendarSwipeTarget,
-  retainMonthEvents,
+  decorateMiniCalendarEvents,
   type MiniCalendarSwipeTargetInput,
 } from "./sidebar-mini-calendar-utils";
 
@@ -38,17 +38,9 @@ function createResponse(eventId: string): EventsResponse {
   };
 }
 
-describe("retainMonthEvents", () => {
-  it("keeps a month's events while its next fetch is still empty", () => {
-    const cache = new Map();
-    const retained = retainMonthEvents(cache, "2026-08", createResponse("aug"));
-
-    expect(retainMonthEvents(cache, "2026-08", undefined)).toBe(retained);
-    expect(retained.map((event) => event.id)).toEqual(["aug"]);
-  });
-
+describe("decorateMiniCalendarEvents", () => {
   it("colors events from the live calendar list over the one cached with the events", () => {
-    const [event] = retainMonthEvents(new Map(), "2026-08", createResponse("aug"), [
+    const [event] = decorateMiniCalendarEvents(createResponse("aug"), [
       { ...createResponse("aug").calendars[0], color: "amber" },
     ]);
 
@@ -56,10 +48,7 @@ describe("retainMonthEvents", () => {
   });
 
   it("does not paint another month's events onto a page that has not loaded yet", () => {
-    const cache = new Map();
-    retainMonthEvents(cache, "2026-08", createResponse("aug"));
-
-    expect(retainMonthEvents(cache, "2026-09", undefined)).toEqual([]);
+    expect(decorateMiniCalendarEvents(undefined)).toEqual([]);
   });
 });
 

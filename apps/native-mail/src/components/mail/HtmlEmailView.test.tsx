@@ -1,5 +1,6 @@
 /** @jest-environment jsdom */
 
+import { runInNewContext } from "node:vm";
 import React, { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { nativeMailLightTheme } from "@workspace/design-tokens";
@@ -95,6 +96,28 @@ describe("HtmlEmailView", () => {
 
     expect(mockWebViewHtml).toContain(REMOTE_IMAGE_URL);
     expect(mockWebViewHtml).toMatch(/img-src[^;"]*https:/);
+  });
+
+  it("fits wide mail after Android lays out the WebView and restores it when it fits", () => {
+    act(() => root.render(
+      <HtmlEmailView html={EMAIL_HTML} isDark={false} theme={nativeMailLightTheme} onLinkPress={onLinkPress} />,
+    ));
+    if (!mockWebViewProps) throw new Error("WebView not rendered");
+    const document = window.document.implementation.createHTMLDocument();
+    Object.defineProperty(document, "readyState", { value: "complete" });
+    Object.defineProperty(document.body, "scrollWidth", { value: 600 });
+    const viewport = Object.assign(new EventTarget(), { innerWidth: 0 });
+    runInNewContext(mockWebViewProps.injectedJavaScript, { window: viewport, document, setTimeout: jest.fn() });
+    expect(document.body.style.transform).toBe("");
+
+    viewport.innerWidth = 300;
+    viewport.dispatchEvent(new Event("resize"));
+    expect(document.body.style.transform).toBe("scale(0.5)");
+
+    viewport.innerWidth = 600;
+    viewport.dispatchEvent(new Event("resize"));
+    expect(document.body.style.transform).toBe("");
+    expect(document.body.style.width).toBe("");
   });
 
   it("hands tapped links to the host and ignores malformed messages", () => {
